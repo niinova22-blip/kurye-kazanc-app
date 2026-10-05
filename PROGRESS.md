@@ -80,3 +80,18 @@ Yeni oturuma başlarken önce bu dosyayı okuyun; "Tamamlandı" olarak işaretle
 
 ### Sonraki adım
 - Repo Codemagic'e bağlanınca ilk CI çalışmasının sonucunu kontrol et, derleme/test hatalarını düzelt.
+
+## Oturum 1 (devam 2) — 2026-10-05
+
+### Yapılanlar
+- Codemagic GitHub App erişimine `kurye-kazanc` eklendi; Codemagic'te `kurye-kazanc` uygulaması (iOS) oluşturuldu.
+- İlk CI çalışması (`ios-ci`, `main`, elle tetiklendi): **BAŞARILI** — XcodeGen 16 sn, derleme 47 sn, birim testleri **21/21** (EarningsCalculatorTests 15, ModelTests 6), UI testleri **3/3** (DashboardUITests).
+  Build: https://codemagic.io/app/6ac40d8d93090394b5725bb9/build/6ac40d9f7394575b200b6a64
+- Böylece Oturum 1 kodu derleniyor ve testleri geçiyor (önceki "henüz derlenmedi" uyarısı kapandı).
+
+### Dikkat
+- Repo bağlandığı için `main`/`release/*` push'ları artık `ios-release`'i (TestFlight) tetikler. App Store Connect'te `com.kuryekazanc.app` kaydı + `APP_STORE_APPLE_ID` tanımlanana kadar bu akış imzalamada düşer → o zamana kadar geliştirme `develop`/özellik dallarında yapılmalı ya da `main` commit'lerine `[skip ci]` eklenmeli.
+
+### Sonraki adım
+- Yol haritası #2 Onboarding ve #3 manuel Kazanç ekle formu (özellik dalında).
+- Kullanıcı: App Store Connect'te uygulama kaydı → `APP_STORE_APPLE_ID` → ilk TestFlight.
