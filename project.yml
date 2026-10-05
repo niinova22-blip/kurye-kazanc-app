@@ -1,0 +1,85 @@
+# XcodeGen proje tanimi.
+# .xcodeproj repoda TUTULMAZ; CI'da (ve Mac'te) `xcodegen generate` ile bu dosyadan uretilir.
+# Windows'ta yalnizca bu dosya ve Swift kaynaklari duzenlenir.
+name: KuryeKazanc
+
+options:
+  bundleIdPrefix: com.kuryekazanc
+  deploymentTarget:
+    iOS: "17.0"          # SwiftData icin minimum iOS 17
+  developmentLanguage: tr
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    VERSIONING_SYSTEM: apple-generic   # CI'da agvtool ile build numarasi arttirilir
+    # DEVELOPMENT_TEAM bilerek yok: Codemagic `xcode-project use-profiles` ile imzalama ayarlarini enjekte eder.
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  KuryeKazanc:
+    type: application
+    platform: iOS
+    sources:
+      - path: KuryeKazanc
+        excludes:
+          - "Supporting/Info.plist"
+    settings:
+      base:
+        # Bundle ID gizli bilgi degildir; App Store Connect'teki kayitla ayni olmali (codemagic.yaml'daki BUNDLE_ID ile de).
+        PRODUCT_BUNDLE_IDENTIFIER: com.kuryekazanc.app
+        INFOPLIST_FILE: KuryeKazanc/Supporting/Info.plist
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Kurye Kazanç"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.finance
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+
+  KuryeKazancTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: KuryeKazancTests
+    dependencies:
+      - target: KuryeKazanc
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kuryekazanc.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  KuryeKazancUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: KuryeKazancUITests
+    dependencies:
+      - target: KuryeKazanc
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kuryekazanc.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  KuryeKazanc:
+    build:
+      targets:
+        KuryeKazanc: all
+        KuryeKazancTests: [test]
+        KuryeKazancUITests: [test]
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - KuryeKazancTests
+        - KuryeKazancUITests
+    archive:
+      config: Release

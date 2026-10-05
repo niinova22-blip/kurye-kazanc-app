@@ -1,0 +1,33 @@
+# XcodeGen ciktisi: proje project.yml'den uretilir
+*.xcodeproj/
+*.xcworkspace/
+
+# Xcode / derleme
+build/
+DerivedData/
+*.xcresult
+xcuserdata/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# CI'da uretilen dosyalar
+release_notes.json
+
+# Imzalama / gizli bilgiler - ASLA commit edilmez
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+.env
+.env.*
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json

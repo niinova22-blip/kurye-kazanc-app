@@ -1,0 +1,166 @@
+# Codemagic CI/CD - Kurye Kazanc (iOS)
+#
+# Akislar:
+#   ios-ci       : main/release disindaki her dal + PR -> proje uret, build, unit test, UI test
+#   ios-release  : main ve release/* dallarina push -> testler + imzali IPA + otomatik TestFlight
+#
+# GIZLI BILGILER KODA YAZILMAZ. Codemagic arayuzunde tanimlanmasi gerekenler:
+#   1) Teams > Integrations > Developer Portal: App Store Connect API anahtari
+#      (Issuer ID, Key ID, .p8 dosyasi). Asagidaki `integrations.app_store_connect` alanina
+#      SADECE bu anahtara verdiginiz ad yazilir (ornek: "KuryeKazanc ASC").
+#   2) Code signing identities: iOS Distribution sertifikasi (veya Codemagic'in otomatik uretmesi)
+#      -> `ios_signing` bunu bundle ID uzerinden otomatik bulur.
+#   3) Environment variables (grup: app_store_credentials):
+#        APP_STORE_APPLE_ID  -> App Store Connect'teki sayisal uygulama kimligi (Apple ID), build numarasi icin
+#   Team ID gerekmez; `xcode-project use-profiles` imzalama profilinden alir.
+
+definitions:
+  env_versions: &env_versions
+    xcode: latest
+
+  vars: &common_vars
+    XCODE_PROJECT: "KuryeKazanc.xcodeproj"
+    XCODE_SCHEME: "KuryeKazanc"
+    BUNDLE_ID: "com.kuryekazanc.app"   # project.yml ile ayni olmali (gizli degil)
+
+  scripts:
+    - &generate_project
+      name: XcodeGen ile Xcode projesini uret
+      script: |
+        brew install xcodegen xcbeautify
+        xcodegen generate
+    - &build_for_testing
+      name: Test icin derle
+      script: |
+        set -o pipefail
+        SIM_ID=$(bash scripts/ci/pick_simulator.sh)
+        echo "SIM_ID=$SIM_ID" >> $CM_ENV
+        xcodebuild build-for-testing \
+          -project "$XCODE_PROJECT" \
+          -scheme "$XCODE_SCHEME" \
+          -destination "id=$SIM_ID" \
+          -derivedDataPath build/DerivedData \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcbeautify
+    - &unit_tests
+      name: Birim testleri (XCTest)
+      script: |
+        set -o pipefail
+        xcodebuild test-without-building \
+          -project "$XCODE_PROJECT" \
+          -scheme "$XCODE_SCHEME" \
+          -destination "id=$SIM_ID" \
+          -derivedDataPath build/DerivedData \
+          -only-testing:KuryeKazancTests \
+          -resultBundlePath build/results/UnitTests.xcresult \
+          | xcbeautify --report junit --report-path build/test-reports --junit-report-filename unit.xml
+      test_report: build/test-reports/unit.xml
+    - &ui_tests
+      name: UI testleri (XCUITest, simulator)
+      script: |
+        set -o pipefail
+        xcodebuild test-without-building \
+          -project "$XCODE_PROJECT" \
+          -scheme "$XCODE_SCHEME" \
+          -destination "id=$SIM_ID" \
+          -derivedDataPath build/DerivedData \
+          -only-testing:KuryeKazancUITests \
+          -resultBundlePath build/results/UITests.xcresult \
+          | xcbeautify --report junit --report-path build/test-reports --junit-report-filename ui.xml
+      test_report: build/test-reports/ui.xml
+
+workflows:
+  ios-ci:
+    name: iOS CI (build + test)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      <<: *env_versions
+      vars:
+        <<: *common_vars
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: "*"
+          include: true
+          source: true
+        # Kararli dallar ios-release akisinda test ediliyor; cift calismasin
+        - pattern: "main"
+          include: false
+          source: true
+        - pattern: "release/*"
+          include: false
+          source: true
+      cancel_previous_builds: true
+    scripts:
+      - *generate_project
+      - *build_for_testing
+      - *unit_tests
+      - *ui_tests
+    artifacts:
+      - build/results/*.xcresult
+      - build/test-reports/*.xml
+
+  ios-release:
+    name: iOS Release (TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: "KuryeKazanc ASC"   # Codemagic'te kayitli API anahtarinin ADI (gizli degil)
+    environment:
+      <<: *env_versions
+      groups:
+        - app_store_credentials              # APP_STORE_APPLE_ID burada
+      vars:
+        <<: *common_vars
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.kuryekazanc.app
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: "main"
+          include: true
+          source: true
+        - pattern: "release/*"
+          include: true
+          source: true
+      cancel_previous_builds: false
+    scripts:
+      - *generate_project
+      - *build_for_testing
+      - *unit_tests
+      - *ui_tests
+      - name: Imzalama profillerini uygula
+        script: xcode-project use-profiles
+      - name: Build numarasini arttir
+        script: |
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          NEXT=$((LATEST + 1))
+          echo "Build numarasi: $NEXT"
+          agvtool new-version -all "$NEXT"
+      - name: TestFlight degisiklik notu (What to Test)
+        script: bash scripts/ci/make_release_notes.sh
+      - name: IPA olustur
+        script: |
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+      - build/results/*.xcresult
+      - release_notes.json
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Dahili testciler (App Store Connect kullanicilari) build'i otomatik gorur.
+        # Gonullu kuryeler gibi harici testciler icin grup acilinca asagidaki satiri acin
+        # (harici grup ilk build'de Apple Beta App Review gerektirir):
+        # beta_groups:
+        #   - Kurye Testcileri

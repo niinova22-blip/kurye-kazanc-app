@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Kismi Info.plist: GENERATE_INFOPLIST_FILE=YES ile Xcode'un urettigi anahtarlarla birlestirilir.
+  Burada yalnizca INFOPLIST_KEY_* build ayari olarak verilemeyen anahtarlar bulunur.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Kazanç kayıtlarına çalıştığın ilçe/semt bilgisini otomatik eklemek için konumunu kullanıyoruz.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Yalnızca "Çalışıyorum" modu açıkken, uygulama arka plandayken de mesafe ve bölge bilgisini kaydetmek için konumunu kullanıyoruz. Mod kapalıyken konum takibi yapılmaz.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>
