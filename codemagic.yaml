@@ -7,7 +7,7 @@
 # GIZLI BILGILER KODA YAZILMAZ. Codemagic arayuzunde tanimlanmasi gerekenler:
 #   1) Teams > Integrations > Developer Portal: App Store Connect API anahtari
 #      (Issuer ID, Key ID, .p8 dosyasi). Asagidaki `integrations.app_store_connect` alanina
-#      SADECE bu anahtara verdiginiz ad yazilir (ornek: "KuryeKazanc ASC").
+#      SADECE bu anahtara verdiginiz ad yazilir (mevcut anahtar: "Codemagic").
 #   2) Code signing identities: iOS Distribution sertifikasi (veya Codemagic'in otomatik uretmesi)
 #      -> `ios_signing` bunu bundle ID uzerinden otomatik bulur.
 #   3) Environment variables (grup: app_store_credentials):
@@ -108,7 +108,7 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 90
     integrations:
-      app_store_connect: "KuryeKazanc ASC"   # Codemagic'te kayitli API anahtarinin ADI (gizli degil)
+      app_store_connect: "Codemagic"   # Codemagic'te kayitli API anahtarinin ADI (gizli degil)
     environment:
       <<: *env_versions
       groups:
@@ -138,8 +138,13 @@ workflows:
         script: xcode-project use-profiles
       - name: Build numarasini arttir
         script: |
-          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
-          NEXT=$((LATEST + 1))
+          if [ -n "${APP_STORE_APPLE_ID:-}" ]; then
+            LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+            NEXT=$((LATEST + 1))
+          else
+            echo "APP_STORE_APPLE_ID tanimli degil; Codemagic BUILD_NUMBER kullaniliyor"
+            NEXT=$((BUILD_NUMBER + 1))
+          fi
           echo "Build numarasi: $NEXT"
           agvtool new-version -all "$NEXT"
       - name: TestFlight degisiklik notu (What to Test)

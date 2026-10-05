@@ -36,7 +36,7 @@ Gizli bilgiler koda yazılmaz; hepsi Codemagic arayüzünde tutulur:
 
 | Ne | Nerede |
 |---|---|
-| App Store Connect API anahtarı (Issuer ID, Key ID, .p8) | Teams → Integrations → Developer Portal, adı: `KuryeKazanc ASC` |
+| App Store Connect API anahtarı (Issuer ID, Key ID, .p8) | Teams → Integrations → Developer Portal, mevcut anahtar adı: `Codemagic` (zaten bağlı) |
 | iOS Distribution sertifikası | Teams → Code signing identities (veya Codemagic'e ürettirin) |
 | `APP_STORE_APPLE_ID` (uygulamanın sayısal Apple ID'si) | Environment variables, grup: `app_store_credentials` |
 

@@ -63,3 +63,20 @@ Yeni oturuma başlarken önce bu dosyayı okuyun; "Tamamlandı" olarak işaretle
 ### Sonraki adım
 1. İlk CI çalışmasının sonucunu kontrol et, varsa derleme/test hatalarını düzelt.
 2. Yol haritası #2 (Onboarding) ve #3 (manuel Kazanç ekle formu).
+
+## Oturum 1 (devam) — 2026-10-05
+
+**Commit:** `ci: Codemagic entegrasyon adını düzelt, build numarası için yedek`
+
+### Yapılanlar
+- İlk commit atıldı ve GitHub'a gönderildi: private repo `niinova22-blip/kurye-kazanc` (`main`).
+- Codemagic hesabı incelendi: GitHub entegrasyonu ve Developer Portal (App Store Connect API) anahtarı zaten bağlı. Anahtarın adı `Codemagic`; `codemagic.yaml` buna göre güncellendi.
+- `ios-release`: `APP_STORE_APPLE_ID` yoksa build numarası Codemagic `BUILD_NUMBER`'dan üretiliyor (adım çökmesin).
+
+### Engel (kullanıcı yapmalı)
+- Codemagic GitHub App'i yalnızca seçili repolara erişiyor; `kurye-kazanc` eklenmeli. GitHub bu ayar için kimlik doğrulaması (sudo mode) istiyor → github.com/settings/installations → Codemagic CI/CD → Configure → Repository access'e `kurye-kazanc` ekle.
+- Ardından Codemagic → Add application → `kurye-kazanc` → iOS.
+- TestFlight için: App Store Connect'te `com.kuryekazanc.app` bundle ID'li uygulama kaydı oluşturulmalı; sayısal Apple ID'si Codemagic'te `app_store_credentials` grubuna `APP_STORE_APPLE_ID` olarak eklenmeli.
+
+### Sonraki adım
+- Repo Codemagic'e bağlanınca ilk CI çalışmasının sonucunu kontrol et, derleme/test hatalarını düzelt.
