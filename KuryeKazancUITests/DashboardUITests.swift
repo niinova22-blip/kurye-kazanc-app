@@ -113,7 +113,13 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(net.label.contains("850"), "Gunluk net 850 olmali, gelen: \(net.label)")
 
         app.tabBars.buttons["Ayarlar"].tap()
-        XCTAssertTrue(app.switches["settings.dataSharing"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["settings.autoEstimate"].waitForExistence(timeout: 5))
+        // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
+        let sharing = app.switches["settings.dataSharing"]
+        for _ in 0..<4 where !sharing.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(sharing.exists)
     }
 
     func testDataSharingRequiresExplicitConsent() {
