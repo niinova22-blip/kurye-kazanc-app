@@ -15,6 +15,10 @@ final class ExpenseRecord {
     var note: String?
     var createdAt: Date
 
+    func updateDate(_ newDate: Date, calendar: Calendar = .current) {
+        date = calendar.startOfDay(for: newDate)
+    }
+
     var type: ExpenseType {
         get { ExpenseType(rawValue: typeRaw) ?? .other }
         set { typeRaw = newValue.rawValue }

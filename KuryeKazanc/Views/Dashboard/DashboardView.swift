@@ -3,23 +3,37 @@ import SwiftData
 
 /// Ana ekran: bugunun net kazanci, net TL/saat, calisma suresi, mesafe ve "Calisiyorum" modu.
 struct DashboardView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(WorkSessionManager.self) private var workSession
+
     @Query private var todaysEarnings: [EarningRecord]
     @Query private var todaysExpenses: [ExpenseRecord]
+    @Query private var couriers: [Courier]
 
     @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
 
-    @State private var viewModel = DashboardViewModel()
     @State private var activeSheet: Sheet?
 
     private let day: Date
 
-    enum Sheet: String, Identifiable {
-        case addEarning, addExpense
-        var id: String { rawValue }
+    enum Sheet: Identifiable {
+        case addEarning(WorkSessionSummary?)
+        case editEarning(EarningRecord)
+        case addExpense
+        case editExpense(ExpenseRecord)
+
+        var id: String {
+            switch self {
+            case .addEarning: "addEarning"
+            case .editEarning(let record): "editEarning-\(record.id)"
+            case .addExpense: "addExpense"
+            case .editExpense(let record): "editExpense-\(record.id)"
+            }
+        }
     }
 
-    /// - Parameter day: Gosterilecek gun. Gece yarisi gecisi icin sonraki adimda scenePhase ile yenilenecek.
+    /// - Parameter day: Gosterilecek gun. Gece yarisi gecince MainTabView yeni gunle yeniden olusturur.
     init(day: Date = .now) {
         let start = Calendar.current.startOfDay(for: day)
         self.day = start
@@ -33,8 +47,13 @@ struct DashboardView: View {
         )
     }
 
+    /// Kazanc formunda onceden secili platform: profildeki ilk platform.
+    private var defaultPlatform: Platform? {
+        couriers.first?.defaultPlatforms.sorted { $0.sortOrder < $1.sortOrder }.first
+    }
+
     var body: some View {
-        let summary = viewModel.summary(
+        let summary = DashboardViewModel.summary(
             earnings: todaysEarnings,
             expenses: todaysExpenses,
             costPerKm: costPerKm,
@@ -47,11 +66,16 @@ struct DashboardView: View {
                     NetEarningsCard(summary: summary)
                     metricsRow(summary)
                     WorkModeButton(
-                        isWorking: viewModel.isWorking,
-                        sessionStart: viewModel.workSessionStart,
-                        action: { viewModel.toggleWorking() }
+                        isWorking: workSession.isWorking,
+                        sessionStart: workSession.sessionStart,
+                        distanceKm: workSession.sessionDistanceKm,
+                        isLocationAvailable: workSession.location.isAuthorized || !workSession.location.isEnabled,
+                        action: toggleWork
                     )
-                    recordsSection
+                    earningsSection
+                    if !todaysExpenses.isEmpty {
+                        expensesSection
+                    }
                 }
                 .padding(16)
             }
@@ -65,7 +89,7 @@ struct DashboardView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("Kazanç ekle", systemImage: "turkishlirasign.circle") { activeSheet = .addEarning }
+                        Button("Kazanç ekle", systemImage: "turkishlirasign.circle") { activeSheet = .addEarning(nil) }
                         Button("Gider ekle", systemImage: "fuelpump") { activeSheet = .addExpense }
                     } label: {
                         Image(systemName: "plus.circle.fill")
@@ -76,9 +100,28 @@ struct DashboardView: View {
                 }
             }
             .sheet(item: $activeSheet) { sheet in
-                // TODO: AddEarningView (manuel + OCR) ve AddExpenseView sonraki adimlarda.
-                ComingSoonView(title: sheet == .addEarning ? "Kazanç ekle" : "Gider ekle")
+                switch sheet {
+                case .addEarning(let session):
+                    EarningFormView(session: session, defaultPlatform: defaultPlatform)
+                case .editEarning(let record):
+                    EarningFormView(record: record)
+                case .addExpense:
+                    ExpenseFormView()
+                case .editExpense(let record):
+                    ExpenseFormView(record: record)
+                }
             }
+        }
+    }
+
+    private func toggleWork() {
+        if workSession.isWorking {
+            // Oturum bitince kazanc formu sure + mesafe + bolgeyle on doldurulmus acilir
+            if let summary = workSession.stop() {
+                activeSheet = .addEarning(summary)
+            }
+        } else {
+            workSession.start()
         }
     }
 
@@ -105,10 +148,9 @@ struct DashboardView: View {
         }
     }
 
-    @ViewBuilder
-    private var recordsSection: some View {
+    private var earningsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Bugünkü kayıtlar")
+            Text("Bugünkü kazançlar")
                 .font(.headline)
                 .padding(.horizontal, 4)
 
@@ -123,7 +165,17 @@ struct DashboardView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(todaysEarnings) { record in
-                        EarningRow(record: record)
+                        Button { activeSheet = .editEarning(record) } label: {
+                            EarningListRow(record: record)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("Düzenle", systemImage: "pencil") { activeSheet = .editEarning(record) }
+                            Button("Sil", systemImage: "trash", role: .destructive) { delete(record) }
+                        }
+                        .accessibilityIdentifier("dashboard.earningRow")
                         if record.id != todaysEarnings.last?.id {
                             Divider().padding(.leading, 16)
                         }
@@ -132,6 +184,37 @@ struct DashboardView: View {
                 .background(.background, in: RoundedRectangle(cornerRadius: 16))
             }
         }
+    }
+
+    private var expensesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Bugünkü giderler")
+                .font(.headline)
+                .padding(.horizontal, 4)
+            VStack(spacing: 0) {
+                ForEach(todaysExpenses) { record in
+                    Button { activeSheet = .editExpense(record) } label: {
+                        ExpenseListRow(record: record)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button("Düzenle", systemImage: "pencil") { activeSheet = .editExpense(record) }
+                        Button("Sil", systemImage: "trash", role: .destructive) { delete(record) }
+                    }
+                    if record.id != todaysExpenses.last?.id {
+                        Divider().padding(.leading, 16)
+                    }
+                }
+            }
+            .background(.background, in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    private func delete(_ model: some PersistentModel) {
+        modelContext.delete(model)
+        try? modelContext.save()
     }
 }
 
@@ -218,6 +301,8 @@ private struct MetricTile: View {
 private struct WorkModeButton: View {
     let isWorking: Bool
     let sessionStart: Date?
+    let distanceKm: Double
+    let isLocationAvailable: Bool
     let action: () -> Void
 
     var body: some View {
@@ -229,12 +314,12 @@ private struct WorkModeButton: View {
                     Text(isWorking ? "Çalışmayı bitir" : "Çalışmaya başla")
                         .font(.headline)
                     if isWorking, let sessionStart {
-                        TimelineView(.periodic(from: sessionStart, by: 60)) { context in
-                            Text("Süre: \(Formatters.duration(context.date.timeIntervalSince(sessionStart))) · konum takibi açık")
+                        TimelineView(.periodic(from: sessionStart, by: 30)) { context in
+                            Text(statusText(elapsed: context.date.timeIntervalSince(sessionStart)))
                                 .font(.caption)
                         }
                     } else {
-                        Text("Konum yalnızca bu mod açıkken takip edilir")
+                        Text("Süre ve mesafe ölçülür; konum yalnızca bu mod açıkken takip edilir")
                             .font(.caption)
                     }
                 }
@@ -250,67 +335,22 @@ private struct WorkModeButton: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("dashboard.workToggle")
     }
-}
 
-private struct EarningRow: View {
-    let record: EarningRecord
-
-    private var subtitle: String {
-        let range = "\(Formatters.time(record.startTime))–\(Formatters.time(record.endTime))"
-        guard let district = record.district else { return range }
-        return "\(range) · \(district)"
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(record.platform?.name ?? "Platform yok")
-                        .font(.subheadline.weight(.semibold))
-                    if record.source == .ocr {
-                        Text("OCR")
-                            .font(.caption2.weight(.bold))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.accentColor.opacity(0.15), in: Capsule())
-                    }
-                }
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(Formatters.currency(record.totalEarning))
-                .font(.subheadline.weight(.semibold))
-                .monospacedDigit()
+    private func statusText(elapsed: TimeInterval) -> String {
+        var parts = ["Süre: \(Formatters.duration(elapsed))"]
+        if isLocationAvailable {
+            parts.append(Formatters.distance(distanceKm))
+        } else {
+            parts.append("konum izni yok, mesafe ölçülmüyor")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-}
-
-private struct ComingSoonView: View {
-    let title: String
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView(title, systemImage: "hammer", description: Text("Bu ekran bir sonraki adımda eklenecek."))
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Kapat") { dismiss() }
-                    }
-                }
-        }
+        return parts.joined(separator: " · ")
     }
 }
 
 #Preview("Örnek veri") {
-    DashboardView()
+    let location = LocationService(isEnabled: false)
+    return DashboardView()
         .modelContainer(SampleData.previewContainer)
-}
-
-#Preview("Boş") {
-    DashboardView()
-        .modelContainer(ModelContainerFactory.make(inMemory: true))
+        .environment(location)
+        .environment(WorkSessionManager(location: location))
 }

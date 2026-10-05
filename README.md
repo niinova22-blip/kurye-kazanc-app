@@ -11,6 +11,19 @@ Kuryeler için net kazanç takip uygulaması. Swift + SwiftUI + SwiftData, MVVM,
 4. `main` veya `release/*` dalına push → `ios-release`: testler + imzalı IPA + otomatik TestFlight.
    Öncesinde `TESTFLIGHT_NOTES.md` en üstüne yeni sürüm notunu ekleyin.
 
+### Yerel hızlı test (Windows, Mac gerekmez)
+
+Saf iş mantığı (`KuryeKazanc/Core`: net TL/saat ve gider hesabı, Türkçe sayı ayrıştırma, OCR regex şablonları, dönem aralıkları)
+kökteki `Package.swift` ile ayrı bir Swift paketi olarak da derlenir:
+
+```
+swift test
+```
+
+Gereken: Swift for Windows (`winget install Swift.Toolchain`) + Visual Studio Build Tools (C++ ve Windows SDK).
+`KuryeKazanc/Core` içine SwiftData/UIKit/SwiftUI/Vision import eden dosya **konmamalı**; bunlar yalnızca iOS'ta derlenir.
+Ekranlar, SwiftData ve UI testleri yine CI'da (macOS) çalışır. UI testleri sıradan push'ta atlanır; PR'larda ve TestFlight akışında çalışır.
+
 Mac erişimi olursa: `brew install xcodegen && xcodegen generate && open KuryeKazanc.xcodeproj`
 
 ## Klasör yapısı
@@ -18,8 +31,9 @@ Mac erişimi olursa: `brew install xcodegen && xcodegen generate && open KuryeKa
 ```
 KuryeKazanc/
   App/           Uygulama girişi, ModelContainer, örnek veri
-  Models/        SwiftData @Model sınıfları + enum'lar + anonim cihaz UUID'si
-  Services/      Saf iş mantığı (EarningsCalculator), tercih anahtarları, seed
+  Core/          Saf iş mantığı (iOS'a bağımlı değil, Windows'ta `swift test` ile test edilir)
+  Models/        SwiftData @Model sınıfları + anonim cihaz UUID'si
+  Services/      Konum, çalışma oturumu, Vision OCR, tercih anahtarları, seed
   ViewModels/    @Observable ViewModel'ler
   Views/         SwiftUI ekranları (ekran başına klasör)
   Utilities/     Biçimlendiriciler

@@ -1,5 +1,9 @@
 import XCTest
-@testable import KuryeKazanc
+#if canImport(KuryeCore)
+@testable import KuryeCore // Windows/Linux: swift test
+#else
+@testable import KuryeKazanc // Xcode / CI
+#endif
 
 final class EarningsCalculatorTests: XCTestCase {
     private let base = Date(timeIntervalSince1970: 1_760_000_000)
@@ -133,6 +137,39 @@ final class EarningsCalculatorTests: XCTestCase {
         )
         XCTAssertEqual(summary.distanceKm, 0)
         XCTAssertEqual(summary.totalExpenses, 0)
+    }
+
+    // MARK: - Donem (gun bazli) ozet
+
+    func testSummarizeByDay_appliesEstimateRulePerDay() {
+        let day1 = hours(0)
+        let day2 = hours(24)
+        let calc = EarningsCalculator(costPerKm: 2)
+        let daily = calc.summarizeByDay(
+            earnings: [
+                (day: day1, entry: entry(0, 4, gross: 400, km: 50)),
+                (day: day2, entry: entry(24, 28, gross: 600, km: 100)),
+            ],
+            expenses: [(day: day2, entry: ExpenseEntry(type: .fuel, amount: 150))]
+        )
+        // Gun 1: tahmin 100; Gun 2: manuel yakit var -> tahmin yok, 150 manuel
+        XCTAssertEqual(daily[day1]?.estimatedExpenses ?? -1, 100, accuracy: 0.001)
+        XCTAssertEqual(daily[day2]?.estimatedExpenses ?? -1, 0, accuracy: 0.001)
+
+        let total = daily.values.total
+        XCTAssertEqual(total.totalEarnings, 1000, accuracy: 0.001)
+        XCTAssertEqual(total.totalExpenses, 250, accuracy: 0.001)
+        XCTAssertEqual(total.netEarnings, 750, accuracy: 0.001)
+        XCTAssertEqual(total.workHours, 8, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(total.netPerHour), 93.75, accuracy: 0.001)
+    }
+
+    func testSummarizeByDay_expenseOnlyDay() {
+        let daily = EarningsCalculator(costPerKm: 2).summarizeByDay(
+            earnings: [], expenses: [(day: hours(0), entry: ExpenseEntry(type: .tire, amount: 900))]
+        )
+        XCTAssertEqual(daily.values.total.netEarnings, -900, accuracy: 0.001)
+        XCTAssertNil(daily.values.total.netPerHour)
     }
 
     // MARK: - Platform bazinda toplam

@@ -26,6 +26,13 @@ enum SampleData {
             grossEarning: 400, bonus: 0, distanceKm: 20, packageCount: 9, source: .ocr
         ))
         context.insert(ExpenseRecord(date: today, type: .other, amount: 50, note: "Otopark"))
+
+        if (try? context.fetchCount(FetchDescriptor<Courier>())) == 0 {
+            context.insert(Courier(
+                name: "Örnek Kurye", vehicleType: .motorcycle,
+                defaultPlatforms: [platform("trendyol_go"), platform("getir")].compactMap { $0 }
+            ))
+        }
         try? context.save()
     }
 

@@ -1,0 +1,19 @@
+#!/bin/sh
+# Push oncesi saf is mantigi testleri (KuryeCore) yerelde calisir; hatali kod CI'a gitmez.
+# Kurulum (bir kez): git config core.hooksPath .githooks
+# Acil durumda atlamak icin: git push --no-verify
+if ! command -v swift >/dev/null 2>&1; then
+  echo "[pre-push] swift bulunamadi; yerel testler atlandi (CI calistiracak)."
+  exit 0
+fi
+
+echo "[pre-push] swift test (KuryeCore)..."
+log="$(mktemp)"
+swift test >"$log" 2>&1
+status=$?
+tail -15 "$log"
+rm -f "$log"
+if [ $status -ne 0 ]; then
+  echo "[pre-push] Core testleri basarisiz; push iptal edildi."
+  exit 1
+fi
