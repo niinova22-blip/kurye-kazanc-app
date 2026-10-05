@@ -42,6 +42,21 @@ struct EarningsSummary: Equatable {
         grossEarnings: 0, bonusEarnings: 0, manualExpenses: 0,
         estimatedExpenses: 0, workDuration: 0, distanceKm: 0
     )
+
+    static func + (lhs: EarningsSummary, rhs: EarningsSummary) -> EarningsSummary {
+        EarningsSummary(
+            grossEarnings: lhs.grossEarnings + rhs.grossEarnings,
+            bonusEarnings: lhs.bonusEarnings + rhs.bonusEarnings,
+            manualExpenses: lhs.manualExpenses + rhs.manualExpenses,
+            estimatedExpenses: lhs.estimatedExpenses + rhs.estimatedExpenses,
+            workDuration: lhs.workDuration + rhs.workDuration,
+            distanceKm: lhs.distanceKm + rhs.distanceKm
+        )
+    }
+}
+
+extension Sequence where Element == EarningsSummary {
+    var total: EarningsSummary { reduce(.empty, +) }
 }
 
 /// Net kazanc hesaplama kurallari.
@@ -101,6 +116,26 @@ struct EarningsCalculator {
         }
         if let c = current { total += c.end.timeIntervalSince(c.start) }
         return total
+    }
+
+    /// Birden fazla gunu kapsayan donem (hafta/ay) icin ozet.
+    /// Gider tahmini kurali GUN BAZINDA uygulanir: bir gun manuel yakit girilmisse yalnizca o gunun tahmini duser.
+    func summarizeByDay(
+        earnings: [(day: Date, entry: EarningEntry)],
+        expenses: [(day: Date, entry: ExpenseEntry)]
+    ) -> [Date: EarningsSummary] {
+        let earningsByDay = Dictionary(grouping: earnings, by: { $0.day })
+        let expensesByDay = Dictionary(grouping: expenses, by: { $0.day })
+        let allDays = Set(earningsByDay.keys).union(expensesByDay.keys)
+
+        var result: [Date: EarningsSummary] = [:]
+        for day in allDays {
+            result[day] = summarize(
+                earnings: earningsByDay[day]?.map { $0.entry } ?? [],
+                expenses: expensesByDay[day]?.map { $0.entry } ?? []
+            )
+        }
+        return result
     }
 
     /// Platform koduna gore toplam kazanc (brut + bonus). Platformu olmayan kayitlar "other" altinda toplanir.

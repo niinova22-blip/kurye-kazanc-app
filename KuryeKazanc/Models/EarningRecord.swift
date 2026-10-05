@@ -38,6 +38,13 @@ final class EarningRecord {
         set { sourceRaw = newValue.rawValue }
     }
 
+    /// Duzenlemede baslangic/bitis degisince gun alanini da gunceller.
+    func updateInterval(start: Date, end: Date, calendar: Calendar = .current) {
+        startTime = start
+        endTime = end
+        date = calendar.startOfDay(for: start)
+    }
+
     /// Calisma suresi (saniye). Bitis baslangictan once ise 0.
     var duration: TimeInterval { max(0, endTime.timeIntervalSince(startTime)) }
 

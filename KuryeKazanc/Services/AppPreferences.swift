@@ -11,6 +11,8 @@ enum AppPreferences {
     static let workSessionStartKey = "workSessionStart"
     /// Anonim istatistik havuzuna katilim. Varsayilan KAPALI (opt-in, acik onay gerekir).
     static let dataSharingOptInKey = "dataSharingOptIn"
+    /// Kullanicinin acik onay verdigi an (Unix zaman damgasi). Onay geri alininca silinir.
+    static let dataSharingConsentDateKey = "dataSharingConsentDate"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
 
     static let defaultCostPerKm = VehicleType.motorcycle.defaultCostPerKm
