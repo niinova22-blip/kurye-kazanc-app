@@ -195,6 +195,14 @@ struct EarningFormView: View {
                     .foregroundStyle(.red)
                     .font(.subheadline)
             }
+
+            if BuildEnvironment.showsTesterTools, let report = viewModel.ocrDiagnosticReport {
+                ShareLink(item: report, subject: Text("Kurye Kazanç OCR raporu")) {
+                    Label("Yanlış okuduysa: okunan metni geliştiriciye gönder", systemImage: "ladybug")
+                        .font(.subheadline)
+                }
+                .accessibilityIdentifier("earningForm.ocrReport")
+            }
         } footer: {
             Text("Trendyol GO ve Getir kazanç ekranları desteklenir. Görüntü cihazında işlenir, hiçbir yere gönderilmez.")
         }

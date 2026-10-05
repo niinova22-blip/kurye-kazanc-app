@@ -1,5 +1,9 @@
 import XCTest
-@testable import KuryeKazanc
+#if canImport(KuryeCore)
+@testable import KuryeCore // Windows/Linux: swift test
+#else
+@testable import KuryeKazanc // Xcode / CI
+#endif
 
 final class EarningsCalculatorTests: XCTestCase {
     private let base = Date(timeIntervalSince1970: 1_760_000_000)

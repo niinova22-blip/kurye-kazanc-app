@@ -95,3 +95,28 @@ Yeni oturuma başlarken önce bu dosyayı okuyun; "Tamamlandı" olarak işaretle
 ### Sonraki adım
 - Yol haritası #2 Onboarding ve #3 manuel Kazanç ekle formu (özellik dalında).
 - Kullanıcı: App Store Connect'te uygulama kaydı → `APP_STORE_APPLE_ID` → ilk TestFlight.
+
+## Oturum 2 — 2026-10-06
+
+**Commitler:** `feat: V1 ekranları — onboarding, kazanç (manuel+OCR), gider, geçmiş/analiz, ayarlar, konum`, `test: Ayarlar UI testinde tembel yüklenen satır için kaydırma; sürüm 1.0.0 ve TestFlight notları`
+
+### Tamamlanan (yol haritası #2–#9, V1 uygulama tarafı)
+- **Onboarding** (`Views/Onboarding`, `OnboardingViewModel`): ad (isteğe bağlı) → araç tipi → platformlar (en az 1) → konum izni bilgisi. Bitince Courier oluşur, km başı maliyet araç tipine göre ayarlanır.
+- **Kazanç formu** (`Views/Earnings/EarningFormView`, `EarningFormViewModel`): manuel giriş, düzenleme, "Çalışıyorum" oturumundan ön doldurma (süre, km, ilçe). Türkçe sayı girişi (`TurkishNumberParser`). Gece yarısını geçen vardiya desteği.
+- **OCR** (`Services/OCR`): Vision `VNRecognizeTextRequest` (tr-TR, cihaz üstünde) + `EarningsScreenshotParser` + `TrendyolGoTemplate`/`GetirTemplate` (regex: tarih, paket/sipariş sayısı, toplam, bonus). Güvenilmeyen alan boş bırakılmaz: en iyi tahmin yazılır ve turuncu "Bu alanları kontrol et" ile işaretlenir; işaretli alan varken kaydetmede onay istenir. Çalışma saatleri ekran görüntüsünde olmadığından her OCR'da kontrol için işaretlenir.
+- **Gider formu** (`Views/Expenses`, `ExpenseFormViewModel`): tür, tutar, tarih, not; yakıt/bakım girilince o günün km tahmini düşer.
+- **Konum** (`LocationService`, `WorkSessionManager`): yalnızca "Çalışıyorum" modunda `startUpdatingLocation` + arka plan (UIBackgroundModes=location), 25 m filtre, gürültü/sıçrama eleme; bitince durur. Oturum uygulama kapanıp açılınca devam eder. CLGeocoder ile il/ilçe/semt; ham koordinat saklanmaz. UI testlerinde konum kapalı.
+- **Geçmiş/Analiz** (`Views/History`): gün/hafta/ay (hafta Pazartesi başlar, `PeriodRange`), özet, günlük net grafiği (Swift Charts), platform bazında toplam, düzenle/sil. Gider tahmini kuralı gün bazında (`summarizeByDay`).
+- **Ayarlar** (`Views/Settings`): profil/araç/platformlar, otomatik tahmin + km başı maliyet, konum izni durumu/yükseltme, anonim veri paylaşımı (varsayılan kapalı, açık onay ekranı, onay tarihi saklanır, V1'de gönderim yok), tüm kayıtları sil.
+- **Ana yapı:** `MainTabView` (Bugün / Geçmiş / Ayarlar), gün değişiminde Bugün ekranı yenilenir. Bugün ekranında gider satırları, düzenle/sil.
+- **App Store hazırlığı:** `SchemaV1` + `KuryeMigrationPlan` (sonraki model değişiklikleri veri kaybetmeden göç eder), `PrivacyInfo.xcprivacy` (UserDefaults CA92.1, izleme yok, veri toplama yok), sürüm 1.0.0, `TESTFLIGHT_NOTES.md` 1.0.0 bölümü (gerçek cihaz test listesi).
+- **CI:** Codemagic webhook'u oluşturuldu (artık her push otomatik build+test tetikliyor).
+
+### Testler
+- Birim: 58/58 geçti (EarningsCalculator 17, EarningsScreenshotParser 11, FormViewModel 12, Model 6, PeriodRange 5, TurkishNumberParser 7).
+- UI (build #2): 8/9 geçti; `testHistoryAndSettingsTabs` testteki bir eksik yüzünden düştü (tembel Form satırı ekran dışında) → test düzeltildi, build #3'te doğrulanacak.
+
+### Açık konular
+- OCR şablonları gerçek ekran görüntüleriyle kalibre edilmeli (TestFlight'tan örnek toplanacak).
+- Uygulama ikonu geçici.
+- TestFlight: App Store Connect'te `com.kuryekazanc.app` kaydı + Codemagic `APP_STORE_APPLE_ID` → `develop`'u `main`'e birleştir → `ios-release`.

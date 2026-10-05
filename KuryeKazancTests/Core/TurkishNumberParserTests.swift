@@ -1,5 +1,9 @@
 import XCTest
-@testable import KuryeKazanc
+#if canImport(KuryeCore)
+@testable import KuryeCore // Windows/Linux: swift test
+#else
+@testable import KuryeKazanc // Xcode / CI
+#endif
 
 final class TurkishNumberParserTests: XCTestCase {
     func testTurkishFormats() {

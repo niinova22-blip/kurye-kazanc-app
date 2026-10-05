@@ -1,7 +1,7 @@
 # Codemagic CI/CD - Kurye Kazanc (iOS)
 #
 # Akislar:
-#   ios-ci       : main/release disindaki her dal + PR -> proje uret, build, unit test, UI test
+#   ios-ci       : main/release disindaki her dal + PR -> proje uret, build, unit test (UI test yalnizca PR'da)
 #   ios-release  : main ve release/* dallarina push -> testler + imzali IPA + otomatik TestFlight
 #
 # GIZLI BILGILER KODA YAZILMAZ. Codemagic arayuzunde tanimlanmasi gerekenler:
@@ -59,6 +59,13 @@ definitions:
       name: UI testleri (XCUITest, simulator)
       script: |
         set -o pipefail
+        # Hiz icin: siradan push'ta atlanir; PR'larda ve TestFlight akisinda (RUN_UI_TESTS=true) calisir
+        if [ "${CM_PULL_REQUEST:-false}" != "true" ] && [ "${RUN_UI_TESTS:-false}" != "true" ]; then
+          echo "UI testleri bu push'ta atlandi (PR degil). Elle calistirmak icin RUN_UI_TESTS=true."
+          mkdir -p build/test-reports
+          echo '<?xml version="1.0" encoding="UTF-8"?><testsuites name="UI tests skipped" tests="0" failures="0"></testsuites>' > build/test-reports/ui.xml
+          exit 0
+        fi
         xcodebuild test-without-building \
           -project "$XCODE_PROJECT" \
           -scheme "$XCODE_SCHEME" \
@@ -115,6 +122,7 @@ workflows:
         - app_store_credentials              # APP_STORE_APPLE_ID burada
       vars:
         <<: *common_vars
+        RUN_UI_TESTS: "true"                 # TestFlight'a gitmeden once UI testleri sart
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.kuryekazanc.app

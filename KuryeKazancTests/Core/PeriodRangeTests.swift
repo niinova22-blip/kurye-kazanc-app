@@ -1,5 +1,9 @@
 import XCTest
-@testable import KuryeKazanc
+#if canImport(KuryeCore)
+@testable import KuryeCore // Windows/Linux: swift test
+#else
+@testable import KuryeKazanc // Xcode / CI
+#endif
 
 final class PeriodRangeTests: XCTestCase {
     private let tz = TimeZone(identifier: "Europe/Istanbul")!

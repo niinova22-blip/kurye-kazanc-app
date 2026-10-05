@@ -116,7 +116,7 @@ final class FormViewModelTests: XCTestCase {
         XCTAssertTrue(vm.fieldsToReview.contains(.platform))
     }
 
-    func testImportScreenshot_usesRecognizerAndParser() async {
+    func testImportScreenshot_usesRecognizerAndParser() async throws {
         struct FakeRecognizer: TextRecognizing {
             func recognizeLines(in image: UIImage) async throws -> [String] {
                 ["Trendyol GO", "05.10.2026", "Toplam Kazanç", "₺1.200,00", "Teslimat Sayısı", "15", "Bonus", "₺200,00"]
@@ -132,6 +132,11 @@ final class FormViewModelTests: XCTestCase {
         XCTAssertEqual(vm.platform?.code, "trendyol_go")
         XCTAssertEqual(vm.grossText, "1000")
         XCTAssertEqual(vm.fieldsToReview, [.hours])
+
+        // Testci raporu: satirlar teste yapistirilabilir Swift dizisi olarak
+        let report = try XCTUnwrap(vm.ocrDiagnosticReport)
+        XCTAssertTrue(report.contains("\"Toplam Kazanç\","), report)
+        XCTAssertTrue(report.contains("let lines = ["))
     }
 
     func testImportScreenshot_failureIsReported() async {

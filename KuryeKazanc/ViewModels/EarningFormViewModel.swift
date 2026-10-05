@@ -47,6 +47,8 @@ final class EarningFormViewModel {
     /// "Bu alanlari kontrol et" ile vurgulanan alanlar.
     var fieldsToReview: Set<Field> = []
     var ocrState: OCRState = .idle
+    /// Son OCR'da Vision'in okudugu ham satirlar (kalibrasyon raporu icin).
+    private(set) var recognizedLines: [String] = []
     var isResolvingRegion = false
 
     private(set) var editingRecord: EarningRecord?
@@ -114,6 +116,7 @@ final class EarningFormViewModel {
         ocrState = .processing
         do {
             let lines = try await recognizer.recognizeLines(in: image)
+            recognizedLines = lines
             let parsed = parser.parse(lines: lines, referenceDate: referenceDate)
             apply(parsed, platforms: platforms)
             ocrState = .finished
@@ -155,6 +158,27 @@ final class EarningFormViewModel {
         // Ekran goruntusunde calisma saati yoktur; varsayilan saatler mutlaka kontrol edilmeli
         review.insert(.hours)
         fieldsToReview = review
+    }
+
+    /// TestFlight testcilerinin gelistiriciye gonderdigi OCR raporu. Satirlar dogrudan
+    /// `EarningsScreenshotParserTests`'e yapistirilabilecek Swift dizisi bicimindedir.
+    var ocrDiagnosticReport: String? {
+        guard !recognizedLines.isEmpty else { return nil }
+        let escaped = recognizedLines.map { line in
+            "    \"" + line.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\","
+        }
+        let info = Bundle.main.infoDictionary
+        let version = "\(info?["CFBundleShortVersionString"] as? String ?? "-") (\(info?["CFBundleVersion"] as? String ?? "-"))"
+        return """
+        Kurye Kazanç OCR raporu — sürüm \(version)
+        Platform: \(platform?.name ?? "-") · Kazanç: \(grossText) · Bonus: \(bonusText) · Paket: \(packageText)
+        Kontrol edilecek: \(fieldsToReview.map(\.title).sorted().joined(separator: ", "))
+        Doğru değerler (testçi doldursun): kazanç=… bonus=… paket=… tarih=…
+
+        let lines = [
+        \(escaped.joined(separator: "\n"))
+        ]
+        """
     }
 
     // MARK: - Bolge

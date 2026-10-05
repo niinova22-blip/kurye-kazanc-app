@@ -1,5 +1,9 @@
 import XCTest
-@testable import KuryeKazanc
+#if canImport(KuryeCore)
+@testable import KuryeCore // Windows/Linux: swift test
+#else
+@testable import KuryeKazanc // Xcode / CI
+#endif
 
 /// OCR ayristirma regex testleri. Girdiler Vision'in dondurdugu satir dizisi bicimindedir.
 /// Gercek ekran goruntuleriyle (TestFlight) yeni ekran duzenleri goruldukce buraya test eklenmeli.
