@@ -23,7 +23,7 @@ CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "W
 
 **Bilinen sınırlamalar**
 - OCR şablonları gerçek ekran görüntüleriyle kalibre ediliyor; ilk sürümde bazı ekranlar "kontrol et" uyarısıyla gelebilir
-- Uygulama ikonu geçici
+- Uygulama ikonu: ilk tasarım (geri bildirime açık)
 - Veri paylaşımı onayı kaydedilir ama bu sürümde hiçbir veri cihazdan gönderilmez
 
 ## 0.1.0 – İlk iskelet
