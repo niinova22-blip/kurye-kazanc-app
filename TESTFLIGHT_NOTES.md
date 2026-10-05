@@ -15,7 +15,7 @@ CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "W
 - Ayarlar: km başı maliyet, konum izni, anonim veri paylaşımı (varsayılan kapalı, açık onaylı)
 
 **Mutlaka gerçek cihazda test et**
-1. OCR: Trendyol GO ve Getir kazanç ekranlarının görüntüsünü yükle. Tutar, bonus, paket sayısı ve tarih doğru mu? Yanlış okunan ekranın görüntüsünü (kişisel bilgileri kapatarak) geliştiriciye gönder.
+1. OCR: Trendyol GO ve Getir kazanç ekranlarının görüntüsünü yükle. Tutar, bonus, paket sayısı ve tarih doğru mu? Yanlış okursa formdaki "okunan metni geliştiriciye gönder" düğmesiyle raporu paylaş ve doğru değerleri rapora yaz (göndermeden önce ad/telefon gibi bilgileri silebilirsin).
 2. Arka plan konumu: "Çalışmaya başla" → telefonu kilitle, 15-20 dk motorla dolaş → "Çalışmayı bitir". Km makul mü? Pil tüketimi normal mi? Üstte mavi konum göstergesi görünüyor mu?
 3. Bitirince açılan formda ilçe/semt doğru mu?
 4. Gece yarısını geçen vardiya (ör. 20:00–02:00) doğru süreyle kaydediliyor mu?

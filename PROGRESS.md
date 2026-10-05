@@ -120,3 +120,26 @@ Yeni oturuma başlarken önce bu dosyayı okuyun; "Tamamlandı" olarak işaretle
 - OCR şablonları gerçek ekran görüntüleriyle kalibre edilmeli (TestFlight'tan örnek toplanacak).
 - Uygulama ikonu geçici.
 - TestFlight: App Store Connect'te `com.kuryekazanc.app` kaydı + Codemagic `APP_STORE_APPLE_ID` → `develop`'u `main`'e birleştir → `ios-release`.
+
+## Oturum 2 (devam) — 2026-10-06
+
+### Verimlilik / kalite
+- **KuryeCore paketi:** saf mantık `KuryeKazanc/Core`'a taşındı; kökteki `Package.swift` aynı dosyaları derler. Windows'ta `swift test`: 40 test ~0,7 sn (Swift 6.4 + VS Build Tools kuruldu). Core'a SwiftData/UIKit/SwiftUI/Vision import eden dosya konmaz. Core testleri `#if canImport(KuryeCore)` ile hem SwiftPM hem Xcode'da çalışır.
+- **pre-push kancası** (`.githooks/pre-push`, `git config core.hooksPath .githooks`): push öncesi `swift test`.
+- **CI:** UI testleri sıradan push'ta atlanır; PR'larda ve `ios-release`'te (`RUN_UI_TESTS=true`) çalışır.
+- **OCR testçi raporu:** TestFlight/DEBUG'da formdan Vision satırlarını teste hazır Swift dizisi olarak paylaşma (`BuildEnvironment`, `ocrDiagnosticReport`).
+- **Dal koruması:** GitHub ücretsiz planda private repoda yok → kural: `main`'e yalnızca `develop`'tan PR ile, CI yeşilse.
+- **Uygulama ikonu:** `scripts/design/make_app_icon.py` ile üretildi (₺ + hız çizgileri + artış oku).
+
+### App Store / TestFlight kurulumu (tamam)
+- Apple Developer: App ID `com.kuryekazanc.app` kaydedildi (ek yetenek yok).
+- App Store Connect: "Kurye Kazanç" (iOS, Türkçe, SKU `kurye-kazanc-ios`), Apple ID **6819440649** → `codemagic.yaml` vars (gizli değil).
+- Provisioning profile "Kurye Kazanc App Store" (sertifika: Distribution, 12.09.2027 — Codemagic'teki `selfwake-distribution`) → Codemagic'e `kurye-kazanc-appstore` adıyla çekildi.
+- Build numarası adımı ilk yükleme (boş TestFlight) için sağlamlaştırıldı.
+
+### CI
+- develop: build #3 (UI dahil) ve #4 (Core taşıma sonrası) yeşil.
+
+### Sonraki adım
+- `develop → main` PR → CI (UI dahil) yeşil → birleştir → `ios-release` → TestFlight 1.0.0 (1).
+- TestFlight'ta gerçek cihaz testleri (TESTFLIGHT_NOTES.md listesi), OCR raporlarıyla şablon kalibrasyonu.
