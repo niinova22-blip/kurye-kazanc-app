@@ -143,3 +143,14 @@ Yeni oturuma başlarken önce bu dosyayı okuyun; "Tamamlandı" olarak işaretle
 ### Sonraki adım
 - `develop → main` PR → CI (UI dahil) yeşil → birleştir → `ios-release` → TestFlight 1.0.0 (1).
 - TestFlight'ta gerçek cihaz testleri (TESTFLIGHT_NOTES.md listesi), OCR raporlarıyla şablon kalibrasyonu.
+
+## Oturum 2 (kapanış) — 2026-10-06
+
+- PR #1 (develop → main) CI'dan geçti (UI dahil, 11 dk) ve birleştirildi (`09c1208`).
+- `ios-release` başarılı → **TestFlight 1.0.0 (1) yüklendi** (App Store Connect'te Processing).
+- Masaüstünde `KURYE_KALDIGIM_YER.txt`: kısa devam notu.
+
+### Sonraki adım
+1. Processing bitince TestFlight'ta dahili test grubu oluştur, kendini ekle → iPhone'a TestFlight uygulamasıyla kur.
+2. Gönüllü kuryeler (App Store Connect kullanıcısı değillerse) için harici grup: ilk build Apple Beta App Review'dan geçer (~1 gün). Gerekirse `codemagic.yaml` → `beta_groups`.
+3. Gerçek cihaz testleri (TESTFLIGHT_NOTES.md), OCR raporlarıyla şablon kalibrasyonu.
