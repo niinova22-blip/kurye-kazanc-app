@@ -5,12 +5,16 @@ import SwiftData
 struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(WorkSessionManager.self) private var workSession
+    @Environment(ScreenshotScanner.self) private var scanner
+    @Environment(\.scenePhase) private var scenePhase
 
     @Query private var todaysEarnings: [EarningRecord]
     @Query private var todaysExpenses: [ExpenseRecord]
     @Query private var weekEarnings: [EarningRecord]
     @Query private var weekExpenses: [ExpenseRecord]
     @Query private var couriers: [Courier]
+    /// Yalnizca assetIdentifier icin: kaydedilmis ekran goruntuleri tekrar onerilmez.
+    @Query private var evidences: [ScreenshotEvidence]
 
     @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
@@ -83,6 +87,10 @@ struct TodayView: View {
 
         NavigationStack {
             List {
+                if let suggestion = scanner.suggestion {
+                    suggestionSection(suggestion)
+                }
+
                 Section {
                     HStack(alignment: .center, spacing: 16) {
                         HeroAmount(title: "Net kazanç", value: summary.netEarnings, identifier: "dashboard.netEarnings")
@@ -131,6 +139,12 @@ struct TodayView: View {
                     addMenu
                 }
             }
+            .task { await scanner.scan(knownIdentifiers: knownIDs) }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    Task { await scanner.scan(knownIdentifiers: knownIDs) }
+                }
+            }
             .sheet(item: $activeSheet) { sheet in
                 switch sheet {
                 case .addEarning(let session, let opensPicker):
@@ -149,6 +163,42 @@ struct TodayView: View {
     }
 
     // MARK: - Bolumler
+
+    private var knownIDs: Set<String> {
+        Set(evidences.compactMap(\.assetIdentifier))
+    }
+
+    private func platformName(_ code: String?) -> String {
+        Platform.defaults.first { $0.code == code }?.name ?? "Platform"
+    }
+
+    private func suggestionSection(_ suggestion: ImportedScreenshot) -> some View {
+        Section {
+            HStack(spacing: 12) {
+                Image(systemName: "text.viewfinder")
+                    .font(.title2)
+                    .foregroundStyle(Theme.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Yeni kazanç ekranı bulundu")
+                        .font(.subheadline.weight(.semibold))
+                    Text("\(platformName(suggestion.parsed.platformCode)) · \(Formatters.currency(suggestion.parsed.totalEarning))")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Ekle") {
+                    if let imported = scanner.consumeSuggestion() {
+                        activeSheet = .importedScreenshot(imported)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("today.suggestion.add")
+            }
+            .swipeActions {
+                Button("Gizle", role: .destructive) { scanner.dismissSuggestion() }
+            }
+        }
+    }
 
     private var addMenu: some View {
         Menu {
@@ -193,6 +243,16 @@ struct TodayView: View {
                 Text("Platformun kazanç ekranının görüntüsünü ekle — + düğmesinden.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if !scanner.isEnabled {
+                    Button("Ekran görüntülerini otomatik bul") {
+                        Task {
+                            if await scanner.enable() {
+                                await scanner.scan(knownIdentifiers: knownIDs)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("today.enableScan")
+                }
             } else {
                 ForEach(todaysEarnings) { record in
                     Button { activeSheet = .editEarning(record) } label: {
@@ -259,4 +319,5 @@ struct TodayView: View {
         .modelContainer(SampleData.previewContainer)
         .environment(location)
         .environment(WorkSessionManager(location: location))
+        .environment(ScreenshotScanner())
 }

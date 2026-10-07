@@ -6,6 +6,7 @@ struct KuryeKazancApp: App {
     private let container: ModelContainer
     @State private var location: LocationService
     @State private var workSession: WorkSessionManager
+    @State private var scanner: ScreenshotScanner
 
     init() {
         let launch = LaunchOptions.current
@@ -20,6 +21,10 @@ struct KuryeKazancApp: App {
         let location = LocationService(isEnabled: !launch.isUITesting)
         _location = State(initialValue: location)
         _workSession = State(initialValue: WorkSessionManager(location: location))
+        // UI testlerinde ayri (bos) tercih alani: tarama kapali, fotograf izni sorulmaz
+        _scanner = State(initialValue: launch.isUITesting
+            ? ScreenshotScanner(defaults: UserDefaults(suiteName: "ui-tests") ?? .standard)
+            : ScreenshotScanner(library: PhotoKitScreenshotLibrary()))
     }
 
     var body: some Scene {
@@ -27,6 +32,7 @@ struct KuryeKazancApp: App {
             RootView()
                 .environment(location)
                 .environment(workSession)
+                .environment(scanner)
                 .task { workSession.resumeIfNeeded() }
         }
         .modelContainer(container)

@@ -1,0 +1,123 @@
+import Foundation
+import Observation
+import Photos
+import UIKit
+
+struct LibraryScreenshot {
+    var identifier: String
+    var createdAt: Date?
+    var data: () async -> Data?
+}
+
+protocol ScreenshotLibrary {
+    var isAuthorized: Bool { get }
+    func requestAccess() async -> Bool
+    func recentScreenshots(since: Date, limit: Int) async -> [LibraryScreenshot]
+}
+
+/// PhotoKit: yalnizca ekran goruntusu alt turundeki fotograflar. Sinirli erisimde yalnizca secilenler gorunur.
+struct PhotoKitScreenshotLibrary: ScreenshotLibrary {
+    var isAuthorized: Bool {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        return status == .authorized || status == .limited
+    }
+
+    func requestAccess() async -> Bool {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        return status == .authorized || status == .limited
+    }
+
+    func recentScreenshots(since: Date, limit: Int) async -> [LibraryScreenshot] {
+        guard isAuthorized else { return [] }
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(
+            format: "(mediaSubtypes & %d) != 0 AND creationDate >= %@",
+            PHAssetMediaSubtype.photoScreenshot.rawValue, since as NSDate
+        )
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.fetchLimit = limit
+        let assets = PHAsset.fetchAssets(with: .image, options: options)
+        var result: [LibraryScreenshot] = []
+        assets.enumerateObjects { asset, _, _ in
+            result.append(LibraryScreenshot(identifier: asset.localIdentifier, createdAt: asset.creationDate) {
+                await withCheckedContinuation { continuation in
+                    let request = PHImageRequestOptions()
+                    request.isNetworkAccessAllowed = true
+                    request.deliveryMode = .highQualityFormat
+                    PHImageManager.default().requestImageDataAndOrientation(for: asset, options: request) { data, _, _, _ in
+                        continuation.resume(returning: data)
+                    }
+                }
+            })
+        }
+        return result
+    }
+}
+
+/// Uygulama acilinca son 48 saatin islenmemis kazanc ekran goruntusunu bulup oneri olarak sunar.
+@MainActor
+@Observable
+final class ScreenshotScanner {
+    private(set) var suggestion: ImportedScreenshot?
+    /// Kullanici otomatik taramayi acti mi? (Gozlenir: dugme acilinca gizlenir.)
+    private(set) var isEnabled: Bool
+
+    @ObservationIgnored private let library: ScreenshotLibrary
+    @ObservationIgnored private let importer: ScreenshotImporter
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private var isScanning = false
+
+    init(library: ScreenshotLibrary = PhotoKitScreenshotLibrary(),
+         importer: ScreenshotImporter = ScreenshotImporter(),
+         defaults: UserDefaults = .standard) {
+        self.library = library
+        self.importer = importer
+        self.defaults = defaults
+        self.isEnabled = defaults.bool(forKey: AppPreferences.screenshotScanEnabledKey)
+    }
+
+    /// Kullanici "otomatik bul"u actiginda: izin ister, verilirse tercihi kaydeder.
+    func enable() async -> Bool {
+        let granted = await library.requestAccess()
+        defaults.set(granted, forKey: AppPreferences.screenshotScanEnabledKey)
+        isEnabled = granted
+        return granted
+    }
+
+    func scan(knownIdentifiers: Set<String>, now: Date = .now) async {
+        guard isEnabled, library.isAuthorized, !isScanning else {
+            suggestion = nil
+            return
+        }
+        isScanning = true
+        defer { isScanning = false }
+
+        let dismissed = Set(defaults.stringArray(forKey: AppPreferences.dismissedScreenshotIDsKey) ?? [])
+        let since = now.addingTimeInterval(-48 * 3600)
+        for item in await library.recentScreenshots(since: since, limit: 5) {
+            guard !knownIdentifiers.contains(item.identifier), !dismissed.contains(item.identifier),
+                  let data = await item.data(),
+                  let result = try? await importer.importImage(data: data, assetIdentifier: item.identifier, referenceDate: now),
+                  result.parsed.platformCode != nil else { continue }
+            var imported = result
+            imported.capturedAt = imported.capturedAt ?? item.createdAt
+            suggestion = imported
+            return
+        }
+        suggestion = nil
+    }
+
+    func dismissSuggestion() {
+        guard let id = suggestion?.assetIdentifier else { return }
+        var dismissed = defaults.stringArray(forKey: AppPreferences.dismissedScreenshotIDsKey) ?? []
+        dismissed.append(id)
+        defaults.set(Array(dismissed.suffix(200)), forKey: AppPreferences.dismissedScreenshotIDsKey)
+        suggestion = nil
+    }
+
+    /// Oneri forma aktarilinca listeden duser (kayit edilirse kanit kimligi zaten "bilinen" olur).
+    func consumeSuggestion() -> ImportedScreenshot? {
+        defer { suggestion = nil }
+        return suggestion
+    }
+}

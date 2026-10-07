@@ -20,6 +20,9 @@ enum AppPreferences {
     /// Haftalik / gunluk net kazanc hedefi (TL). 0 = ayarlanmadi.
     static let weeklyGoalKey = "weeklyNetGoal"
     static let dailyGoalKey = "dailyNetGoal"
+    /// Son 48 saatin ekran goruntulerini otomatik tara (kullanici acar; izin o an istenir).
+    static let screenshotScanEnabledKey = "screenshotScanEnabled"
+    static let dismissedScreenshotIDsKey = "dismissedScreenshotIDs"
 
     static let defaultCostPerKm = VehicleType.motorcycle.defaultCostPerKm
 }
