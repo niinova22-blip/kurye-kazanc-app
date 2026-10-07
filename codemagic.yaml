@@ -124,7 +124,7 @@ workflows:
       # Uygulama + paylas eklentisi: iki profil (App Group yetenekli). Onkosul: README > Imzalama.
       ios_signing:
         provisioning_profiles:
-          - kurye-kazanc-appstore
+          - kurye-kazanc-appstore-v2
           - kurye-kazanc-share-appstore
         certificates:
           - selfwake-distribution

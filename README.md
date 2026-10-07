@@ -59,7 +59,7 @@ scripts/ci/          CI yardımcı scriptleri
 2. `com.kuryekazanc.app` App ID'sinde App Groups yeteneğini aç, grubu seç.
 3. Yeni App ID `com.kuryekazanc.app.share` (App Groups açık, aynı grup).
 4. Profiller: "Kurye Kazanc App Store" yeniden kaydedilir; yeni "Kurye Kazanc Share App Store" (`com.kuryekazanc.app.share`).
-5. Codemagic → Code signing identities → iOS provisioning profiles → Fetch: `kurye-kazanc-appstore` ve `kurye-kazanc-share-appstore`.
+5. Codemagic → Code signing identities → iOS provisioning profiles → Fetch: `kurye-kazanc-appstore-v2` (App Group yetenekli yeni profil) ve `kurye-kazanc-share-appstore`.
 
 Gizli bilgiler koda yazılmaz; hepsi Codemagic arayüzünde tutulur:
 
