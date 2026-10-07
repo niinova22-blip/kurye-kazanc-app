@@ -111,9 +111,12 @@ final class DashboardUITests: XCTestCase {
     func testSampleRecordsShowVerificationBadges() {
         let app = launch(sampleData: true)
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
-        // Ornek veride bir elle, bir ekran goruntusu kaydi var
-        XCTAssertTrue(app.descendants(matching: .any)["verification.manual"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["verification.ocrUnverified"].exists)
+        // Ornek veride bir elle, bir ekran goruntusu kaydi var. Satir bir dugme oldugundan
+        // rozet metni dugmenin etiketine katilir (ic kimlikler XCUITest'te gorunmez).
+        let labels = app.buttons.matching(identifier: "dashboard.earningRow").allElementsBoundByIndex.map(\.label)
+        XCTAssertEqual(labels.count, 2)
+        XCTAssertTrue(labels.contains { $0.contains("Elle girildi") }, "\(labels)")
+        XCTAssertTrue(labels.contains { $0.contains("Ekran görüntüsü") }, "\(labels)")
     }
 
     // MARK: - Sekmeler
