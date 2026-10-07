@@ -21,6 +21,8 @@ final class ScreenshotEvidence {
     var parsedBonus: Double
     var parsedPackages: Int
     var parsedDate: Date
+    /// Normalize OCR metninin ozeti (bkz. `TextHash`): ayni ekran goruntusu ikinci kez kaydedilmesin.
+    var textHash: String = ""
 
     @Relationship(deleteRule: .nullify, inverse: \EarningRecord.evidence)
     var records: [EarningRecord] = []
@@ -47,6 +49,7 @@ final class ScreenshotEvidence {
         self.periodRaw = parsed.period.rawValue
         self.isGenuineScreenshot = isGenuineScreenshot
         self.linesData = RecognizedLine.encode(lines)
+        self.textHash = TextHash.of(lines.map(\.text))
         self.parsedTotal = parsed.totalEarning
         self.parsedBonus = parsed.bonus
         self.parsedPackages = parsed.packageCount

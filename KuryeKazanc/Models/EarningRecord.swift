@@ -37,6 +37,11 @@ final class EarningRecord {
     var verificationRaw: String = VerificationLevel.manual.rawValue
     /// Kaydin dayandigi ekran goruntusu kaniti (elle girilende nil).
     var evidence: ScreenshotEvidence?
+    /// Sunucu esitleme durumu (spec 9): "local", "queued", "uploaded". 1.3'te kullanilacak;
+    /// simdiden eklendi ki o surumde yeni sema (V3) gerekmesin.
+    var syncStateRaw: String = "local"
+    /// Sunucudaki kayit kimligi (1.3). Gonderilmeden nil.
+    var remoteID: UUID? = nil
 
     var verification: VerificationLevel {
         get { VerificationLevel(rawValue: verificationRaw) ?? .manual }

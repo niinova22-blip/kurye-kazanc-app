@@ -108,4 +108,19 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<ExpenseRecord>()), 0)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<ScreenshotEvidence>()), 0)
     }
+
+    func testEvidenceStoresTextHashOfItsLines() throws {
+        let (_, evidence) = recordWithEvidence()
+        try context.save()
+        XCTAssertEqual(evidence.textHash, TextHash.of(["IBAN TR00"]))
+        XCTAssertEqual(evidence.textHash.count, 16)
+    }
+
+    func testEarningRecordSyncFieldsDefaultToLocal() throws {
+        let record = EarningRecord(startTime: .now, endTime: .now, grossEarning: 100)
+        context.insert(record)
+        try context.save()
+        XCTAssertEqual(record.syncStateRaw, "local")
+        XCTAssertNil(record.remoteID)
+    }
 }
