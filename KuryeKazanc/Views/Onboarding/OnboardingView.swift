@@ -13,41 +13,20 @@ struct OnboardingView: View {
     @AppStorage(AppPreferences.dataSharingOptInKey) private var dataSharingOptIn = false
     @AppStorage(AppPreferences.dataSharingConsentDateKey) private var consentTimestamp: Double = 0
 
+    // Derleyicinin tip denetimi zaman asimina ugramasin diye govde kucuk parcalara bolundu.
     var body: some View {
-        @Bindable var vm = viewModel
-
         VStack(spacing: 0) {
-            stepDots(current: vm.step)
+            stepDots(current: viewModel.step)
                 .padding(.top, 16)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    switch vm.step {
-                    case .vehicle: vehicleStep
-                    case .platforms: platformsStep
-                    case .location: locationStep
-                    case .sharing: sharingStep
-                    }
-                }
+                stepContent
+                    .padding(24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            bottomButtons
                 .padding(24)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            VStack(spacing: 12) {
-                Button(vm.isLastStep ? "Başla" : "Devam") {
-                    if vm.isLastStep { finish() } else { withAnimation { vm.next() } }
-                }
-                .buttonStyle(PrimaryActionButtonStyle())
-                .disabled(!vm.canContinue)
-                .opacity(vm.canContinue ? 1 : 0.5)
-                .accessibilityIdentifier("onboarding.next")
-
-                if vm.step != .vehicle {
-                    Button("Geri") { withAnimation { vm.back() } }
-                        .accessibilityIdentifier("onboarding.back")
-                }
-            }
-            .padding(24)
         }
         .sheet(isPresented: $showConsent) {
             DataSharingConsentView {
@@ -61,6 +40,45 @@ struct OnboardingView: View {
             Button("Tamam", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
+        }
+    }
+
+    // MARK: - Iskelet
+
+    private var stepContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            switch viewModel.step {
+            case .vehicle: vehicleStep
+            case .platforms: platformsStep
+            case .location: locationStep
+            case .sharing: sharingStep
+            }
+        }
+    }
+
+    /// Alt kisimda tek elle ulasilan dugmeler.
+    private var bottomButtons: some View {
+        VStack(spacing: 12) {
+            Button(viewModel.isLastStep ? "Başla" : "Devam") {
+                advance()
+            }
+            .buttonStyle(PrimaryActionButtonStyle())
+            .disabled(!viewModel.canContinue)
+            .opacity(viewModel.canContinue ? 1 : 0.5)
+            .accessibilityIdentifier("onboarding.next")
+
+            if viewModel.step != .vehicle {
+                Button("Geri") { withAnimation { viewModel.back() } }
+                    .accessibilityIdentifier("onboarding.back")
+            }
+        }
+    }
+
+    private func advance() {
+        if viewModel.isLastStep {
+            finish()
+        } else {
+            withAnimation { viewModel.next() }
         }
     }
 
@@ -123,8 +141,10 @@ struct OnboardingView: View {
     private var locationStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: "location.circle")
-                .font(.system(size: 56))
+                .font(.largeTitle)
+                .imageScale(.large)
                 .foregroundStyle(Theme.accent)
+                .accessibilityHidden(true)
             Text("Konum yalnızca vardiyada")
                 .font(.title.bold())
             Text("Vardiyayı başlattığında mesafeni ölçer, bitirince durur. Kayıtlara yalnızca ilçe eklenir.")
@@ -151,8 +171,10 @@ struct OnboardingView: View {
     private var sharingStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: "person.3")
-                .font(.system(size: 48))
+                .font(.largeTitle)
+                .imageScale(.large)
                 .foregroundStyle(Theme.accent)
+                .accessibilityHidden(true)
             Text("Bölgendeki kuryelerle karşılaştır")
                 .font(.title.bold())
             Text("Anonim paylaşıma katılırsan, topluluk özellikleri açıldığında ilçendeki saat başı ortalama net kazancı ve en yoğun saatleri görürsün. Yalnızca ekran görüntüsüyle doğrulanmış kazançlar kullanılır; adın ve tam konumun asla paylaşılmaz.")
@@ -192,8 +214,9 @@ private struct SelectableRow: View {
             HStack(spacing: 14) {
                 Image(systemName: systemImage)
                     .font(.title3)
-                    .frame(width: 28)
+                    .frame(minWidth: 28)
                     .foregroundStyle(isSelected ? Theme.accent : .secondary)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.headline)
                     if let subtitle {
@@ -202,7 +225,9 @@ private struct SelectableRow: View {
                 }
                 Spacer()
                 if isSelected {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
                 }
             }
             .padding(14)
