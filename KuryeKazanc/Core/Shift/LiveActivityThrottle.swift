@@ -11,6 +11,8 @@ struct LiveActivityThrottle {
     func shouldUpdate(lastUpdate: Date?, lastDistanceMeters: Double, now: Date, distanceMeters: Double, isLowPower: Bool) -> Bool {
         guard let lastUpdate else { return true }
         let elapsed = now.timeIntervalSince(lastUpdate)
+        // Saat geri alindi: son guncelleme gelecekte kaldi, beklersek etkinlik uzun sure donar
+        if elapsed < 0 { return true }
         if isLowPower { return elapsed >= lowPowerInterval }
         if elapsed >= normalInterval { return true }
         return elapsed >= minimumGap && distanceMeters - lastDistanceMeters >= distanceStep

@@ -42,4 +42,11 @@ final class PendingShiftTests: XCTestCase {
         XCTAssertFalse(throttle.shouldUpdate(lastUpdate: base, lastDistanceMeters: 0, now: base.addingTimeInterval(120), distanceMeters: 900, isLowPower: true))
         XCTAssertTrue(throttle.shouldUpdate(lastUpdate: base, lastDistanceMeters: 0, now: base.addingTimeInterval(180), distanceMeters: 0, isLowPower: true))
     }
+
+    func testThrottleUpdatesWhenClockMovesBack() {
+        let throttle = LiveActivityThrottle()
+        // Saat geri alinirsa son guncelleme "gelecekte" kalir: beklemek yerine hemen guncellenir
+        XCTAssertTrue(throttle.shouldUpdate(lastUpdate: base, lastDistanceMeters: 0, now: base.addingTimeInterval(-3600), distanceMeters: 0, isLowPower: false))
+        XCTAssertTrue(throttle.shouldUpdate(lastUpdate: base, lastDistanceMeters: 0, now: base.addingTimeInterval(-1), distanceMeters: 0, isLowPower: true))
+    }
 }
