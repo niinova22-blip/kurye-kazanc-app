@@ -8,6 +8,7 @@ struct EarningEntry: Equatable {
     var bonus: Double
     var distanceKm: Double
     var platformCode: String?
+    var packageCount: Int? = nil
 }
 
 /// Hesaplamada kullanilan, SwiftData'dan bagimsiz gider verisi.

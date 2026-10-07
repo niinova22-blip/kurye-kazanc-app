@@ -6,7 +6,7 @@ extension EarningRecord {
     var entry: EarningEntry {
         EarningEntry(
             start: startTime, end: endTime, gross: grossEarning, bonus: bonus,
-            distanceKm: distanceKm, platformCode: platform?.code
+            distanceKm: distanceKm, platformCode: platform?.code, packageCount: packageCount
         )
     }
 }
