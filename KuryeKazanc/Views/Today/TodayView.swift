@@ -43,6 +43,8 @@ struct TodayView: View {
 
     enum Sheet: Identifiable {
         case addEarning(session: WorkSessionSummary?)
+        /// Biten otomatik vardiya: kazanc kaydedilince bekleyenlerden duser.
+        case pendingShift(id: UUID, summary: WorkSessionSummary)
         case editEarning(EarningRecord)
         case importedScreenshot(ImportedScreenshot)
         case addExpense
@@ -51,6 +53,7 @@ struct TodayView: View {
         var id: String {
             switch self {
             case .addEarning: "addEarning"
+            case .pendingShift(let id, _): "pending-\(id)"
             case .editEarning(let record): "editEarning-\(record.id)"
             case .importedScreenshot: "imported"
             case .addExpense: "addExpense"
@@ -240,6 +243,8 @@ struct TodayView: View {
         switch sheet {
         case .addEarning(let session):
             EarningFormView(session: session, defaultPlatform: defaultPlatform)
+        case .pendingShift(let id, let summary):
+            pendingShiftForm(id: id, summary: summary)
         case .editEarning(let record):
             EarningFormView(record: record)
         case .importedScreenshot(let imported):
@@ -249,6 +254,15 @@ struct TodayView: View {
         case .editExpense(let record):
             ExpenseFormView(record: record)
         }
+    }
+
+    private func pendingShiftForm(id: UUID, summary: WorkSessionSummary) -> some View {
+        let coordinator: AutoShiftCoordinator = autoShift
+        return EarningFormView(
+            session: summary,
+            defaultPlatform: defaultPlatform,
+            onSaved: { coordinator.dismissPending(id: id) }
+        )
     }
 
     private var knownIDs: Set<String> {
@@ -590,7 +604,11 @@ struct TodayView: View {
 
     private func sheetDismissed() {
         presentedHash = nil
-        showNextFromInbox()
+        // Bildirimden gelen bekleyen vardiya istegi once; sonra siradaki ekran goruntusu
+        openRequestedPending()
+        if activeSheet == nil {
+            showNextFromInbox()
+        }
     }
 
     private func shiftStatus(elapsed: TimeInterval, summary: EarningsSummary) -> String {
@@ -622,15 +640,17 @@ struct TodayView: View {
         }
     }
 
+    /// Bekleyen vardiya listeden silinmeden acilir; kazanc kaydedilince (onSaved) duser.
     private func openPending(_ id: UUID) {
-        if let summary = autoShift.takePending(id: id) {
-            activeSheet = .addEarning(session: summary)
+        if let summary = autoShift.pendingSummary(id: id) {
+            activeSheet = .pendingShift(id: id, summary: summary)
         }
     }
 
     /// Bildirimden gelen istek bir kez tuketilir (soguk acilista onAppear, sonra onChange).
+    /// Acik bir form varsa degistirilmez: istek form kapaninca (sheetDismissed) islenir.
     private func openRequestedPending() {
-        guard let id = autoShift.requestedPendingID else { return }
+        guard activeSheet == nil, let id = autoShift.requestedPendingID else { return }
         autoShift.requestedPendingID = nil
         openPending(id)
     }

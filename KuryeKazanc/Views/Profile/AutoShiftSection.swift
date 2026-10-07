@@ -9,8 +9,17 @@ struct AutoShiftSection: View {
 
     var body: some View {
         Section {
+            // Liste icinde Section'a eklenen degistiriciler her satira uygulanabilir:
+            // onAppear ve sheet her zaman var olan anahtar satirinda durur.
             Toggle("Otomatik vardiya", isOn: enabledBinding)
                 .accessibilityIdentifier("profile.autoShift")
+                .onAppear { hours = autoShift.workHours }
+                .sheet(isPresented: $showIntro) {
+                    AutoShiftIntroView {
+                        let coordinator: AutoShiftCoordinator = autoShift
+                        Task { _ = await coordinator.enable() }
+                    }
+                }
 
             if autoShift.isEnabled {
                 hoursRows
@@ -27,13 +36,6 @@ struct AutoShiftSection: View {
             Text("Otomatik vardiya")
         } footer: {
             Text("Motorla ya da bisikletle yola çıkınca vardiyan kendiliğinden başlar, km sayılır; 20 dakika durunca biter. Yalnızca bu saatlerde başlar. Konum yalnızca vardiyada ayrıntılı izlenir.")
-        }
-        .onAppear { hours = autoShift.workHours }
-        .sheet(isPresented: $showIntro) {
-            AutoShiftIntroView {
-                let coordinator: AutoShiftCoordinator = autoShift
-                Task { _ = await coordinator.enable() }
-            }
         }
     }
 

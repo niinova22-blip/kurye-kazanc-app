@@ -199,6 +199,12 @@ final class AutoShiftCoordinator {
         defaults.set(clock(), forKey: AppPreferences.lastAutoCancelKey)
     }
 
+    /// Bekleyen vardiyanin ozeti; listeden SILMEZ. Kazanc kaydedilene kadar bekleyen kalir (spec 3):
+    /// form vazgecilerek kapanirsa sure/km kaybolmaz. Kayitta dismissPending(id:) cagrilir.
+    func pendingSummary(id: UUID) -> WorkSessionSummary? {
+        pendingShifts.first(where: { $0.id == id })?.summary
+    }
+
     func takePending(id: UUID) -> WorkSessionSummary? {
         guard let shift = pendingShifts.first(where: { $0.id == id }) else { return nil }
         removePending(id: id)

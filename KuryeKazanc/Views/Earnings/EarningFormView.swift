@@ -23,17 +23,21 @@ struct EarningFormView: View {
     private let session: WorkSessionSummary?
     private let importer: ScreenshotImporter
     private let initialImported: ImportedScreenshot?
+    /// Basarili kayittan sonra (kapanmadan once) cagrilir; or. bekleyen vardiyayi listeden dusurmek icin.
+    private let onSaved: (() -> Void)?
 
     /// - Parameters:
     ///   - imported: Paylas eklentisi / otomatik tarama sonucu; form bununla dolu acilir.
     ///   - opensPhotoPicker: "Ekran goruntusu" ile acildiginda secici hemen gosterilir.
+    ///   - onSaved: Yalnizca kayit basariliysa cagrilir (vazgecilince cagrilmaz).
     init(
         record: EarningRecord? = nil,
         session: WorkSessionSummary? = nil,
         defaultPlatform: Platform? = nil,
         imported: ImportedScreenshot? = nil,
         opensPhotoPicker: Bool = false,
-        importer: ScreenshotImporter = ScreenshotImporter()
+        importer: ScreenshotImporter = ScreenshotImporter(),
+        onSaved: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: EarningFormViewModel(
             record: record, session: session, defaultPlatform: defaultPlatform, imported: imported
@@ -42,6 +46,7 @@ struct EarningFormView: View {
         self.session = session
         self.importer = importer
         self.initialImported = imported
+        self.onSaved = onSaved
     }
 
     var body: some View {
@@ -294,6 +299,7 @@ struct EarningFormView: View {
     private func save() {
         do {
             try viewModel.save(in: modelContext)
+            onSaved?()
             dismiss()
         } catch {
             saveError = error.localizedDescription
