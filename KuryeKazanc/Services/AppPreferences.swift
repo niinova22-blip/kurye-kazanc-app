@@ -13,6 +13,9 @@ enum AppPreferences {
     static let dataSharingOptInKey = "dataSharingOptIn"
     /// Kullanicinin acik onay verdigi an (Unix zaman damgasi). Onay geri alininca silinir.
     static let dataSharingConsentDateKey = "dataSharingConsentDate"
+    /// Konum yogunlugu paylasimi (kazanc paylasimindan AYRI acik riza). Varsayilan KAPALI.
+    static let locationSharingOptInKey = "locationSharingOptIn"
+    static let locationSharingConsentDateKey = "locationSharingConsentDate"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     /// Haftalik / gunluk net kazanc hedefi (TL). 0 = ayarlanmadi.
     static let weeklyGoalKey = "weeklyNetGoal"

@@ -167,6 +167,23 @@ final class DashboardUITests: XCTestCase {
         app.buttons["Vazgeç"].tap()
         XCTAssertEqual(toggle.value as? String, "0")
     }
+
+    func testLocationSharingRequiresEarningsSharingAndOwnConsent() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Profil"].tap()
+        let location = app.switches["profile.locationSharing"]
+        for _ in 0..<5 where !location.exists { app.swipeUp() }
+        XCTAssertTrue(location.exists)
+        XCTAssertFalse(location.isEnabled, "Kazanc paylasimi kapaliyken konum paylasimi acilamamali")
+    }
+
+    func testCommunityTabExists() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.tabBars.buttons["Topluluk"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Topluluk"].tap()
+        XCTAssertTrue(app.staticTexts["Bölgendeki kuryelerle karşılaştır"].waitForExistence(timeout: 5))
+    }
 }
 
 final class OnboardingUITests: XCTestCase {

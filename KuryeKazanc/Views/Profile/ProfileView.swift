@@ -2,7 +2,8 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 
-struct SettingsView: View {
+/// Profil sekmesi: profil, hedefler, gider hesabi, konum izni, paylasim rizalari, veri.
+struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(LocationService.self) private var location
@@ -14,9 +15,16 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
     @AppStorage(AppPreferences.dataSharingOptInKey) private var dataSharingOptIn = false
     @AppStorage(AppPreferences.dataSharingConsentDateKey) private var consentTimestamp: Double = 0
+    @AppStorage(AppPreferences.locationSharingOptInKey) private var locationSharingOptIn = false
+    @AppStorage(AppPreferences.locationSharingConsentDateKey) private var locationConsentTimestamp: Double = 0
+    @AppStorage(AppPreferences.weeklyGoalKey) private var weeklyGoal = 0.0
+    @AppStorage(AppPreferences.dailyGoalKey) private var dailyGoal = 0.0
 
     @State private var costText = ""
+    @State private var weeklyGoalText = ""
+    @State private var dailyGoalText = ""
     @State private var showConsentSheet = false
+    @State private var showLocationConsentSheet = false
     @State private var showDeleteConfirmation = false
 
     private var courier: Courier? { couriers.first }
@@ -25,18 +33,29 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 profileSection
+                goalsSection
                 expenseSection
                 locationSection
                 sharingSection
                 dataSection
                 aboutSection
             }
-            .navigationTitle("Ayarlar")
-            .onAppear { costText = TurkishNumberParser.format(costPerKm) }
+            .navigationTitle("Profil")
+            .onAppear {
+                costText = TurkishNumberParser.format(costPerKm)
+                weeklyGoalText = weeklyGoal > 0 ? TurkishNumberParser.format(weeklyGoal) : ""
+                dailyGoalText = dailyGoal > 0 ? TurkishNumberParser.format(dailyGoal) : ""
+            }
             .sheet(isPresented: $showConsentSheet) {
                 DataSharingConsentView {
                     dataSharingOptIn = true
                     consentTimestamp = Date.now.timeIntervalSince1970
+                }
+            }
+            .sheet(isPresented: $showLocationConsentSheet) {
+                LocationSharingConsentView {
+                    locationSharingOptIn = true
+                    locationConsentTimestamp = Date.now.timeIntervalSince1970
                 }
             }
             .confirmationDialog(
@@ -75,6 +94,35 @@ struct SettingsView: View {
             } else {
                 Text("Profil bulunamadı").foregroundStyle(.secondary)
             }
+        }
+    }
+
+    // MARK: - Hedefler
+
+    private var goalsSection: some View {
+        Section {
+            goalField("Haftalık net hedef", text: $weeklyGoalText, identifier: "profile.weeklyGoal") { weeklyGoal = $0 }
+            goalField("Günlük net hedef", text: $dailyGoalText, identifier: "profile.dailyGoal") { dailyGoal = $0 }
+        } header: {
+            Text("Hedefler")
+        } footer: {
+            Text("Bugün ekranındaki halka haftalık hedefi gösterir. Boş bırakırsan hedef kapalı olur.")
+        }
+    }
+
+    private func goalField(_ title: String, text: Binding<String>, identifier: String, onValue: @escaping (Double) -> Void) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField("—", text: text)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: 110)
+                .onChange(of: text.wrappedValue) { _, value in
+                    onValue(value.nilIfBlank.flatMap(TurkishNumberParser.parseDecimal).map { max(0, $0) } ?? 0)
+                }
+                .accessibilityIdentifier(identifier)
+            Text("₺").foregroundStyle(.secondary)
         }
     }
 
@@ -149,11 +197,11 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Veri paylasimi
+    // MARK: - Paylasim
 
     private var sharingSection: some View {
         Section {
-            Toggle("Anonim istatistik havuzuna katıl", isOn: Binding(
+            Toggle("Kazançlarımı anonim paylaş", isOn: Binding(
                 get: { dataSharingOptIn },
                 set: { newValue in
                     if newValue {
@@ -161,19 +209,30 @@ struct SettingsView: View {
                     } else {
                         dataSharingOptIn = false
                         consentTimestamp = 0
+                        locationSharingOptIn = false
+                        locationConsentTimestamp = 0
                     }
                 }
             ))
             .accessibilityIdentifier("settings.dataSharing")
 
-            if dataSharingOptIn, consentTimestamp > 0 {
-                LabeledContent("Onay tarihi", value: Date(timeIntervalSince1970: consentTimestamp)
-                    .formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Formatters.locale)))
-            }
+            Toggle("Konum yoğunluğunu paylaş", isOn: Binding(
+                get: { locationSharingOptIn },
+                set: { newValue in
+                    if newValue {
+                        showLocationConsentSheet = true
+                    } else {
+                        locationSharingOptIn = false
+                        locationConsentTimestamp = 0
+                    }
+                }
+            ))
+            .disabled(!dataSharingOptIn)
+            .accessibilityIdentifier("profile.locationSharing")
         } header: {
-            Text("Veri paylaşımı")
+            Text("Paylaşım")
         } footer: {
-            Text("Varsayılan olarak kapalıdır. Bu sürümde hiçbir veri cihazından gönderilmez; onayın yalnızca kaydedilir. Paylaşım ileride başladığında yalnızca isimsiz kazanç/gider rakamları ve ilçe bilgisi, rastgele bir cihaz kimliğiyle paylaşılacak. İstediğin an kapatabilirsin.")
+            Text("Varsayılan olarak kapalıdır. Bu sürümde hiçbir veri gönderilmez; tercihlerin kaydedilir. Topluluk özellikleri açıldığında yalnızca ekran görüntüsüyle doğrulanmış kazançlar paylaşılır.")
         }
     }
 
@@ -211,60 +270,6 @@ struct SettingsView: View {
         try? modelContext.delete(model: EarningRecord.self)
         try? modelContext.delete(model: ExpenseRecord.self)
         try? modelContext.save()
-    }
-}
-
-/// Acik onay ekrani: ne paylasilir, ne paylasilmaz.
-private struct DataSharingConsentView: View {
-    @Environment(\.dismiss) private var dismiss
-    let onAccept: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Anonim istatistik havuzu")
-                        .font(.title2.bold())
-                    Text("Amaç: kuryelerin bölge ve platform bazında gerçek net kazançlarını görebilmesi.")
-                        .foregroundStyle(.secondary)
-
-                    GroupBox("Paylaşılacaklar") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Label("Kazanç, bonus, gider tutarları", systemImage: "checkmark")
-                            Label("Çalışma süresi, mesafe, paket sayısı", systemImage: "checkmark")
-                            Label("Platform ve ilçe/semt", systemImage: "checkmark")
-                            Label("Rastgele cihaz kimliği (seninle ilişkilendirilemez)", systemImage: "checkmark")
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    GroupBox("Asla paylaşılmayacaklar") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Label("Adın ve profil bilgilerin", systemImage: "xmark")
-                            Label("Tam konumun veya güzergâhın", systemImage: "xmark")
-                            Label("Telefon numarası, e-posta, Apple kimliği", systemImage: "xmark")
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    Text("Bu sürümde veri gönderimi henüz yok; onayın kaydedilir. Ayarlar'dan istediğin an geri alabilirsin.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(20)
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Vazgeç") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Onaylıyorum") {
-                        onAccept()
-                        dismiss()
-                    }
-                    .accessibilityIdentifier("consent.accept")
-                }
-            }
-        }
     }
 }
 
