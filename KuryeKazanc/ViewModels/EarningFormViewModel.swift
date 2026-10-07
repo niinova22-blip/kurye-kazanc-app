@@ -49,6 +49,8 @@ final class EarningFormViewModel {
     var ocrState: OCRState = .idle
     /// Son ekran goruntusu ice aktarimi (kanit + degerlendirme).
     private(set) var imported: ImportedScreenshot?
+    /// Ice aktarilan ekranin metin ozeti kayitli bir kanitla ayni: kayit en fazla `ocrEdited` olur (spec 10).
+    private(set) var isDuplicateScreenshot = false
     /// Ekrandan okunan degerlerin karsilastirma tabani (kullanici degistirdi mi?).
     @ObservationIgnored private var readBaseline: ReadValues?
     var isResolvingRegion = false
@@ -67,7 +69,15 @@ final class EarningFormViewModel {
         var packages: Int?
     }
 
-    var assessmentIssues: [String] { imported?.assessment.issues ?? [] }
+    static let duplicateScreenshotIssue = "Bu ekran görüntüsü daha önce kaydedilmiş."
+
+    var assessmentIssues: [String] {
+        var issues: [String] = imported?.assessment.issues ?? []
+        if isDuplicateScreenshot {
+            issues.append(Self.duplicateScreenshotIssue)
+        }
+        return issues
+    }
 
     /// Kaydedilince alinacak seviye.
     var pendingVerification: VerificationLevel {
@@ -75,6 +85,10 @@ final class EarningFormViewModel {
             // Duzenleme: okunan degerler degistiyse ocrEdited, yoksa mevcut seviye
             guard editingRecord.source == .ocr else { return .manual }
             return userEditedReadValues ? .ocrEdited : editingRecord.verification
+        }
+        if imported != nil, isDuplicateScreenshot {
+            // Daha once kullanilmis ekran: asla topluluga girmez
+            return .ocrEdited
         }
         return VerificationLevel.resolve(
             isFromScreenshot: imported != nil,
@@ -161,25 +175,34 @@ final class EarningFormViewModel {
 
     // MARK: - OCR
 
+    /// - Parameters:
+    ///   - capturedAt: Gorselin cekildigi an (PhotoKit); EXIF yoksa kullanilir.
+    ///   - knownTextHashes: Kayitli kanitlarin metin ozetleri (tekrar kontrolu).
     func importScreenshot(
         data: Data,
         assetIdentifier: String?,
+        capturedAt: Date? = nil,
         importer: ScreenshotImporter = ScreenshotImporter(),
         platforms: [Platform],
+        knownTextHashes: Set<String> = [],
         referenceDate: Date = .now
     ) async {
         ocrState = .processing
         do {
-            let result = try await importer.importImage(data: data, assetIdentifier: assetIdentifier, referenceDate: referenceDate)
-            apply(result, platforms: platforms)
+            let result = try await importer.importImage(
+                data: data, assetIdentifier: assetIdentifier,
+                capturedAt: capturedAt, referenceDate: referenceDate
+            )
+            apply(result, platforms: platforms, knownTextHashes: knownTextHashes)
             ocrState = .finished
         } catch {
             ocrState = .failed(error.localizedDescription)
         }
     }
 
-    func apply(_ imported: ImportedScreenshot, platforms: [Platform]) {
+    func apply(_ imported: ImportedScreenshot, platforms: [Platform], knownTextHashes: Set<String> = []) {
         self.imported = imported
+        isDuplicateScreenshot = !imported.textHash.isEmpty && knownTextHashes.contains(imported.textHash)
         apply(imported.parsed, platforms: platforms)
         if imported.parsed.period == .week {
             // Haftalik toplam tek vardiya gibi sessizce kaydedilmesin: "Kontrol ettim" onayi zorunlu

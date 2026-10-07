@@ -286,7 +286,61 @@ final class FormViewModelTests: XCTestCase {
         )
         return ImportedScreenshot(lines: [RecognizedLine(text: "Getir", x: 0, y: 0, width: 1, height: 0.1)],
                                   parsed: parsed, assessment: assessment, capturedAt: nil,
-                                  assetIdentifier: "asset-1", isGenuine: true)
+                                  assetIdentifier: "asset-1", isGenuine: true,
+                                  textHash: TextHash.of(["Getir"]))
+    }
+
+    func testDuplicateScreenshot_isOcrEditedWithIssue() throws {
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        vm.apply(imported(candidate: .verified), platforms: platforms, knownTextHashes: [TextHash.of(["Getir"])])
+        XCTAssertTrue(vm.isDuplicateScreenshot)
+        XCTAssertEqual(vm.pendingVerification, .ocrEdited, "Daha once kullanilmis ekran topluluga giremez")
+        XCTAssertTrue(vm.assessmentIssues.contains("Bu ekran görüntüsü daha önce kaydedilmiş."))
+
+        let record = try vm.save(in: context)
+        XCTAssertEqual(record.verification, .ocrEdited)
+        XCTAssertEqual(record.evidence?.textHash, TextHash.of(["Getir"]))
+    }
+
+    func testUnknownScreenshot_isNotDuplicate() {
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        vm.apply(imported(candidate: .verified), platforms: platforms, knownTextHashes: ["0000000000000000"])
+        XCTAssertFalse(vm.isDuplicateScreenshot)
+        XCTAssertEqual(vm.pendingVerification, .verified)
+        XCTAssertFalse(vm.assessmentIssues.contains("Bu ekran görüntüsü daha önce kaydedilmiş."))
+
+        // Varsayilan parametreyle eski cagri bicimi de calisir
+        vm.apply(imported(), platforms: platforms)
+        XCTAssertFalse(vm.isDuplicateScreenshot)
+    }
+
+    func testImportScreenshot_marksDuplicateAndPassesCaptureDate() async {
+        let lines = ["Getir", "Kazançlarım", "Toplam Kazanç", "₺700"]
+        struct FakeRecognizer: TextRecognizing {
+            var lines: [String]
+            func recognize(in image: UIImage) async throws -> [RecognizedLine] {
+                lines.map { RecognizedLine(text: $0, x: 0, y: 0, width: 1, height: 0.05) }
+            }
+        }
+        let importer = ScreenshotImporter(
+            recognizer: FakeRecognizer(lines: lines), parser: EarningsScreenshotParser(calendar: calendar),
+            verifier: ScreenshotVerifier(calendar: calendar), assetIsScreenshot: { _ in nil }
+        )
+        let captured = at(5, 23)
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        await vm.importScreenshot(
+            data: Self.pngData(), assetIdentifier: nil, capturedAt: captured, importer: importer,
+            platforms: platforms, knownTextHashes: [TextHash.of(lines)], referenceDate: at(6, 18)
+        )
+        XCTAssertEqual(vm.ocrState, .finished)
+        XCTAssertTrue(vm.isDuplicateScreenshot)
+        XCTAssertEqual(vm.pendingVerification, .ocrEdited)
+        XCTAssertEqual(vm.imported?.capturedAt, captured)
+
+        // Ozet bilinmiyorsa (ornegin onceki kayit silindi) isaret kalkar
+        await vm.importScreenshot(data: Self.pngData(), assetIdentifier: nil, importer: importer,
+                                  platforms: platforms, knownTextHashes: [], referenceDate: at(6, 18))
+        XCTAssertFalse(vm.isDuplicateScreenshot)
     }
 
     func testScreenshotSave_storesEvidenceAndCandidateLevel() throws {
