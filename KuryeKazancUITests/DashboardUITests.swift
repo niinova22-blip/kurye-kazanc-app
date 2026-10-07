@@ -50,7 +50,7 @@ final class DashboardUITests: XCTestCase {
         let app = launch(sampleData: true)
         XCTAssertTrue(app.buttons["dashboard.addMenu"].waitForExistence(timeout: 10))
         app.buttons["dashboard.addMenu"].tap()
-        app.buttons["Kazanç ekle"].tap()
+        app.buttons["Elle kazanç"].tap()
 
         let gross = app.textFields["earningForm.gross"]
         XCTAssertTrue(gross.waitForExistence(timeout: 5))
@@ -74,7 +74,7 @@ final class DashboardUITests: XCTestCase {
         let app = launch(sampleData: true)
         XCTAssertTrue(app.buttons["dashboard.addMenu"].waitForExistence(timeout: 10))
         app.buttons["dashboard.addMenu"].tap()
-        app.buttons["Gider ekle"].tap()
+        app.buttons["Gider"].tap()
 
         let amount = app.textFields["expenseForm.amount"]
         XCTAssertTrue(amount.waitForExistence(timeout: 5))
@@ -93,10 +93,27 @@ final class DashboardUITests: XCTestCase {
         let app = launch(sampleData: false)
         XCTAssertTrue(app.buttons["dashboard.addMenu"].waitForExistence(timeout: 10))
         app.buttons["dashboard.addMenu"].tap()
-        app.buttons["Kazanç ekle"].tap()
+        app.buttons["Elle kazanç"].tap()
         XCTAssertTrue(app.buttons["form.cancel"].waitForExistence(timeout: 5))
         app.buttons["form.cancel"].tap()
         XCTAssertFalse(app.buttons["dashboard.earningRow"].exists)
+    }
+
+    func testAddMenuOffersScreenshotFirst() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.buttons["dashboard.addMenu"].waitForExistence(timeout: 10))
+        app.buttons["dashboard.addMenu"].tap()
+        XCTAssertTrue(app.buttons["Ekran görüntüsü"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Elle kazanç"].exists)
+        XCTAssertTrue(app.buttons["Gider"].exists)
+    }
+
+    func testSampleRecordsShowVerificationBadges() {
+        let app = launch(sampleData: true)
+        XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
+        // Ornek veride bir elle, bir ekran goruntusu kaydi var
+        XCTAssertTrue(app.descendants(matching: .any)["verification.manual"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["verification.ocrUnverified"].exists)
     }
 
     // MARK: - Sekmeler

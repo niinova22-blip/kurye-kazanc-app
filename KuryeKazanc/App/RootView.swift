@@ -25,15 +25,15 @@ struct MainTabView: View {
 
     var body: some View {
         TabView {
-            DashboardView(day: today)
+            TodayView(day: today)
                 .id(today) // Gun degisince sorgular yeni gunle yeniden kurulur
-                .tabItem { Label("Bugün", systemImage: "house") }
-
-            HistoryView()
-                .tabItem { Label("Geçmiş", systemImage: "chart.bar") }
-
-            SettingsView()
-                .tabItem { Label("Ayarlar", systemImage: "gearshape") }
+                .tabItem { Label("Bugün", systemImage: "sun.max") }
+            AnalysisView()
+                .tabItem { Label("Analiz", systemImage: "chart.bar.xaxis") }
+            CommunityView()
+                .tabItem { Label("Topluluk", systemImage: "person.3") }
+            ProfileView()
+                .tabItem { Label("Profil", systemImage: "person.crop.circle") }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { refreshDay() }
