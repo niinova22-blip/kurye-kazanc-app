@@ -118,8 +118,9 @@ final class FormViewModelTests: XCTestCase {
 
     func testImportScreenshot_usesRecognizerAndParser() async throws {
         struct FakeRecognizer: TextRecognizing {
-            func recognizeLines(in image: UIImage) async throws -> [String] {
+            func recognize(in image: UIImage) async throws -> [RecognizedLine] {
                 ["Trendyol GO", "05.10.2026", "Toplam Kazanç", "₺1.200,00", "Teslimat Sayısı", "15", "Bonus", "₺200,00"]
+                    .map { RecognizedLine(text: $0, x: 0, y: 0, width: 1, height: 0.05) }
             }
         }
         let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
@@ -141,7 +142,7 @@ final class FormViewModelTests: XCTestCase {
 
     func testImportScreenshot_failureIsReported() async {
         struct FailingRecognizer: TextRecognizing {
-            func recognizeLines(in image: UIImage) async throws -> [String] {
+            func recognize(in image: UIImage) async throws -> [RecognizedLine] {
                 throw TextRecognitionError.noTextFound
             }
         }

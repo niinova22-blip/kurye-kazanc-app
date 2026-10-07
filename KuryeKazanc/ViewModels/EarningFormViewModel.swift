@@ -115,7 +115,7 @@ final class EarningFormViewModel {
     ) async {
         ocrState = .processing
         do {
-            let lines = try await recognizer.recognizeLines(in: image)
+            let lines = try await recognizer.recognize(in: image).map(\.text)
             recognizedLines = lines
             let parsed = parser.parse(lines: lines, referenceDate: referenceDate)
             apply(parsed, platforms: platforms)
