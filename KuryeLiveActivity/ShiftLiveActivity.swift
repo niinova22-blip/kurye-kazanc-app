@@ -86,7 +86,7 @@ private struct ShiftLockScreenView: View {
 
     private var title: String {
         if state.endedAt != nil { return "Vardiya bitti" }
-        return attributes.isAuto ? "Vardiya · otomatik" : "Vardiya"
+        return attributes.isAuto ? "Vardiya · otomatik" : "Vardiya · elle"
     }
 
     var body: some View {
