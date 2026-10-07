@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import Photos
 
 /// Kazanc ekle / duzenle. Manuel giris VEYA ekran goruntusunden OCR ile doldurma (sonuc onaya sunulur).
 struct EarningFormView: View {
@@ -9,6 +10,8 @@ struct EarningFormView: View {
     @Environment(LocationService.self) private var location
 
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
+    /// Kayitli kanitlar: ayni ekran goruntusu ikinci kez eklenirse uyarilir.
+    @Query private var evidences: [ScreenshotEvidence]
 
     @State private var viewModel: EarningFormViewModel
     @State private var photoItem: PhotosPickerItem?
@@ -179,7 +182,7 @@ struct EarningFormView: View {
                 // Init'te platform listesi yoktu; platformu eslestirmek icin bir kez yeniden uygulanir
                 if let initialImported, !appliedInitialImport {
                     appliedInitialImport = true
-                    viewModel.apply(initialImported, platforms: platforms)
+                    viewModel.apply(initialImported, platforms: platforms, knownTextHashes: knownHashes)
                 }
                 await viewModel.resolveRegionIfNeeded(using: location, from: session)
             }
@@ -194,6 +197,13 @@ struct EarningFormView: View {
                 Label("Ekran görüntüsünden doldur", systemImage: "text.viewfinder")
             }
             .accessibilityIdentifier("earningForm.ocrPicker")
+
+            if viewModel.isDuplicateScreenshot {
+                Label("Bu ekran görüntüsü daha önce kaydedilmiş.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("earningForm.duplicateWarning")
+            }
 
             switch viewModel.ocrState {
             case .idle:
@@ -254,8 +264,22 @@ struct EarningFormView: View {
             viewModel.ocrState = .failed("Görsel yüklenemedi.")
             return
         }
-        await viewModel.importScreenshot(data: data, assetIdentifier: item.itemIdentifier,
-                                         importer: importer, platforms: platforms)
+        let identifier: String? = item.itemIdentifier
+        let capturedAt: Date? = PhotoAssetInfo.creationDate(localIdentifier: identifier)
+        await viewModel.importScreenshot(
+            data: data,
+            assetIdentifier: identifier,
+            capturedAt: capturedAt,
+            importer: importer,
+            platforms: platforms,
+            knownTextHashes: knownHashes
+        )
+    }
+
+    /// Kayitli kanitlarin metin ozetleri (bos ozet eslesme sayilmaz).
+    private var knownHashes: Set<String> {
+        let hashes: [String] = evidences.map(\.textHash).filter { !$0.isEmpty }
+        return Set(hashes)
     }
 
     private func attemptSave() {
@@ -273,5 +297,16 @@ struct EarningFormView: View {
         } catch {
             saveError = error.localizedDescription
         }
+    }
+}
+
+/// PhotoKit cekim tarihi. Secicinin verdigi yerel kimlik + fotograf izni (tam / sinirli) gerekir; yoksa nil.
+enum PhotoAssetInfo {
+    static func creationDate(localIdentifier: String?) -> Date? {
+        guard let localIdentifier else { return nil }
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard status == .authorized || status == .limited else { return nil }
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
+        return assets.firstObject?.creationDate
     }
 }

@@ -136,7 +136,7 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.switches["settings.autoEstimate"].waitForExistence(timeout: 5))
         // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
         let sharing = app.switches["settings.dataSharing"]
-        for _ in 0..<4 where !sharing.exists {
+        for _ in 0..<6 where !sharing.exists {
             app.swipeUp()
         }
         XCTAssertTrue(sharing.exists)
@@ -157,8 +157,11 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Profil"].tap()
 
+        // Ekran goruntusu bolumu eklendi: paylasim satiri ilk ekranda olmayabilir
+        XCTAssertTrue(app.switches["settings.autoEstimate"].waitForExistence(timeout: 5))
         let toggle = app.switches["settings.dataSharing"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        for _ in 0..<6 where !(toggle.exists && toggle.isHittable) { app.swipeUp() }
+        XCTAssertTrue(toggle.exists)
         XCTAssertEqual(toggle.value as? String, "0", "Varsayilan kapali olmali (opt-in)")
 
         toggle.switches.firstMatch.tap()
@@ -173,9 +176,31 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Profil"].tap()
         let location = app.switches["profile.locationSharing"]
-        for _ in 0..<5 where !location.exists { app.swipeUp() }
+        for _ in 0..<7 where !location.exists { app.swipeUp() }
         XCTAssertTrue(location.exists)
         XCTAssertFalse(location.isEnabled, "Kazanc paylasimi kapaliyken konum paylasimi acilamamali")
+    }
+
+    func testProfileOffersAutoScanToggle() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Profil"].tap()
+        // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
+        let autoScan = app.switches["profile.autoScan"]
+        for _ in 0..<5 where !autoScan.exists { app.swipeUp() }
+        XCTAssertTrue(autoScan.exists)
+        // UI testlerinde tarama tercihi bos alandan okunur: kapali baslar (izin istenmez)
+        XCTAssertEqual(autoScan.value as? String, "0")
+    }
+
+    func testDashboardShowsGrossAndExpenseBreakdown() {
+        let app = launch(sampleData: true)
+        // Satir birlestirilmis erisilebilirlik ogesi: turu (metin/diger) degisebilir
+        let breakdown = app.descendants(matching: .any)["dashboard.breakdown"].firstMatch
+        XCTAssertTrue(breakdown.waitForExistence(timeout: 10))
+        // 1050 brut; 150 tahmini + 50 elle = 200 gider
+        XCTAssertTrue(breakdown.label.contains("1.050"), "Beklenen brut 1.050, gelen: \(breakdown.label)")
+        XCTAssertTrue(breakdown.label.contains("200"), "Beklenen gider 200, gelen: \(breakdown.label)")
     }
 
     func testCommunityTabExists() {
