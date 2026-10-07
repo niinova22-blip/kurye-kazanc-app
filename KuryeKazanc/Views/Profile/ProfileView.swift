@@ -37,6 +37,7 @@ struct ProfileView: View {
                 goalsSection
                 expenseSection
                 locationSection
+                AutoShiftSection()
                 screenshotSection
                 sharingSection
                 dataSection

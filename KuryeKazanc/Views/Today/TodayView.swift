@@ -7,6 +7,7 @@ struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(WorkSessionManager.self) private var workSession
     @Environment(ScreenshotScanner.self) private var scanner
+    @Environment(AutoShiftCoordinator.self) private var autoShift
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
 
@@ -121,6 +122,11 @@ struct TodayView: View {
                     pickedItems = []
                     Task { await importPicked(items) }
                 }
+                // "Vardiya bitti" bildirimine dokunuldu: bekleyen vardiyanin kazanc formu acilir
+                .onAppear(perform: openRequestedPending)
+                .onChange(of: autoShift.requestedPendingID) { _, _ in
+                    openRequestedPending()
+                }
         }
     }
 
@@ -132,6 +138,7 @@ struct TodayView: View {
                 suggestionSection(suggestion)
             }
             noticesSection
+            autoShiftSections
             heroSection(summary)
 
             Section {
@@ -145,6 +152,74 @@ struct TodayView: View {
                 expensesSection
             }
             scanSection
+        }
+    }
+
+    /// Otomatik vardiya: iptal satiri, biten vardiyalar, izin uyarisi.
+    @ViewBuilder
+    private var autoShiftSections: some View {
+        cancelAutoShiftSection
+        pendingShiftsSection
+        autoShiftPermissionSection
+    }
+
+    @ViewBuilder
+    private var cancelAutoShiftSection: some View {
+        if workSession.isWorking, workSession.origin == .auto {
+            Section {
+                Button(role: .destructive) {
+                    autoShift.cancelAutoShift()
+                } label: {
+                    Label("Bu bir vardiya değil", systemImage: "xmark.circle")
+                }
+                .accessibilityIdentifier("today.cancelAutoShift")
+            } footer: {
+                Text("Vardiya hareketle kendiliğinden başladı.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pendingShiftsSection: some View {
+        if !autoShift.pendingShifts.isEmpty {
+            Section("Biten vardiyalar") {
+                ForEach(autoShift.pendingShifts) { (shift: PendingShift) in
+                    pendingShiftButton(shift)
+                }
+            }
+        }
+    }
+
+    private func pendingShiftButton(_ shift: PendingShift) -> some View {
+        Button {
+            openPending(shift.id)
+        } label: {
+            PendingShiftRow(shift: shift)
+        }
+        .buttonStyle(.plain)
+        .swipeActions {
+            Button("Sil", role: .destructive) { autoShift.dismissPending(id: shift.id) }
+        }
+        .accessibilityIdentifier("today.pendingShift")
+    }
+
+    /// Mod aciksa her izin sorunu; kapaliyken yalnizca reddedilen hareket izni gosterilir.
+    @ViewBuilder
+    private var autoShiftPermissionSection: some View {
+        if let problem = autoShift.permissionProblem, autoShift.isEnabled || problem == .motion {
+            Section {
+                Button(action: openSystemSettings) {
+                    Label(autoShiftProblemText(problem), systemImage: "exclamationmark.triangle")
+                }
+                .accessibilityIdentifier("today.autoShiftPermission")
+            }
+        }
+    }
+
+    private func autoShiftProblemText(_ problem: AutoShiftCoordinator.PermissionProblem) -> String {
+        switch problem {
+        case .motion: "Otomatik vardiya için hareket izni gerekli — Ayarlar"
+        case .locationAlways: "Otomatik vardiya için konum izni “Her zaman” olmalı — Ayarlar"
         }
     }
 
@@ -539,12 +614,25 @@ struct TodayView: View {
         Haptics.impact()
         if workSession.isWorking {
             // Vardiya bitince kazanc formu sure + mesafe + bolgeyle on doldurulmus acilir
-            if let summary = workSession.stop() {
+            if let summary = autoShift.endShift() {
                 activeSheet = .addEarning(session: summary)
             }
         } else {
-            workSession.start()
+            autoShift.startManualShift()
         }
+    }
+
+    private func openPending(_ id: UUID) {
+        if let summary = autoShift.takePending(id: id) {
+            activeSheet = .addEarning(session: summary)
+        }
+    }
+
+    /// Bildirimden gelen istek bir kez tuketilir (soguk acilista onAppear, sonra onChange).
+    private func openRequestedPending() {
+        guard let id = autoShift.requestedPendingID else { return }
+        autoShift.requestedPendingID = nil
+        openPending(id)
     }
 
     private func delete(_ model: some PersistentModel) {
@@ -586,11 +674,35 @@ private struct ImportBatch {
     }
 }
 
+private struct PendingShiftRow: View {
+    let shift: PendingShift
+
+    private var detail: String {
+        let range: String = "\(Formatters.time(shift.start))–\(Formatters.time(shift.end))"
+        var parts: [String] = [range, Formatters.distance(shift.distanceKm)]
+        if let district = shift.district { parts.append(district) }
+        return parts.joined(separator: " · ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Kazancını ekle")
+                .font(.body.weight(.semibold))
+            Text(verbatim: detail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 #Preview("Örnek veri") {
-    let location = LocationService(isEnabled: false)
+    // Koordinator, gorunumle ayni vardiya yoneticisini kullanmali: ortak nesne grafigi
+    let environment = AppEnvironment.shared
     return TodayView()
         .modelContainer(SampleData.previewContainer)
-        .environment(location)
-        .environment(WorkSessionManager(location: location))
-        .environment(ScreenshotScanner())
+        .environment(environment.location)
+        .environment(environment.workSession)
+        .environment(environment.scanner)
+        .environment(environment.autoShift)
 }

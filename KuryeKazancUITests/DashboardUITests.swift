@@ -211,6 +211,18 @@ final class DashboardUITests: XCTestCase {
         XCTAssertEqual(autoScan.value as? String, "0")
     }
 
+    func testProfileOffersAutoShift() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Profil"].tap()
+        // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
+        let toggle = app.switches["profile.autoShift"]
+        for _ in 0..<6 where !toggle.exists { app.swipeUp() }
+        XCTAssertTrue(toggle.exists)
+        // UI testlerinde tercih bos alandan okunur: kapali baslar (izin istenmez)
+        XCTAssertEqual(toggle.value as? String, "0", "Varsayilan kapali")
+    }
+
     func testDashboardShowsGrossAndExpenseBreakdown() {
         let app = launch(sampleData: true)
         // Satir birlestirilmis erisilebilirlik ogesi: turu (metin/diger) degisebilir

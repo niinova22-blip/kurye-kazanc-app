@@ -5,11 +5,13 @@ import SwiftData
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(LocationService.self) private var location
+    @Environment(AutoShiftCoordinator.self) private var autoShift
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
 
     @State private var viewModel = OnboardingViewModel()
     @State private var errorMessage: String?
     @State private var showConsent = false
+    @State private var showAutoShiftIntro = false
     @AppStorage(AppPreferences.dataSharingOptInKey) private var dataSharingOptIn = false
     @AppStorage(AppPreferences.dataSharingConsentDateKey) private var consentTimestamp: Double = 0
     @AppStorage(AppPreferences.locationSharingOptInKey) private var locationSharingOptIn = false
@@ -37,6 +39,12 @@ struct OnboardingView: View {
                 // Konum yogunlugu kazanc paylasimiyla birlikte acik gelir (Profil'den ayri kapatilabilir)
                 locationSharingOptIn = true
                 locationConsentTimestamp = Date.now.timeIntervalSince1970
+            }
+        }
+        .sheet(isPresented: $showAutoShiftIntro) {
+            AutoShiftIntroView {
+                let coordinator: AutoShiftCoordinator = autoShift
+                Task { _ = await coordinator.enable() }
             }
         }
         .alert("Kaydedilemedi", isPresented: Binding(
@@ -170,6 +178,25 @@ struct OnboardingView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            autoShiftOption
+        }
+    }
+
+    /// Istege bagli: otomatik vardiya aciklamasi; onayda izinler istenir.
+    @ViewBuilder
+    private var autoShiftOption: some View {
+        if autoShift.isEnabled {
+            Label("Otomatik vardiya açık", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(Theme.accent)
+        } else {
+            Button {
+                showAutoShiftIntro = true
+            } label: {
+                Label("Otomatik vardiyayı aç (isteğe bağlı)", systemImage: "scooter")
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("onboarding.autoShift")
         }
     }
 
