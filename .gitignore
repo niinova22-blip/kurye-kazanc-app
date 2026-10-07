@@ -31,3 +31,6 @@ release_notes.json
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# Claude Code calisma kopyalari
+.claude/

@@ -33,6 +33,21 @@ final class EarningRecord {
     var sourceRaw: String
     var createdAt: Date
 
+    /// Dogrulama seviyesi (bkz. VerificationLevel). V1'den gelen kayitlar gocte ayarlanir.
+    var verificationRaw: String = VerificationLevel.manual.rawValue
+    /// Kaydin dayandigi ekran goruntusu kaniti (elle girilende nil).
+    var evidence: ScreenshotEvidence?
+    /// Sunucu esitleme durumu (spec 9): "local", "queued", "uploaded". 1.3'te kullanilacak;
+    /// simdiden eklendi ki o surumde yeni sema (V3) gerekmesin.
+    var syncStateRaw: String = "local"
+    /// Sunucudaki kayit kimligi (1.3). Gonderilmeden nil.
+    var remoteID: UUID? = nil
+
+    var verification: VerificationLevel {
+        get { VerificationLevel(rawValue: verificationRaw) ?? .manual }
+        set { verificationRaw = newValue.rawValue }
+    }
+
     var source: EarningSource {
         get { EarningSource(rawValue: sourceRaw) ?? .manual }
         set { sourceRaw = newValue.rawValue }
@@ -65,6 +80,7 @@ final class EarningRecord {
         distanceKm: Double = 0,
         packageCount: Int? = nil,
         source: EarningSource = .manual,
+        verification: VerificationLevel = .manual,
         createdAt: Date = .now,
         calendar: Calendar = .current
     ) {
@@ -83,5 +99,6 @@ final class EarningRecord {
         self.packageCount = packageCount
         self.sourceRaw = source.rawValue
         self.createdAt = createdAt
+        self.verificationRaw = verification.rawValue
     }
 }

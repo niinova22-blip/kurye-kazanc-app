@@ -47,8 +47,12 @@ final class EarningFormViewModel {
     /// "Bu alanlari kontrol et" ile vurgulanan alanlar.
     var fieldsToReview: Set<Field> = []
     var ocrState: OCRState = .idle
-    /// Son OCR'da Vision'in okudugu ham satirlar (kalibrasyon raporu icin).
-    private(set) var recognizedLines: [String] = []
+    /// Son ekran goruntusu ice aktarimi (kanit + degerlendirme).
+    private(set) var imported: ImportedScreenshot?
+    /// Ice aktarilan ekranin metin ozeti kayitli bir kanitla ayni: kayit en fazla `ocrEdited` olur (spec 10).
+    private(set) var isDuplicateScreenshot = false
+    /// Ekrandan okunan degerlerin karsilastirma tabani (kullanici degistirdi mi?).
+    @ObservationIgnored private var readBaseline: ReadValues?
     var isResolvingRegion = false
 
     private(set) var editingRecord: EarningRecord?
@@ -56,10 +60,68 @@ final class EarningFormViewModel {
 
     var isEditing: Bool { editingRecord != nil }
 
+    /// Ekrandan okunan (saatler haric) degerler.
+    struct ReadValues: Equatable {
+        var platformCode: String?
+        var day: Date
+        var gross: Double
+        var bonus: Double
+        var packages: Int?
+    }
+
+    static let duplicateScreenshotIssue = "Bu ekran görüntüsü daha önce kaydedilmiş."
+
+    var assessmentIssues: [String] {
+        var issues: [String] = imported?.assessment.issues ?? []
+        if isDuplicateScreenshot {
+            issues.append(Self.duplicateScreenshotIssue)
+        }
+        return issues
+    }
+
+    /// Kaydedilince alinacak seviye.
+    var pendingVerification: VerificationLevel {
+        if let editingRecord, imported == nil {
+            // Duzenleme: okunan degerler degistiyse ocrEdited, yoksa mevcut seviye
+            guard editingRecord.source == .ocr else { return .manual }
+            return userEditedReadValues ? .ocrEdited : editingRecord.verification
+        }
+        if imported != nil, isDuplicateScreenshot {
+            // Daha once kullanilmis ekran: asla topluluga girmez
+            return .ocrEdited
+        }
+        return VerificationLevel.resolve(
+            isFromScreenshot: imported != nil,
+            userEditedReadValues: userEditedReadValues,
+            candidate: imported?.assessment.candidate ?? .manual
+        )
+    }
+
+    private var currentReadValues: ReadValues {
+        ReadValues(
+            platformCode: platform?.code,
+            day: calendar.startOfDay(for: date),
+            gross: TurkishNumberParser.parseDecimal(grossText) ?? -1,
+            bonus: TurkishNumberParser.parseDecimal(bonusText) ?? 0,
+            packages: TurkishNumberParser.parseInt(packageText)
+        )
+    }
+
+    private var userEditedReadValues: Bool {
+        guard let readBaseline else { return false }
+        let current = currentReadValues
+        return current.platformCode != readBaseline.platformCode
+            || current.day != readBaseline.day
+            || abs(current.gross - readBaseline.gross) > 0.005
+            || abs(current.bonus - readBaseline.bonus) > 0.005
+            || (current.packages ?? 0) != (readBaseline.packages ?? 0)
+    }
+
     init(
         record: EarningRecord? = nil,
         session: WorkSessionSummary? = nil,
         defaultPlatform: Platform? = nil,
+        imported: ImportedScreenshot? = nil,
         now: Date = .now,
         calendar: Calendar = .current
     ) {
@@ -90,6 +152,13 @@ final class EarningFormViewModel {
             endTime = now
             startTime = calendar.date(byAdding: .hour, value: -4, to: now) ?? now
         }
+        // OCR kaynakli kayit duzenlenirken okunan degerler taban alinir
+        if let record, record.source == .ocr {
+            readBaseline = currentReadValues
+        }
+        if let imported {
+            apply(imported, platforms: defaultPlatform.map { [$0] } ?? [])
+        }
     }
 
     // MARK: - Alan guncelleme (kullanici etkilesimi -> vurgu kalkar)
@@ -106,23 +175,42 @@ final class EarningFormViewModel {
 
     // MARK: - OCR
 
+    /// - Parameters:
+    ///   - capturedAt: Gorselin cekildigi an (PhotoKit); EXIF yoksa kullanilir.
+    ///   - knownTextHashes: Kayitli kanitlarin metin ozetleri (tekrar kontrolu).
     func importScreenshot(
-        _ image: UIImage,
-        recognizer: TextRecognizing,
-        parser: EarningsScreenshotParser = EarningsScreenshotParser(),
+        data: Data,
+        assetIdentifier: String?,
+        capturedAt: Date? = nil,
+        importer: ScreenshotImporter = ScreenshotImporter(),
         platforms: [Platform],
+        knownTextHashes: Set<String> = [],
         referenceDate: Date = .now
     ) async {
         ocrState = .processing
         do {
-            let lines = try await recognizer.recognizeLines(in: image)
-            recognizedLines = lines
-            let parsed = parser.parse(lines: lines, referenceDate: referenceDate)
-            apply(parsed, platforms: platforms)
+            let result = try await importer.importImage(
+                data: data, assetIdentifier: assetIdentifier,
+                capturedAt: capturedAt, referenceDate: referenceDate
+            )
+            apply(result, platforms: platforms, knownTextHashes: knownTextHashes)
             ocrState = .finished
         } catch {
             ocrState = .failed(error.localizedDescription)
         }
+    }
+
+    func apply(_ imported: ImportedScreenshot, platforms: [Platform], knownTextHashes: Set<String> = []) {
+        self.imported = imported
+        isDuplicateScreenshot = !imported.textHash.isEmpty && knownTextHashes.contains(imported.textHash)
+        apply(imported.parsed, platforms: platforms)
+        if imported.parsed.period == .week {
+            // Haftalik toplam tek vardiya gibi sessizce kaydedilmesin: "Kontrol ettim" onayi zorunlu
+            fieldsToReview.formUnion([.gross, .date])
+        }
+        readBaseline = currentReadValues
+        // Paylasim / oneri ile acilan formda da degerlendirme ve rozet gorunsun
+        ocrState = .finished
     }
 
     /// OCR sonucunu forma yazar. Hicbir alan bos birakilmaz; emin olunamayanlar vurgulanir.
@@ -163,6 +251,7 @@ final class EarningFormViewModel {
     /// TestFlight testcilerinin gelistiriciye gonderdigi OCR raporu. Satirlar dogrudan
     /// `EarningsScreenshotParserTests`'e yapistirilabilecek Swift dizisi bicimindedir.
     var ocrDiagnosticReport: String? {
+        let recognizedLines = imported?.lines.map(\.text) ?? []
         guard !recognizedLines.isEmpty else { return nil }
         let escaped = recognizedLines.map { line in
             "    \"" + line.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\","
@@ -241,6 +330,8 @@ final class EarningFormViewModel {
 
     @discardableResult
     func save(in context: ModelContext) throws -> EarningRecord {
+        // Seviye kayit alanlari degismeden ONCE hesaplanir
+        let level = pendingVerification
         let interval = resolvedInterval()
         let gross = TurkishNumberParser.parseDecimal(grossText) ?? 0
         let bonus = TurkishNumberParser.parseDecimal(bonusText) ?? 0
@@ -264,6 +355,18 @@ final class EarningFormViewModel {
                 packageCount: packages, source: source, calendar: calendar
             )
             context.insert(record)
+        }
+        record.verification = level
+        if let imported, record.evidence == nil {
+            let evidence = ScreenshotEvidence(
+                capturedAt: imported.capturedAt,
+                assetIdentifier: imported.assetIdentifier,
+                parsed: imported.parsed,
+                lines: imported.lines,
+                isGenuineScreenshot: imported.isGenuine
+            )
+            context.insert(evidence)
+            record.evidence = evidence
         }
         record.province = province.nilIfBlank
         record.district = district.nilIfBlank

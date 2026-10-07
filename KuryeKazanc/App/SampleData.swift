@@ -23,7 +23,7 @@ enum SampleData {
         context.insert(EarningRecord(
             startTime: at(12), endTime: at(15), platform: platform("getir"),
             province: "İstanbul", district: "Ataşehir",
-            grossEarning: 400, bonus: 0, distanceKm: 20, packageCount: 9, source: .ocr
+            grossEarning: 400, bonus: 0, distanceKm: 20, packageCount: 9, source: .ocr, verification: .ocrUnverified
         ))
         context.insert(ExpenseRecord(date: today, type: .other, amount: 50, note: "Otopark"))
 

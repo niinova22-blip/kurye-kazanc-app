@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Ilk acilis: profil (isim) -> arac tipi -> sik kullanilan platformlar -> konum izni bilgisi.
+/// Ilk acilis: arac tipi -> sik kullanilan platformlar -> konum bilgisi -> istege bagli anonim paylasim.
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(LocationService.self) private var location
@@ -9,47 +9,30 @@ struct OnboardingView: View {
 
     @State private var viewModel = OnboardingViewModel()
     @State private var errorMessage: String?
+    @State private var showConsent = false
+    @AppStorage(AppPreferences.dataSharingOptInKey) private var dataSharingOptIn = false
+    @AppStorage(AppPreferences.dataSharingConsentDateKey) private var consentTimestamp: Double = 0
 
+    // Derleyicinin tip denetimi zaman asimina ugramasin diye govde kucuk parcalara bolundu.
     var body: some View {
-        @Bindable var vm = viewModel
-
         VStack(spacing: 0) {
-            ProgressView(value: Double(vm.step.rawValue + 1), total: Double(OnboardingViewModel.Step.allCases.count))
-                .padding(.horizontal, 24)
+            stepDots(current: viewModel.step)
                 .padding(.top, 16)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    switch vm.step {
-                    case .welcome: welcomeStep
-                    case .vehicle: vehicleStep
-                    case .platforms: platformsStep
-                    case .permissions: permissionsStep
-                    }
-                }
-                .padding(24)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                stepContent
+                    .padding(24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            HStack {
-                if vm.step != .welcome {
-                    Button("Geri") { withAnimation { vm.back() } }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("onboarding.back")
-                }
-                Spacer()
-                Button {
-                    if vm.isLastStep { finish() } else { withAnimation { vm.next() } }
-                } label: {
-                    Text(vm.isLastStep ? "Bitir" : "Devam")
-                        .frame(minWidth: 120)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!vm.canContinue)
-                .accessibilityIdentifier("onboarding.next")
+            bottomButtons
+                .padding(24)
+        }
+        .sheet(isPresented: $showConsent) {
+            DataSharingConsentView {
+                dataSharingOptIn = true
+                consentTimestamp = Date.now.timeIntervalSince1970
             }
-            .padding(24)
         }
         .alert("Kaydedilemedi", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
@@ -60,31 +43,62 @@ struct OnboardingView: View {
         }
     }
 
+    // MARK: - Iskelet
+
+    private var stepContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            switch viewModel.step {
+            case .vehicle: vehicleStep
+            case .platforms: platformsStep
+            case .location: locationStep
+            case .sharing: sharingStep
+            }
+        }
+    }
+
+    /// Alt kisimda tek elle ulasilan dugmeler.
+    private var bottomButtons: some View {
+        VStack(spacing: 12) {
+            Button(viewModel.isLastStep ? "Başla" : "Devam") {
+                advance()
+            }
+            .buttonStyle(PrimaryActionButtonStyle())
+            .disabled(!viewModel.canContinue)
+            .opacity(viewModel.canContinue ? 1 : 0.5)
+            .accessibilityIdentifier("onboarding.next")
+
+            if viewModel.step != .vehicle {
+                Button("Geri") { withAnimation { viewModel.back() } }
+                    .accessibilityIdentifier("onboarding.back")
+            }
+        }
+    }
+
+    private func advance() {
+        if viewModel.isLastStep {
+            finish()
+        } else {
+            withAnimation { viewModel.next() }
+        }
+    }
+
     // MARK: - Adimlar
 
-    private var welcomeStep: some View {
-        @Bindable var vm = viewModel
-        return VStack(alignment: .leading, spacing: 16) {
-            Image(systemName: "scooter")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accentColor)
-            Text("Kurye Kazanç'a hoş geldin")
-                .font(.largeTitle.bold())
-            Text("Brüt değil, **net** kazancını gör: yakıt ve bakım giderleri düşülmüş saatlik kazancın, platform platform.")
-                .foregroundStyle(.secondary)
-            TextField("Adın (isteğe bağlı)", text: $vm.name)
-                .textFieldStyle(.roundedBorder)
-                .textContentType(.givenName)
-                .accessibilityIdentifier("onboarding.name")
-            Text("Adın yalnızca bu cihazda kalır, hiçbir yere gönderilmez.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+    private func stepDots(current: OnboardingViewModel.Step) -> some View {
+        HStack(spacing: 8) {
+            ForEach(OnboardingViewModel.Step.allCases, id: \.self) { step in
+                Circle()
+                    .fill(step == current ? Theme.accent : Color(.tertiaryLabel))
+                    .frame(width: 8, height: 8)
+            }
         }
+        .accessibilityElement()
+        .accessibilityLabel("Adım \(current.rawValue + 1) / \(OnboardingViewModel.Step.allCases.count)")
     }
 
     private var vehicleStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Aracın ne?")
+            Text("Neyle çalışıyorsun?")
                 .font(.title.bold())
             Text("Km başına yakıt ve bakım maliyetini tahmin etmek için kullanılır; ayarlardan değiştirebilirsin.")
                 .foregroundStyle(.secondary)
@@ -106,7 +120,7 @@ struct OnboardingView: View {
 
     private var platformsStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Hangi platformlarda çalışıyorsun?")
+            Text("Hangi platformlarda?")
                 .font(.title.bold())
             Text("Birden fazla seçebilirsin. Kazanç eklerken bunlar önce gösterilir.")
                 .foregroundStyle(.secondary)
@@ -124,23 +138,21 @@ struct OnboardingView: View {
         }
     }
 
-    private var permissionsStep: some View {
+    private var locationStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: "location.circle")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accentColor)
-            Text("Konum yalnızca çalışırken")
+                .font(.largeTitle)
+                .imageScale(.large)
+                .foregroundStyle(Theme.accent)
+                .accessibilityHidden(true)
+            Text("Konum yalnızca vardiyada")
                 .font(.title.bold())
-            VStack(alignment: .leading, spacing: 10) {
-                Label("“Çalışmaya başla” dediğinde mesafeni ölçer, bitirince durur.", systemImage: "play.circle")
-                Label("Kayıtlara yalnızca ilçe/semt eklenir; tam konum saklanmaz.", systemImage: "mappin.and.ellipse")
-                Label("Konum verisi cihazından çıkmaz.", systemImage: "lock")
-            }
-            .foregroundStyle(.secondary)
+            Text("Vardiyayı başlattığında mesafeni ölçer, bitirince durur. Kayıtlara yalnızca ilçe eklenir.")
+                .foregroundStyle(.secondary)
 
             if location.isAuthorized {
                 Label("Konum izni verildi", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.accent)
             } else {
                 Button {
                     location.requestWhenInUseAuthorization()
@@ -149,7 +161,32 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("onboarding.requestLocation")
-                Text("İstersen şimdi geçip daha sonra Ayarlar'dan verebilirsin.")
+                Text("İstersen şimdi geçip daha sonra Profil'den verebilirsin.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var sharingStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Image(systemName: "person.3")
+                .font(.largeTitle)
+                .imageScale(.large)
+                .foregroundStyle(Theme.accent)
+                .accessibilityHidden(true)
+            Text("Bölgendeki kuryelerle karşılaştır")
+                .font(.title.bold())
+            Text("Anonim paylaşıma katılırsan, topluluk özellikleri açıldığında ilçendeki saat başı ortalama net kazancı ve en yoğun saatleri görürsün. Yalnızca ekran görüntüsüyle doğrulanmış kazançlar kullanılır; adın ve tam konumun asla paylaşılmaz.")
+                .foregroundStyle(.secondary)
+            if dataSharingOptIn {
+                Label("Katıldın — Profil'den istediğin an kapatabilirsin.", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(Theme.accent)
+            } else {
+                Button("Anonim paylaşıma katıl") { showConsent = true }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("onboarding.sharing")
+                Text("İstersen geçebilirsin; uygulama paylaşım olmadan da tam çalışır.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -177,8 +214,9 @@ private struct SelectableRow: View {
             HStack(spacing: 14) {
                 Image(systemName: systemImage)
                     .font(.title3)
-                    .frame(width: 28)
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    .frame(minWidth: 28)
+                    .foregroundStyle(isSelected ? Theme.accent : .secondary)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.headline)
                     if let subtitle {
@@ -187,13 +225,15 @@ private struct SelectableRow: View {
                 }
                 Spacer()
                 if isSelected {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.accentColor)
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
                 }
             }
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color(.secondarySystemBackground))
+                    .fill(isSelected ? Theme.accent.opacity(0.12) : Color(.secondarySystemBackground))
             )
             .contentShape(Rectangle())
         }

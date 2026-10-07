@@ -143,3 +143,28 @@ Yeni oturuma başlarken önce bu dosyayı okuyun; "Tamamlandı" olarak işaretle
 ### Sonraki adım
 - `develop → main` PR → CI (UI dahil) yeşil → birleştir → `ios-release` → TestFlight 1.0.0 (1).
 - TestFlight'ta gerçek cihaz testleri (TESTFLIGHT_NOTES.md listesi), OCR raporlarıyla şablon kalibrasyonu.
+
+## Oturum 2 (kapanış) — 2026-10-06
+
+- PR #1 (develop → main) CI'dan geçti (UI dahil, 11 dk) ve birleştirildi (`09c1208`).
+- `ios-release` başarılı → **TestFlight 1.0.0 (1) yüklendi** (App Store Connect'te Processing).
+- Masaüstünde `KURYE_KALDIGIM_YER.txt`: kısa devam notu.
+
+### Sonraki adım
+1. Processing bitince TestFlight'ta dahili test grubu oluştur, kendini ekle → iPhone'a TestFlight uygulamasıyla kur.
+2. Gönüllü kuryeler (App Store Connect kullanıcısı değillerse) için harici grup: ilk build Apple Beta App Review'dan geçer (~1 gün). Gerekirse `codemagic.yaml` → `beta_groups`.
+3. Gerçek cihaz testleri (TESTFLIGHT_NOTES.md), OCR raporlarıyla şablon kalibrasyonu.
+
+## Oturum 3 — 2026-10-07: Sürüm 1.1.0 (iOS tarzı arayüz ve cihaz üstü temel)
+
+Tasarım: `docs/superpowers/specs/2026-10-07-gridwise-tr-design.md` · Plan: `docs/superpowers/plans/2026-10-07-surum-1-1-arayuz-ve-cihaz-ustu.md`
+
+- **Core:** JSON OCR şablon motoru (Trendyol GO, Getir, Yemeksepeti, Migros — hepsi `calibrating`), doğrulama seviyeleri (`manual` / `ocrEdited` / `ocrUnverified` / `verified`) ve ekran görüntüsü değerlendirmesi, analizler (gün×saat ısı haritası, en kârlı saatler, platform karşılaştırması, dönem değişimi), hedef ilerlemesi. Windows `swift test`: 62 test.
+- **Model:** SchemaV2 (doğrulama seviyesi + `ScreenshotEvidence`), dondurulmuş SchemaV1 ve V1→V2 göçü (OCR kaynaklı eski kayıtlar `ocrUnverified`).
+- **Arayüz:** Bugün / Analiz / Topluluk (iskelet) / Profil; yeşil tek vurgu, ana rakam + metrik şeridi, hedef halkası, doğrulama rozetleri; 4 adımlı onboarding.
+- **Ekran görüntüsü:** kanıt (OCR satırları + kutular; görsel saklanmaz), son 48 saat otomatik öneri (izin yalnızca kullanıcı açınca), paylaş menüsü eklentisi + App Group gelen kutusu.
+
+### Açık konular
+- Paylaş eklentisi için Apple Developer önkoşulları (README → İmzalama) yapılmadan `ios-release` imzalamada düşer.
+- Şablonlar gerçek ekran örnekleriyle kalibre edilene kadar hiçbir kayıt "Doğrulandı" olmaz (beklenen).
+- Sonraki: 1.2 planı (Live Activity, widget, hareket algılama, PDF/CSV, Siri).

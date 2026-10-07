@@ -2,9 +2,9 @@ import Foundation
 import Vision
 import UIKit
 
-/// Goruntudeki metni satir satir dondurur (yukaridan asagi).
+/// Goruntudeki metni satir satir dondurur (yukaridan asagi), normalize sinir kutulariyla.
 protocol TextRecognizing {
-    func recognizeLines(in image: UIImage) async throws -> [String]
+    func recognize(in image: UIImage) async throws -> [RecognizedLine]
 }
 
 enum TextRecognitionError: LocalizedError {
@@ -21,11 +21,11 @@ enum TextRecognitionError: LocalizedError {
 
 /// Apple Vision - VNRecognizeTextRequest ile cihaz uzerinde OCR (internet gerekmez, veri cihazdan cikmaz).
 struct VisionTextRecognitionService: TextRecognizing {
-    func recognizeLines(in image: UIImage) async throws -> [String] {
+    func recognize(in image: UIImage) async throws -> [RecognizedLine] {
         guard let cgImage = image.cgImage else { throw TextRecognitionError.invalidImage }
         let orientation = CGImagePropertyOrientation(image.imageOrientation)
 
-        let lines: [String] = try await Task.detached(priority: .userInitiated) {
+        let lines: [RecognizedLine] = try await Task.detached(priority: .userInitiated) {
             let request = VNRecognizeTextRequest()
             request.recognitionLevel = .accurate
             // Sayilar ve marka isimleri dil duzeltmesiyle bozulabiliyor
@@ -38,18 +38,16 @@ struct VisionTextRecognitionService: TextRecognizing {
 
             let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation)
             try handler.perform([request])
-
-            let observations = request.results ?? []
-            return Self.orderedLines(from: observations)
+            return Self.orderedLines(from: request.results ?? [])
         }.value
 
         guard !lines.isEmpty else { throw TextRecognitionError.noTextFound }
         return lines
     }
 
-    /// Gozlemleri okuma sirasina dizer: yukaridan asagi, ayni satirdakiler soldan saga birlestirilir.
-    /// (Vision koordinatlari: orijin sol alt, y yukari dogru artar.)
-    static func orderedLines(from observations: [VNRecognizedTextObservation]) -> [String] {
+    /// Gozlemleri okuma sirasina dizer: yukaridan asagi, ayni satirdakiler soldan saga birlestirilir;
+    /// satirin kutusu parcalarin birlesimidir. (Vision koordinatlari: orijin sol alt, y yukari dogru artar.)
+    static func orderedLines(from observations: [VNRecognizedTextObservation]) -> [RecognizedLine] {
         let items = observations.compactMap { obs -> (text: String, box: CGRect)? in
             guard let text = obs.topCandidates(1).first?.string else { return nil }
             return (text, obs.boundingBox)
@@ -67,7 +65,12 @@ struct VisionTextRecognitionService: TextRecognizing {
             }
         }
         return rows.map { row in
-            row.sorted { $0.box.minX < $1.box.minX }.map(\.text).joined(separator: " ")
+            let sorted = row.sorted { $0.box.minX < $1.box.minX }
+            let box = sorted.dropFirst().reduce(sorted[0].box) { $0.union($1.box) }
+            return RecognizedLine(
+                text: sorted.map(\.text).joined(separator: " "),
+                x: box.minX, y: box.minY, width: box.width, height: box.height
+            )
         }
     }
 }

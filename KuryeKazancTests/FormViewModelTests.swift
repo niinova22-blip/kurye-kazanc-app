@@ -118,14 +118,18 @@ final class FormViewModelTests: XCTestCase {
 
     func testImportScreenshot_usesRecognizerAndParser() async throws {
         struct FakeRecognizer: TextRecognizing {
-            func recognizeLines(in image: UIImage) async throws -> [String] {
+            func recognize(in image: UIImage) async throws -> [RecognizedLine] {
                 ["Trendyol GO", "05.10.2026", "Toplam Kazanç", "₺1.200,00", "Teslimat Sayısı", "15", "Bonus", "₺200,00"]
+                    .map { RecognizedLine(text: $0, x: 0, y: 0, width: 1, height: 0.05) }
             }
         }
         let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        let importer = ScreenshotImporter(
+            recognizer: FakeRecognizer(), parser: EarningsScreenshotParser(calendar: calendar),
+            verifier: ScreenshotVerifier(calendar: calendar), assetIsScreenshot: { _ in nil }
+        )
         await vm.importScreenshot(
-            UIImage(), recognizer: FakeRecognizer(),
-            parser: EarningsScreenshotParser(calendar: calendar),
+            data: Self.pngData(), assetIdentifier: nil, importer: importer,
             platforms: platforms, referenceDate: at(6, 18)
         )
         XCTAssertEqual(vm.ocrState, .finished)
@@ -141,12 +145,16 @@ final class FormViewModelTests: XCTestCase {
 
     func testImportScreenshot_failureIsReported() async {
         struct FailingRecognizer: TextRecognizing {
-            func recognizeLines(in image: UIImage) async throws -> [String] {
+            func recognize(in image: UIImage) async throws -> [RecognizedLine] {
                 throw TextRecognitionError.noTextFound
             }
         }
         let vm = EarningFormViewModel(now: at(6, 18), calendar: calendar)
-        await vm.importScreenshot(UIImage(), recognizer: FailingRecognizer(), platforms: platforms)
+        await vm.importScreenshot(
+            data: Self.pngData(), assetIdentifier: nil,
+            importer: ScreenshotImporter(recognizer: FailingRecognizer(), assetIsScreenshot: { _ in nil }),
+            platforms: platforms
+        )
         guard case .failed = vm.ocrState else { return XCTFail("Hata durumu bekleniyordu") }
     }
 
@@ -212,8 +220,9 @@ final class FormViewModelTests: XCTestCase {
         defaults.removePersistentDomain(forName: #function)
 
         let vm = OnboardingViewModel()
+        XCTAssertEqual(vm.step, .vehicle)
         XCTAssertTrue(vm.canContinue)
-        vm.next(); vm.next()
+        vm.next()
         XCTAssertEqual(vm.step, .platforms)
         XCTAssertFalse(vm.canContinue) // en az bir platform
         vm.togglePlatform("getir")
@@ -221,7 +230,9 @@ final class FormViewModelTests: XCTestCase {
         vm.togglePlatform("getir")
         XCTAssertTrue(vm.canContinue)
         vm.vehicleType = .car
-        vm.name = "  "
+        vm.next(); vm.next()
+        XCTAssertEqual(vm.step, .sharing)
+        XCTAssertTrue(vm.isLastStep)
 
         try vm.complete(in: context, platforms: platforms, defaults: defaults)
 
@@ -256,5 +267,147 @@ final class FormViewModelTests: XCTestCase {
         XCTAssertFalse(restored.isWorking)
         XCTAssertFalse(defaults.bool(forKey: AppPreferences.isWorkingKey))
         XCTAssertNil(restored.stop())
+    }
+
+    // MARK: - Dogrulama seviyesi
+
+    private func imported(total: Double = 1000, bonus: Double = 100, candidate: VerificationLevel = .ocrUnverified,
+                          period: OCRTemplate.Period = .day) -> ImportedScreenshot {
+        let parsed = ParsedEarning(
+            platformCode: "getir", date: calendar.startOfDay(for: at(5, 0)), packageCount: 12,
+            totalEarning: total, bonus: bonus, totalIncludesBonus: true, fieldsToReview: [],
+            templateID: "getir.earnings", templateVersion: 1, templateStatus: .calibrating,
+            fingerprintMatches: 3, period: period
+        )
+        let assessment = ScreenshotAssessment(
+            isGenuine: true, templateActive: candidate == .verified, fingerprintOK: true, dateRecent: true,
+            isDailyScreen: period != .week, internallyConsistent: true, candidate: candidate,
+            issues: period == .week ? ["Haftalık ekran: vardiya için günlük kazanç ekranını kullan."] : []
+        )
+        return ImportedScreenshot(lines: [RecognizedLine(text: "Getir", x: 0, y: 0, width: 1, height: 0.1)],
+                                  parsed: parsed, assessment: assessment, capturedAt: nil,
+                                  assetIdentifier: "asset-1", isGenuine: true,
+                                  textHash: TextHash.of(["Getir"]))
+    }
+
+    func testDuplicateScreenshot_isOcrEditedWithIssue() throws {
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        vm.apply(imported(candidate: .verified), platforms: platforms, knownTextHashes: [TextHash.of(["Getir"])])
+        XCTAssertTrue(vm.isDuplicateScreenshot)
+        XCTAssertEqual(vm.pendingVerification, .ocrEdited, "Daha once kullanilmis ekran topluluga giremez")
+        XCTAssertTrue(vm.assessmentIssues.contains("Bu ekran görüntüsü daha önce kaydedilmiş."))
+
+        let record = try vm.save(in: context)
+        XCTAssertEqual(record.verification, .ocrEdited)
+        XCTAssertEqual(record.evidence?.textHash, TextHash.of(["Getir"]))
+    }
+
+    func testUnknownScreenshot_isNotDuplicate() {
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        vm.apply(imported(candidate: .verified), platforms: platforms, knownTextHashes: ["0000000000000000"])
+        XCTAssertFalse(vm.isDuplicateScreenshot)
+        XCTAssertEqual(vm.pendingVerification, .verified)
+        XCTAssertFalse(vm.assessmentIssues.contains("Bu ekran görüntüsü daha önce kaydedilmiş."))
+
+        // Varsayilan parametreyle eski cagri bicimi de calisir
+        vm.apply(imported(), platforms: platforms)
+        XCTAssertFalse(vm.isDuplicateScreenshot)
+    }
+
+    func testImportScreenshot_marksDuplicateAndPassesCaptureDate() async {
+        let lines = ["Getir", "Kazançlarım", "Toplam Kazanç", "₺700"]
+        struct FakeRecognizer: TextRecognizing {
+            var lines: [String]
+            func recognize(in image: UIImage) async throws -> [RecognizedLine] {
+                lines.map { RecognizedLine(text: $0, x: 0, y: 0, width: 1, height: 0.05) }
+            }
+        }
+        let importer = ScreenshotImporter(
+            recognizer: FakeRecognizer(lines: lines), parser: EarningsScreenshotParser(calendar: calendar),
+            verifier: ScreenshotVerifier(calendar: calendar), assetIsScreenshot: { _ in nil }
+        )
+        let captured = at(5, 23)
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        await vm.importScreenshot(
+            data: Self.pngData(), assetIdentifier: nil, capturedAt: captured, importer: importer,
+            platforms: platforms, knownTextHashes: [TextHash.of(lines)], referenceDate: at(6, 18)
+        )
+        XCTAssertEqual(vm.ocrState, .finished)
+        XCTAssertTrue(vm.isDuplicateScreenshot)
+        XCTAssertEqual(vm.pendingVerification, .ocrEdited)
+        XCTAssertEqual(vm.imported?.capturedAt, captured)
+
+        // Ozet bilinmiyorsa (ornegin onceki kayit silindi) isaret kalkar
+        await vm.importScreenshot(data: Self.pngData(), assetIdentifier: nil, importer: importer,
+                                  platforms: platforms, knownTextHashes: [], referenceDate: at(6, 18))
+        XCTAssertFalse(vm.isDuplicateScreenshot)
+    }
+
+    func testScreenshotSave_storesEvidenceAndCandidateLevel() throws {
+        let vm = EarningFormViewModel(defaultPlatform: nil, imported: imported(candidate: .verified), now: at(6, 18), calendar: calendar)
+        vm.startTime = at(5, 10); vm.endTime = at(5, 16) // saat degisikligi seviyeyi dusurmez
+        let record = try vm.save(in: context)
+        XCTAssertEqual(record.verification, .verified)
+        XCTAssertEqual(record.source, .ocr)
+        XCTAssertEqual(record.evidence?.assetIdentifier, "asset-1")
+        XCTAssertEqual(record.evidence?.parsedTotal, 1000)
+    }
+
+    func testScreenshotSave_editedAmountBecomesOcrEdited() throws {
+        let vm = EarningFormViewModel(defaultPlatform: nil, imported: imported(candidate: .verified), now: at(6, 18), calendar: calendar)
+        vm.grossText = "950"
+        let record = try vm.save(in: context)
+        XCTAssertEqual(record.verification, .ocrEdited)
+        XCTAssertNotNil(record.evidence, "Kanit duzenlemede de saklanir")
+    }
+
+    func testScreenshotSave_reformattedSameValueIsNotAnEdit() throws {
+        let vm = EarningFormViewModel(defaultPlatform: nil, imported: imported(), now: at(6, 18), calendar: calendar)
+        vm.grossText = "900,00" // ayni deger, farkli yazim
+        XCTAssertEqual(try vm.save(in: context).verification, .ocrUnverified)
+    }
+
+    func testWeeklyScreenShowsIssue() {
+        let vm = EarningFormViewModel(defaultPlatform: nil, imported: imported(period: .week), now: at(6, 18), calendar: calendar)
+        XCTAssertTrue(vm.assessmentIssues.contains { $0.contains("Haftalık") })
+        XCTAssertEqual(vm.pendingVerification, .ocrUnverified)
+    }
+
+    func testImportedWeeklyScreen_forcesReviewAndShowsAssessment() {
+        let vm = EarningFormViewModel(defaultPlatform: nil, imported: imported(period: .week), now: at(6, 18), calendar: calendar)
+        XCTAssertEqual(vm.ocrState, .finished, "Paylasim/oneri ile acilan formda degerlendirme gorunmeli")
+        XCTAssertTrue(vm.fieldsToReview.contains(.gross))
+        XCTAssertTrue(vm.fieldsToReview.contains(.date))
+    }
+
+    func testManualSave_isManualWithoutEvidence() throws {
+        let vm = EarningFormViewModel(defaultPlatform: platforms.first, now: at(6, 18), calendar: calendar)
+        vm.grossText = "500"
+        let record = try vm.save(in: context)
+        XCTAssertEqual(record.verification, .manual)
+        XCTAssertNil(record.evidence)
+    }
+
+    func testEditingOcrRecordKeepsLevelUnlessValuesChange() throws {
+        let first = EarningFormViewModel(defaultPlatform: nil, imported: imported(), now: at(6, 18), calendar: calendar)
+        let record = try first.save(in: context)
+
+        let edit = EarningFormViewModel(record: record, now: at(6, 19), calendar: calendar)
+        edit.district = "Kadıköy"
+        XCTAssertEqual(try edit.save(in: context).verification, .ocrUnverified)
+
+        let edit2 = EarningFormViewModel(record: record, now: at(6, 19), calendar: calendar)
+        edit2.bonusText = "150"
+        XCTAssertEqual(try edit2.save(in: context).verification, .ocrEdited)
+    }
+
+    /// Ice aktarici icin gecerli (kucuk) PNG verisi.
+    static func pngData() -> Data {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: CGSize(width: 10, height: 10), format: format).image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 10, height: 10))
+        }.pngData()!
     }
 }
