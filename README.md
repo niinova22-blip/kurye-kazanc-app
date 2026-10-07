@@ -34,17 +34,32 @@ KuryeKazanc/
   Core/          Saf iş mantığı (iOS'a bağımlı değil, Windows'ta `swift test` ile test edilir)
   Models/        SwiftData @Model sınıfları + anonim cihaz UUID'si
   Services/      Konum, çalışma oturumu, Vision OCR, tercih anahtarları, seed
+    Screenshots/ Ekran görüntüsü içe aktarma, otomatik tarama (PhotoKit), paylaş gelen kutusu
   ViewModels/    @Observable ViewModel'ler
-  Views/         SwiftUI ekranları (ekran başına klasör)
+  Views/         SwiftUI ekranları
+    Design/      Tema, ortak bileşenler (ana rakam, metrik şeridi, rozet, hedef halkası)
+    Today/       Bugün sekmesi
+    Analysis/    Analiz sekmesi (ısı haritası, en kârlı saatler, platform karşılaştırması)
+    Community/   Topluluk sekmesi (1.4'e kadar iskelet)
+    Profile/     Profil, hedefler, paylaşım rızaları
   Utilities/     Biçimlendiriciler
   Resources/     Assets.xcassets
   Supporting/    Kısmi Info.plist (konum izin metinleri, arka plan modu)
+KuryeShareExtension/ Fotoğraflar > Paylaş > Kurye Kazanç eklentisi (App Group gelen kutusu)
 KuryeKazancTests/    XCTest birim testleri
 KuryeKazancUITests/  XCUITest
 scripts/ci/          CI yardımcı scriptleri
 ```
 
 ## Codemagic'te bir kez yapılacak ayarlar
+
+### İmzalama (1.1.0'dan itibaren: uygulama + paylaş eklentisi)
+
+1. developer.apple.com → Identifiers → App Groups → `group.com.kuryekazanc.app`.
+2. `com.kuryekazanc.app` App ID'sinde App Groups yeteneğini aç, grubu seç.
+3. Yeni App ID `com.kuryekazanc.app.share` (App Groups açık, aynı grup).
+4. Profiller: "Kurye Kazanc App Store" yeniden kaydedilir; yeni "Kurye Kazanc Share App Store" (`com.kuryekazanc.app.share`).
+5. Codemagic → Code signing identities → iOS provisioning profiles → Fetch: `kurye-kazanc-appstore` ve `kurye-kazanc-share-appstore`.
 
 Gizli bilgiler koda yazılmaz; hepsi Codemagic arayüzünde tutulur:
 

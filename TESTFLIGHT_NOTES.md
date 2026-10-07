@@ -3,6 +3,23 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.1.0
+
+Yeni:
+- Yeni, sade arayüz: Bugün / Analiz / Topluluk / Profil.
+- Kazanç ekranının ekran görüntüsünü Fotoğraflar > Paylaş > Kurye Kazanç ile gönderebilirsin.
+- "Ekran görüntülerini otomatik bul": son 48 saatin kazanç ekranlarını önerir.
+- Analiz: en kârlı saatlerin, gün×saat ısı haritası, platform karşılaştırması (₺/saat, ₺/sipariş, ₺/km).
+- Haftalık ve günlük net hedef; Bugün ekranında halka.
+- Kayıtlarda doğrulama rozeti (Elle / Ekran görüntüsü / Doğrulandı).
+
+Lütfen test et:
+1. Güncellemeden sonra eski kayıtların duruyor mu? (1.0.0 kayıtları korunmalı)
+2. Trendyol GO / Getir / Yemeksepeti / Migros kazanç ekranının görüntüsünü Paylaş menüsüyle gönder; uygulamayı açınca form doluyor mu?
+3. Profil > Hedefler'e haftalık hedef gir; Bugün'deki halka doğru mu?
+4. Analiz > Hafta: en kârlı saatler mantıklı mı?
+5. Yanlış okunan ekranlarda "okunan metni geliştiriciye gönder" ile rapor yolla — şablonları bu raporlarla kalibre ediyoruz.
+
 ## 1.0.0 – V1 ilk test sürümü
 
 **Neler var**
