@@ -14,10 +14,16 @@ extension ModelContext {
     }
 
     /// "Tum kayitlari sil": kazanc, gider ve tum ekran goruntusu kanitlari.
+    /// Not: Kazanc kayitlari tek tek silinir; `evidence` iliskisinin nullify tersi yuzunden
+    /// SwiftData toplu silmeyi (`delete(model:)`) reddeder.
     func deleteAllRecords() throws {
-        try delete(model: EarningRecord.self)
+        for record in try fetch(FetchDescriptor<EarningRecord>()) {
+            delete(record)
+        }
+        for evidence in try fetch(FetchDescriptor<ScreenshotEvidence>()) {
+            delete(evidence)
+        }
         try delete(model: ExpenseRecord.self)
-        try delete(model: ScreenshotEvidence.self)
         try save()
     }
 }
