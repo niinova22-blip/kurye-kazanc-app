@@ -142,6 +142,7 @@ struct EarningFormView: View {
                     }
                 }
             }
+            .dismissesKeyboard()
             .navigationTitle(vm.isEditing ? "Kazancı düzenle" : "Kazanç ekle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

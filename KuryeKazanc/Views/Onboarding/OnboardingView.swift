@@ -12,6 +12,8 @@ struct OnboardingView: View {
     @State private var showConsent = false
     @AppStorage(AppPreferences.dataSharingOptInKey) private var dataSharingOptIn = false
     @AppStorage(AppPreferences.dataSharingConsentDateKey) private var consentTimestamp: Double = 0
+    @AppStorage(AppPreferences.locationSharingOptInKey) private var locationSharingOptIn = false
+    @AppStorage(AppPreferences.locationSharingConsentDateKey) private var locationConsentTimestamp: Double = 0
 
     // Derleyicinin tip denetimi zaman asimina ugramasin diye govde kucuk parcalara bolundu.
     var body: some View {
@@ -32,6 +34,9 @@ struct OnboardingView: View {
             DataSharingConsentView {
                 dataSharingOptIn = true
                 consentTimestamp = Date.now.timeIntervalSince1970
+                // Konum yogunlugu kazanc paylasimiyla birlikte acik gelir (Profil'den ayri kapatilabilir)
+                locationSharingOptIn = true
+                locationConsentTimestamp = Date.now.timeIntervalSince1970
             }
         }
         .alert("Kaydedilemedi", isPresented: Binding(

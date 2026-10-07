@@ -42,6 +42,7 @@ struct ProfileView: View {
                 dataSection
                 aboutSection
             }
+            .dismissesKeyboard()
             .navigationTitle("Profil")
             .onAppear {
                 costText = TurkishNumberParser.format(costPerKm)
@@ -52,6 +53,9 @@ struct ProfileView: View {
                 DataSharingConsentView {
                     dataSharingOptIn = true
                     consentTimestamp = Date.now.timeIntervalSince1970
+                    // Konum yogunlugu, kazanc paylasimiyla birlikte acik gelir (riza ekraninda listelenir); ayri kapatilabilir
+                    locationSharingOptIn = true
+                    locationConsentTimestamp = Date.now.timeIntervalSince1970
                 }
             }
             .sheet(isPresented: $showLocationConsentSheet) {
@@ -184,7 +188,7 @@ struct ProfileView: View {
         } header: {
             Text("Arka plan konumu")
         } footer: {
-            Text("Konum yalnızca “Çalışmaya başla” ile başlattığın oturum boyunca takip edilir (mesafe ve ilçe için), bitirince durur. “Uygulamayı kullanırken” izni de yeterlidir; oturum ön planda başlatıldığında arka planda devam eder. Tam konum saklanmaz.")
+            Text("Konum yalnızca “Vardiyayı başlat” ile başlattığın vardiya boyunca takip edilir (mesafe ve ilçe için), bitirince durur. “Uygulamayı kullanırken” izni de yeterlidir; vardiya ön planda başlatıldığında arka planda devam eder. Tam konum saklanmaz.")
         }
     }
 
@@ -265,7 +269,7 @@ struct ProfileView: View {
         } header: {
             Text("Paylaşım")
         } footer: {
-            Text("Varsayılan olarak kapalıdır. Bu sürümde hiçbir veri gönderilmez; tercihlerin kaydedilir. Topluluk özellikleri açıldığında yalnızca ekran görüntüsüyle doğrulanmış kazançlar paylaşılır.")
+            Text("Kazanç paylaşımını açınca konum yoğunluğu da açılır; istersen ayrıca kapatabilirsin. Bu sürümde hiçbir veri gönderilmez; tercihlerin kaydedilir. Topluluk özellikleri açıldığında yalnızca ekran görüntüsüyle doğrulanmış kazançlar paylaşılır.")
         }
     }
 

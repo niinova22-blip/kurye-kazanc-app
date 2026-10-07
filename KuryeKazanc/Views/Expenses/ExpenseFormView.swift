@@ -37,6 +37,7 @@ struct ExpenseFormView: View {
                     }
                 }
             }
+            .dismissesKeyboard()
             .navigationTitle(vm.isEditing ? "Gideri düzenle" : "Gider ekle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

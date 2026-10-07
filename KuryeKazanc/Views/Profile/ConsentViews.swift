@@ -70,6 +70,7 @@ struct DataSharingConsentView: View {
                 "Çalışma süresi ve mesafe (yuvarlanmış)",
                 "Platform, il ve ilçe",
                 "Haftanın günü ve 15 dakikalık zaman dilimi",
+                "Konum yoğunluğu: vardiyada bulunduğun ~500 m'lik bölge hücreleri (Profil'den ayrıca kapatılabilir)",
             ],
             never: [
                 "Adın ve profil bilgilerin",

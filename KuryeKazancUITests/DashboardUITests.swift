@@ -15,6 +15,8 @@ final class DashboardUITests: XCTestCase {
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
             "-hasCompletedOnboarding", "YES", "-autoEstimateExpenses", "YES",
+            // Paylasim tercihleri testler arasinda tasinmasin
+            "-dataSharingOptIn", "NO", "-locationSharingOptIn", "NO",
         ]
         if sampleData { app.launchArguments.append("-sample-data") }
         app.launch()
@@ -169,6 +171,22 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.buttons["consent.accept"].waitForExistence(timeout: 5))
         app.buttons["Vazgeç"].tap()
         XCTAssertEqual(toggle.value as? String, "0")
+    }
+
+    func testAcceptingEarningsSharingAlsoTurnsOnLocationDensity() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Profil"].tap()
+        let toggle = app.switches["settings.dataSharing"]
+        for _ in 0..<6 where !(toggle.exists && toggle.isHittable) { app.swipeUp() }
+        toggle.switches.firstMatch.tap()
+        XCTAssertTrue(app.buttons["consent.accept"].waitForExistence(timeout: 5))
+        app.buttons["consent.accept"].tap()
+
+        let location = app.switches["profile.locationSharing"]
+        XCTAssertTrue(location.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "1")
+        XCTAssertEqual(location.value as? String, "1", "Konum yogunlugu kazanc paylasimiyla birlikte acik gelir")
     }
 
     func testLocationSharingRequiresEarningsSharingAndOwnConsent() {
