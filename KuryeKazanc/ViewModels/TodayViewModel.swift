@@ -34,7 +34,8 @@ enum TodayViewModel {
     static func liveNetPerHour(todayNet: Double, workedSeconds: TimeInterval, elapsed: TimeInterval) -> Double? {
         let totalSeconds = max(0, workedSeconds) + max(0, elapsed)
         let hours = totalSeconds / 3600
-        guard hours >= 0.25 else { return nil }
+        // Henuz kazanc yokken "~0 TL/saat" gostermek yaniltici
+        guard hours >= 0.25, todayNet > 0 else { return nil }
         return todayNet / hours
     }
 
@@ -45,9 +46,9 @@ enum TodayViewModel {
             notices.append("\(failures) görsel okunamadı. Kazanç ekranının görüntüsünü paylaştığından emin ol.")
         }
         if duplicates == 1 {
-            notices.append("Bu ekran görüntüsü zaten kayıtlı.")
+            notices.append("Bu ekran görüntüsü zaten eklenmiş.")
         } else if duplicates > 1 {
-            notices.append("\(duplicates) ekran görüntüsü zaten kayıtlı.")
+            notices.append("\(duplicates) ekran görüntüsü zaten eklenmiş.")
         }
         return notices
     }

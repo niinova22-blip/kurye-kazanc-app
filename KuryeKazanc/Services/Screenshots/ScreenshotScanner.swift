@@ -88,7 +88,8 @@ final class ScreenshotScanner {
         let granted = await library.requestAccess()
         defaults.set(granted, forKey: AppPreferences.screenshotScanEnabledKey)
         isEnabled = granted
-        isPermissionMissing = false
+        // Izin daha once reddedildiyse iOS tekrar sormaz: "Ayarlar'dan ac" satiri gosterilsin
+        isPermissionMissing = !granted
         return granted
     }
 
@@ -105,7 +106,10 @@ final class ScreenshotScanner {
     ///   - knownTextHashes: Kayitli kanitlarin metin ozetleri; ayni ekranin baska kopyasi onerilmez.
     func scan(knownIdentifiers: Set<String>, knownTextHashes: Set<String> = [], now: Date = .now) async {
         guard isEnabled else {
-            isPermissionMissing = false
+            // Reddedilen etkinlestirmeden kalan uyari, izin Ayarlar'dan verilince kalkar
+            if isPermissionMissing, library.isAuthorized {
+                isPermissionMissing = false
+            }
             suggestion = nil
             return
         }

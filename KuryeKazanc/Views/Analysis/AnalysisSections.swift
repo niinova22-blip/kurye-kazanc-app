@@ -119,7 +119,6 @@ struct PlatformComparisonSection: View {
         Section("Platform karşılaştırması") {
             ForEach(stats) { stat in
                 PlatformStatRow(stat: stat, name: names[stat.platformCode] ?? "Diğer")
-                    .accessibilityIdentifier("analysis.platform.\(stat.platformCode)")
             }
         }
     }
@@ -149,6 +148,7 @@ private struct PlatformStatRow: View {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("analysis.platform.\(stat.platformCode)")
     }
 
     @ViewBuilder

@@ -139,6 +139,18 @@ final class ScreenshotScannerTests: XCTestCase {
         XCTAssertFalse(granted.isPermissionMissing)
     }
 
+    func testEnableWithDeniedPermissionShowsSettingsHint() async {
+        let defaults = UserDefaults(suiteName: "scanner-\(UUID())")!
+        let scanner = makeScanner(authorized: false, items: [], defaults: defaults)
+        scanner.disable()
+        let granted = await scanner.enable()
+        XCTAssertFalse(granted)
+        XCTAssertFalse(scanner.isEnabled)
+        XCTAssertTrue(scanner.isPermissionMissing, "Reddedilmis izinde Ayarlar yonlendirmesi gorunmeli")
+        await scanner.scan(knownIdentifiers: [])
+        XCTAssertTrue(scanner.isPermissionMissing, "Izin hala yokken uyari kalkmamali")
+    }
+
     func testPermissionIsNotMissingWhenScanningIsOff() async {
         let defaults = UserDefaults(suiteName: "scanner-\(UUID())")!
         let scanner = makeScanner(authorized: false, items: [], defaults: defaults)

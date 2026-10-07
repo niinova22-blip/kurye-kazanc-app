@@ -18,6 +18,8 @@ enum TextHash {
                 normalized.append(text)
             }
         }
+        // Metin yoksa ozet yok: bos ozet hicbir zaman "tekrar" sayilmaz
+        guard !normalized.isEmpty else { return "" }
         let joined = normalized.joined(separator: "\n")
 
         var hash: UInt64 = offsetBasis

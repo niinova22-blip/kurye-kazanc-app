@@ -31,6 +31,8 @@ struct TodayView: View {
     @State private var showScreenshotPicker = false
     @State private var pickedItems: [PhotosPickerItem] = []
     @State private var isImportingPicked = false
+    /// Su an acik formdaki ekran goruntusunun ozeti (kuyruktan cikti ama henuz kaydedilmedi).
+    @State private var presentedHash: String?
     /// Okunamayan / zaten kayitli gorseller icin engellemeyen bildirimler.
     @State private var notices: [String] = []
 
@@ -109,7 +111,7 @@ struct TodayView: View {
                         Task { await refreshImports() }
                     }
                 }
-                .sheet(item: $activeSheet, onDismiss: showNextFromInbox) { sheet in
+                .sheet(item: $activeSheet, onDismiss: sheetDismissed) { sheet in
                     sheetContent(sheet)
                 }
                 .photosPicker(isPresented: $showScreenshotPicker, selection: $pickedItems,
@@ -184,10 +186,16 @@ struct TodayView: View {
         return Set(hashes)
     }
 
-    /// Kayitli + sirada bekleyen ekran goruntulerinin metin ozetleri.
+    /// Sirada bekleyen ve su an formda acik ekran goruntulerinin metin ozetleri.
+    private var pendingHashes: Set<String> {
+        var hashes: [String] = inboxQueue.map(\.textHash)
+        if let presentedHash { hashes.append(presentedHash) }
+        return Set(hashes.filter { !$0.isEmpty })
+    }
+
+    /// Kayitli + bekleyen + acik ekran goruntulerinin metin ozetleri.
     private var queuedAndKnownHashes: Set<String> {
-        let queued: [String] = inboxQueue.map(\.textHash).filter { !$0.isEmpty }
-        return knownHashes.union(queued)
+        knownHashes.union(pendingHashes)
     }
 
     private func platformName(_ code: String?) -> String {
@@ -280,6 +288,7 @@ struct TodayView: View {
                 Spacer()
                 Button("Ekle") {
                     if let imported = scanner.consumeSuggestion() {
+                        presentedHash = imported.textHash
                         activeSheet = .importedScreenshot(imported)
                     }
                 }
@@ -344,6 +353,8 @@ struct TodayView: View {
             Button("Ekran görüntüsü", systemImage: "text.viewfinder") {
                 showScreenshotPicker = true
             }
+            // Onceki secim okunurken ikinci bir toplu okuma baslamasin
+            .disabled(isImportingPicked)
             Button("Elle kazanç", systemImage: "square.and.pencil") {
                 activeSheet = .addEarning(session: nil)
             }
@@ -418,13 +429,13 @@ struct TodayView: View {
     /// Gelen kutusunu isler, sonra otomatik taramayi calistirir.
     private func refreshImports() async {
         await processInbox()
-        await scanner.scan(knownIdentifiers: knownIDs, knownTextHashes: knownHashes)
+        await scanner.scan(knownIdentifiers: knownIDs, knownTextHashes: queuedAndKnownHashes)
     }
 
     private func enableScan() {
         Task {
             if await scanner.enable() {
-                await scanner.scan(knownIdentifiers: knownIDs, knownTextHashes: knownHashes)
+                await scanner.scan(knownIdentifiers: knownIDs, knownTextHashes: queuedAndKnownHashes)
             }
         }
     }
@@ -442,7 +453,9 @@ struct TodayView: View {
         isProcessingInbox = true
         defer { isProcessingInbox = false }
         let importer = ScreenshotImporter()
-        var batch = ImportBatch(seenHashes: queuedAndKnownHashes, seenAssets: knownIDs)
+        // Kayitli bir ekranla ayni metin yine forma gelir (form "daha once kaydedilmis" uyarir);
+        // yalnizca ayni anda bekleyen kopyalar elenir.
+        var batch = ImportBatch(seenHashes: pendingHashes, seenAssets: knownIDs)
         for pending in inbox.pending() {
             guard let url = inbox.claim(pending) else { continue }
             defer { inbox.remove(url) }
@@ -460,7 +473,7 @@ struct TodayView: View {
         isImportingPicked = true
         defer { isImportingPicked = false }
         let importer = ScreenshotImporter()
-        var batch = ImportBatch(seenHashes: queuedAndKnownHashes, seenAssets: knownIDs)
+        var batch = ImportBatch(seenHashes: pendingHashes, seenAssets: knownIDs)
         for item in items {
             let identifier: String? = item.itemIdentifier
             if let identifier, batch.seenAssets.contains(identifier) {
@@ -495,7 +508,14 @@ struct TodayView: View {
 
     private func showNextFromInbox() {
         guard !inboxQueue.isEmpty else { return }
-        activeSheet = .importedScreenshot(inboxQueue.removeFirst())
+        let next = inboxQueue.removeFirst()
+        presentedHash = next.textHash
+        activeSheet = .importedScreenshot(next)
+    }
+
+    private func sheetDismissed() {
+        presentedHash = nil
+        showNextFromInbox()
     }
 
     private func shiftStatus(elapsed: TimeInterval, summary: EarningsSummary) -> String {

@@ -30,8 +30,9 @@ final class TextHashTests: XCTestCase {
     }
 
     func testKnownFNV1aValues() {
-        // FNV-1a 64 bit: bos girdi = offset basis; "a" = af63dc4c8601ec8c
-        XCTAssertEqual(TextHash.of([]), "cbf29ce484222325")
+        // Metinsiz girdi ozet uretmez (her bos ekran birbirinin tekrari sayilmasin); "a" = af63dc4c8601ec8c
+        XCTAssertEqual(TextHash.of([]), "")
+        XCTAssertEqual(TextHash.of(["   ", ""]), "")
         XCTAssertEqual(TextHash.of(["A"]), "af63dc4c8601ec8c")
     }
 }
