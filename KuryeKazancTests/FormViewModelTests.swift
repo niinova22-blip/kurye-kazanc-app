@@ -319,6 +319,13 @@ final class FormViewModelTests: XCTestCase {
         XCTAssertEqual(vm.pendingVerification, .ocrUnverified)
     }
 
+    func testImportedWeeklyScreen_forcesReviewAndShowsAssessment() {
+        let vm = EarningFormViewModel(defaultPlatform: nil, imported: imported(period: .week), now: at(6, 18), calendar: calendar)
+        XCTAssertEqual(vm.ocrState, .finished, "Paylasim/oneri ile acilan formda degerlendirme gorunmeli")
+        XCTAssertTrue(vm.fieldsToReview.contains(.gross))
+        XCTAssertTrue(vm.fieldsToReview.contains(.date))
+    }
+
     func testManualSave_isManualWithoutEvidence() throws {
         let vm = EarningFormViewModel(defaultPlatform: platforms.first, now: at(6, 18), calendar: calendar)
         vm.grossText = "500"

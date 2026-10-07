@@ -77,4 +77,35 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(courier.defaultPlatforms.map(\.code), ["trendyol_go"])
         XCTAssertEqual(courier.vehicleType, .motorcycle)
     }
+
+    private func recordWithEvidence() -> (EarningRecord, ScreenshotEvidence) {
+        let parsed = ParsedEarning(platformCode: "getir", date: .now, packageCount: 1, totalEarning: 100,
+                                   bonus: 0, totalIncludesBonus: true, fieldsToReview: [])
+        let evidence = ScreenshotEvidence(capturedAt: nil, assetIdentifier: nil, parsed: parsed,
+                                          lines: [RecognizedLine(text: "IBAN TR00", x: 0, y: 0, width: 1, height: 0.1)],
+                                          isGenuineScreenshot: true)
+        let record = EarningRecord(startTime: .now, endTime: .now, grossEarning: 100, source: .ocr)
+        context.insert(evidence)
+        context.insert(record)
+        record.evidence = evidence
+        return (record, evidence)
+    }
+
+    func testDeletingEarningAlsoDeletesItsEvidence() throws {
+        let (record, _) = recordWithEvidence()
+        try context.save()
+        try context.deleteEarning(record)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<ScreenshotEvidence>()), 0,
+                       "OCR metni (isim, IBAN olabilir) kayitla birlikte silinmeli")
+    }
+
+    func testDeleteAllRecordsRemovesEvidence() throws {
+        _ = recordWithEvidence()
+        context.insert(ExpenseRecord(date: .now, type: .fuel, amount: 50))
+        try context.save()
+        try context.deleteAllRecords()
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<EarningRecord>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<ExpenseRecord>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<ScreenshotEvidence>()), 0)
+    }
 }

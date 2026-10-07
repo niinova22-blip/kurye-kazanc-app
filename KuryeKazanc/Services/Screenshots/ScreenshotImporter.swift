@@ -21,12 +21,18 @@ struct ScreenshotImporter {
     /// Test icin: PhotoKit sorgusu yerine sabit deger.
     var assetIsScreenshot: (String) -> Bool? = ScreenshotImporter.photoKitIsScreenshot
 
-    func importImage(data: Data, assetIdentifier: String?, referenceDate: Date = .now) async throws -> ImportedScreenshot {
+    /// - Parameters:
+    ///   - capturedAt: Gorselin cekildigi an (PhotoKit); EXIF yoksa kullanilir.
+    ///   - referenceDate: Simdi. Tarih yakinligi kontrolu buna gore yapilir.
+    func importImage(data: Data, assetIdentifier: String?, capturedAt: Date? = nil,
+                     referenceDate: Date = .now) async throws -> ImportedScreenshot {
         guard let image = UIImage(data: data) else { throw TextRecognitionError.invalidImage }
         let lines = try await recognizer.recognize(in: image)
-        let parsed = parser.parse(lines: lines.map(\.text), referenceDate: referenceDate)
-
         let metadata = Self.metadata(of: data)
+        let captured = metadata.capturedAt ?? capturedAt
+        // "Bugun"/"Dun" ekranin cekildigi gune gore cozulur (ertesi gun paylasilan goruntu kaymasin)
+        let parsed = parser.parse(lines: lines.map(\.text), referenceDate: captured ?? referenceDate)
+
         let isGenuine = ScreenshotAuthenticity.isGenuine(
             assetIsScreenshot: assetIdentifier.flatMap(assetIsScreenshot),
             pixelWidth: metadata.pixelWidth, pixelHeight: metadata.pixelHeight,
@@ -37,7 +43,7 @@ struct ScreenshotImporter {
 
         return ImportedScreenshot(
             lines: lines, parsed: parsed, assessment: assessment,
-            capturedAt: metadata.capturedAt, assetIdentifier: assetIdentifier, isGenuine: isGenuine
+            capturedAt: captured, assetIdentifier: assetIdentifier, isGenuine: isGenuine
         )
     }
 

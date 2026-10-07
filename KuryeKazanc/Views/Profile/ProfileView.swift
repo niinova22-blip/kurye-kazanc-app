@@ -267,9 +267,7 @@ struct ProfileView: View {
     }
 
     private func deleteAllRecords() {
-        try? modelContext.delete(model: EarningRecord.self)
-        try? modelContext.delete(model: ExpenseRecord.self)
-        try? modelContext.save()
+        try? modelContext.deleteAllRecords()
     }
 }
 

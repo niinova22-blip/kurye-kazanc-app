@@ -29,14 +29,15 @@ struct PhotoKitScreenshotLibrary: ScreenshotLibrary {
 
     func recentScreenshots(since: Date, limit: Int) async -> [LibraryScreenshot] {
         guard isAuthorized else { return [] }
+        // Bit maskeli mediaSubtypes yuklemi yerine sistemin "Ekran Goruntuleri" akilli albumu (belgelenmis yol)
+        guard let album = PHAssetCollection.fetchAssetCollections(
+            with: .smartAlbum, subtype: .smartAlbumScreenshots, options: nil
+        ).firstObject else { return [] }
         let options = PHFetchOptions()
-        options.predicate = NSPredicate(
-            format: "(mediaSubtypes & %d) != 0 AND creationDate >= %@",
-            PHAssetMediaSubtype.photoScreenshot.rawValue, since as NSDate
-        )
+        options.predicate = NSPredicate(format: "creationDate >= %@", since as NSDate)
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.fetchLimit = limit
-        let assets = PHAsset.fetchAssets(with: .image, options: options)
+        let assets = PHAsset.fetchAssets(in: album, options: options)
         var result: [LibraryScreenshot] = []
         assets.enumerateObjects { asset, _, _ in
             result.append(LibraryScreenshot(identifier: asset.localIdentifier, createdAt: asset.creationDate) {
@@ -97,11 +98,10 @@ final class ScreenshotScanner {
         for item in await library.recentScreenshots(since: since, limit: 5) {
             guard !knownIdentifiers.contains(item.identifier), !dismissed.contains(item.identifier),
                   let data = await item.data(),
-                  let result = try? await importer.importImage(data: data, assetIdentifier: item.identifier, referenceDate: now),
+                  let result = try? await importer.importImage(data: data, assetIdentifier: item.identifier,
+                                                               capturedAt: item.createdAt, referenceDate: now),
                   result.parsed.platformCode != nil else { continue }
-            var imported = result
-            imported.capturedAt = imported.capturedAt ?? item.createdAt
-            suggestion = imported
+            suggestion = result
             return
         }
         suggestion = nil

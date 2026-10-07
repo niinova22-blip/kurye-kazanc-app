@@ -181,7 +181,13 @@ final class EarningFormViewModel {
     func apply(_ imported: ImportedScreenshot, platforms: [Platform]) {
         self.imported = imported
         apply(imported.parsed, platforms: platforms)
+        if imported.parsed.period == .week {
+            // Haftalik toplam tek vardiya gibi sessizce kaydedilmesin: "Kontrol ettim" onayi zorunlu
+            fieldsToReview.formUnion([.gross, .date])
+        }
         readBaseline = currentReadValues
+        // Paylasim / oneri ile acilan formda da degerlendirme ve rozet gorunsun
+        ocrState = .finished
     }
 
     /// OCR sonucunu forma yazar. Hicbir alan bos birakilmaz; emin olunamayanlar vurgulanir.

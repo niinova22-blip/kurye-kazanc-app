@@ -23,6 +23,7 @@ struct TodayView: View {
     @State private var activeSheet: Sheet?
     /// Paylas eklentisinden gelen, sirada bekleyen ekran goruntuleri.
     @State private var inboxQueue: [ImportedScreenshot] = []
+    @State private var isProcessingInbox = false
 
     private let inbox = LaunchOptions.current.isUITesting ? ScreenshotInbox(directory: nil) : .shared
 
@@ -296,8 +297,13 @@ struct TodayView: View {
 
     /// Paylas eklentisinin biraktigi gorselleri okur, siler ve sirayla forma aktarir.
     private func processInbox() async {
+        // .task ve scenePhase ayni anda tetikleyebilir: tek calisma
+        guard !isProcessingInbox else { return }
+        isProcessingInbox = true
+        defer { isProcessingInbox = false }
         let importer = ScreenshotImporter()
-        for url in inbox.pending() {
+        for pending in inbox.pending() {
+            guard let url = inbox.claim(pending) else { continue }
             defer { inbox.remove(url) }
             guard let data = try? Data(contentsOf: url),
                   let result = try? await importer.importImage(data: data, assetIdentifier: nil) else { continue }
@@ -337,6 +343,10 @@ struct TodayView: View {
     }
 
     private func delete(_ model: some PersistentModel) {
+        if let record = model as? EarningRecord {
+            try? modelContext.deleteEarning(record)
+            return
+        }
         modelContext.delete(model)
         try? modelContext.save()
     }

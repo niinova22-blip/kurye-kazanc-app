@@ -43,4 +43,21 @@ final class ScreenshotImporterTests: XCTestCase {
         let result = try await importer.importImage(data: screenshotPNG(), assetIdentifier: "X")
         XCTAssertFalse(result.isGenuine)
     }
+
+    func testRelativeDayIsResolvedAgainstCaptureTime() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Istanbul")!
+        let captured = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5, hour: 23, minute: 30))!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 9))!
+        let importer = ScreenshotImporter(
+            recognizer: FakeRecognizer(lines: ["Getir", "Bugün", "Toplam Kazanç", "₺500"]),
+            parser: EarningsScreenshotParser(calendar: calendar),
+            verifier: ScreenshotVerifier(calendar: calendar),
+            assetIsScreenshot: { _ in nil }
+        )
+        let result = try await importer.importImage(data: screenshotPNG(), assetIdentifier: nil,
+                                                    capturedAt: captured, referenceDate: now)
+        XCTAssertEqual(result.parsed.date, calendar.startOfDay(for: captured))
+        XCTAssertEqual(result.capturedAt, captured)
+    }
 }

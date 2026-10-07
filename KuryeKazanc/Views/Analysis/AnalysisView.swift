@@ -201,8 +201,7 @@ private struct AnalysisContentView: View {
                         .buttonStyle(.plain)
                     }
                     .onDelete { offsets in
-                        offsets.map { earnings[$0] }.forEach { modelContext.delete($0) }
-                        try? modelContext.save()
+                        offsets.map { earnings[$0] }.forEach { try? modelContext.deleteEarning($0) }
                     }
                 }
             }

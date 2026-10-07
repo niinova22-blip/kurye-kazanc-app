@@ -32,6 +32,18 @@ struct ScreenshotInbox {
         return files.filter { $0.pathExtension == "img" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
+    /// Dosyayi isleme icin "sahiplenir": adini degistirir ki ikinci bir tarama ayni gorseli gormesin.
+    /// Baska bir tarama once aldiysa nil.
+    func claim(_ url: URL) -> URL? {
+        let claimed = url.deletingPathExtension().appendingPathExtension("processing")
+        do {
+            try FileManager.default.moveItem(at: url, to: claimed)
+            return claimed
+        } catch {
+            return nil
+        }
+    }
+
     func remove(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
     }
