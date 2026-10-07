@@ -44,6 +44,7 @@ struct AnalysisView: View {
                 Spacer()
                 Text(periods.title(of: kind, containing: anchor))
                     .font(.headline)
+                    .multilineTextAlignment(.center)
                     .accessibilityIdentifier("history.periodTitle")
                 Spacer()
 
@@ -100,7 +101,10 @@ private struct AnalysisContentView: View {
         let previousEnd = previous.end
         _previousEarnings = Query(filter: #Predicate<EarningRecord> { $0.date >= previousStart && $0.date < previousEnd })
         _previousExpenses = Query(filter: #Predicate<ExpenseRecord> { $0.date >= previousStart && $0.date < previousEnd })
-        let recentStart = Calendar.current.date(byAdding: .day, value: -56, to: .now) ?? .distantPast
+        // Son 8 hafta: gun basina normalize edilir (sinir gun icinde kaymasin)
+        let calendar = Calendar.current
+        let shifted: Date = calendar.date(byAdding: .day, value: -56, to: .now) ?? .distantPast
+        let recentStart: Date = calendar.startOfDay(for: shifted)
         _recentEarnings = Query(filter: #Predicate<EarningRecord> { $0.date >= recentStart })
     }
 
@@ -123,103 +127,18 @@ private struct AnalysisContentView: View {
         )
     }
 
+    // Derleyicinin tip denetimi zaman asimina ugramasin diye govde kucuk parcalara bolundu.
     var body: some View {
-        let daily = summarize(earnings, expenses)
-        let summary = daily.values.total
-        let previousNet = summarize(previousEarnings, previousExpenses).values.total.netEarnings
-        let change = EarningsAnalytics.percentChange(current: summary.netEarnings, previous: previousNet)
-        let recent = recentEarnings.map(\.entry)
-        let bestSlots = analytics.topSlots(recent)
-        let heatmap = analytics.heatmap(recent)
-        let platformStats = analytics.platformStats(earnings.map(\.entry))
+        let daily: [Date: EarningsSummary] = summarize(earnings, expenses)
+        let summary: EarningsSummary = daily.values.total
 
         List {
-            Section {
-                HeroAmount(title: "Net kazanç", value: summary.netEarnings, identifier: "history.netEarnings")
-                if let change {
-                    Text("Önceki döneme göre \(change >= 0 ? "+" : "−")%\(Int(abs(change).rounded()))")
-                        .font(.subheadline)
-                        .foregroundStyle(change >= 0 ? Theme.accent : Theme.negative)
-                }
-                MetricStrip([
-                    .init(title: "Net ₺/saat", value: Formatters.perHour(summary.netPerHour), identifier: "history.netPerHour"),
-                    .init(title: "Çalışma", value: Formatters.duration(summary.workDuration), identifier: "history.workDuration"),
-                    .init(title: "Mesafe", value: Formatters.distance(summary.distanceKm), identifier: "history.distance"),
-                ])
-                MetricStrip([
-                    .init(title: "Brüt", value: Formatters.currency(summary.totalEarnings), identifier: "history.gross"),
-                    .init(title: "Gider", value: Formatters.currency(summary.totalExpenses), identifier: "history.expenses"),
-                    .init(title: "Tahmini gider", value: Formatters.currency(summary.estimatedExpenses), identifier: "history.estimated"),
-                ])
-            }
-            .listRowSeparator(.hidden)
-
-            if kind != .day, !daily.isEmpty {
-                Section("Günlük net") {
-                    Chart(periods.days(in: interval), id: \.self) { day in
-                        BarMark(
-                            x: .value("Gün", day, unit: .day),
-                            y: .value("Net", daily[day]?.netEarnings ?? 0)
-                        )
-                        .foregroundStyle((daily[day]?.netEarnings ?? 0) >= 0 ? Theme.accent : Theme.negative)
-                    }
-                    .chartXAxis {
-                        AxisMarks(values: .stride(by: .day, count: kind == .month ? 7 : 1)) { _ in
-                            AxisValueLabel(format: kind == .month
-                                           ? .dateTime.day().locale(Formatters.locale)
-                                           : .dateTime.weekday(.abbreviated).locale(Formatters.locale))
-                        }
-                    }
-                    .frame(height: 180)
-                    .padding(.vertical, 8)
-                }
-            }
-
-            if !bestSlots.isEmpty {
-                BestSlotsSection(slots: bestSlots)
-            }
-
-            if !heatmap.isEmpty {
-                HeatmapSection(map: heatmap)
-            }
-
-            if !platformStats.isEmpty {
-                PlatformComparisonSection(stats: platformStats, names: platformNames)
-            }
-
-            if earnings.isEmpty && expenses.isEmpty {
-                ContentUnavailableView("Bu dönemde kayıt yok", systemImage: "calendar.badge.exclamationmark")
-                    .listRowBackground(Color.clear)
-            }
-
-            if !earnings.isEmpty {
-                Section("Kazançlar") {
-                    ForEach(earnings) { record in
-                        Button { editingEarning = record } label: {
-                            EarningListRow(record: record, showsDate: kind != .day)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .onDelete { offsets in
-                        offsets.map { earnings[$0] }.forEach { try? modelContext.deleteEarning($0) }
-                    }
-                }
-            }
-
-            if !expenses.isEmpty {
-                Section("Giderler") {
-                    ForEach(expenses) { record in
-                        Button { editingExpense = record } label: {
-                            ExpenseListRow(record: record, showsDate: kind != .day)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .onDelete { offsets in
-                        offsets.map { expenses[$0] }.forEach { modelContext.delete($0) }
-                        try? modelContext.save()
-                    }
-                }
-            }
+            summarySection(summary: summary)
+            dailyChartSection(daily: daily)
+            insightSections
+            emptyState
+            earningsSection
+            expensesSection
         }
         .listStyle(.insetGrouped)
         .sheet(item: $editingEarning) { record in
@@ -228,5 +147,178 @@ private struct AnalysisContentView: View {
         .sheet(item: $editingExpense) { record in
             ExpenseFormView(record: record)
         }
+    }
+
+    // MARK: - Ozet
+
+    private func summarySection(summary: EarningsSummary) -> some View {
+        Section {
+            HeroAmount(title: "Net kazanç", value: summary.netEarnings, identifier: "history.netEarnings")
+            changeLine(currentNet: summary.netEarnings)
+            MetricStrip(primaryMetrics(summary))
+            MetricStrip(secondaryMetrics(summary))
+        }
+        .listRowSeparator(.hidden)
+    }
+
+    @ViewBuilder
+    private func changeLine(currentNet: Double) -> some View {
+        let previousNet: Double = summarize(previousEarnings, previousExpenses).values.total.netEarnings
+        if let change = EarningsAnalytics.percentChange(current: currentNet, previous: previousNet) {
+            let text: String = Self.changeText(change)
+            Text(verbatim: text)
+                .font(.subheadline)
+                .foregroundStyle(change >= 0 ? Theme.accent : Theme.negative)
+        }
+    }
+
+    /// "%" yerellestirme bicim belirteci gibi yorumlanmasin diye metin once String olarak kurulur.
+    static func changeText(_ change: Double) -> String {
+        let sign: String = change >= 0 ? "+" : "−"
+        let percent: Int = Int(abs(change).rounded())
+        return "Önceki döneme göre " + sign + "%" + String(percent)
+    }
+
+    private func primaryMetrics(_ summary: EarningsSummary) -> [MetricStrip.Item] {
+        [
+            MetricStrip.Item(title: "Net ₺/saat", value: Formatters.perHour(summary.netPerHour), identifier: "history.netPerHour"),
+            MetricStrip.Item(title: "Çalışma", value: Formatters.duration(summary.workDuration), identifier: "history.workDuration"),
+            MetricStrip.Item(title: "Mesafe", value: Formatters.distance(summary.distanceKm), identifier: "history.distance"),
+        ]
+    }
+
+    private func secondaryMetrics(_ summary: EarningsSummary) -> [MetricStrip.Item] {
+        [
+            MetricStrip.Item(title: "Brüt", value: Formatters.currency(summary.totalEarnings), identifier: "history.gross"),
+            MetricStrip.Item(title: "Gider", value: Formatters.currency(summary.totalExpenses), identifier: "history.expenses"),
+            MetricStrip.Item(title: "Tahmini gider", value: Formatters.currency(summary.estimatedExpenses), identifier: "history.estimated"),
+        ]
+    }
+
+    // MARK: - Grafik ve analizler
+
+    @ViewBuilder
+    private func dailyChartSection(daily: [Date: EarningsSummary]) -> some View {
+        if kind != .day, !daily.isEmpty {
+            Section("Günlük net") {
+                DailyNetChart(days: periods.days(in: interval), daily: daily, kind: kind)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var insightSections: some View {
+        let recent: [EarningEntry] = recentEarnings.map(\.entry)
+        let bestSlots: [RankedSlot] = analytics.topSlots(recent)
+        let heatmap: [HourSlot: SlotStat] = analytics.heatmap(recent)
+        let platformStats: [PlatformStat] = analytics.platformStats(earnings.map(\.entry))
+
+        if !bestSlots.isEmpty {
+            BestSlotsSection(slots: bestSlots)
+        }
+        if !heatmap.isEmpty {
+            HeatmapSection(map: heatmap)
+        }
+        if !platformStats.isEmpty {
+            PlatformComparisonSection(stats: platformStats, names: platformNames)
+        }
+    }
+
+    // MARK: - Kayitlar
+
+    @ViewBuilder
+    private var emptyState: some View {
+        if earnings.isEmpty && expenses.isEmpty {
+            ContentUnavailableView("Bu dönemde kayıt yok", systemImage: "calendar.badge.exclamationmark")
+                .listRowBackground(Color.clear)
+        }
+    }
+
+    @ViewBuilder
+    private var earningsSection: some View {
+        if !earnings.isEmpty {
+            Section("Kazançlar") {
+                ForEach(earnings) { record in
+                    Button { editingEarning = record } label: {
+                        EarningListRow(record: record, showsDate: kind != .day)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .onDelete(perform: deleteEarnings)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var expensesSection: some View {
+        if !expenses.isEmpty {
+            Section("Giderler") {
+                ForEach(expenses) { record in
+                    Button { editingExpense = record } label: {
+                        ExpenseListRow(record: record, showsDate: kind != .day)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .onDelete(perform: deleteExpenses)
+            }
+        }
+    }
+
+    private func deleteEarnings(at offsets: IndexSet) {
+        let records: [EarningRecord] = offsets.map { earnings[$0] }
+        for record in records {
+            try? modelContext.deleteEarning(record)
+        }
+    }
+
+    private func deleteExpenses(at offsets: IndexSet) {
+        let records: [ExpenseRecord] = offsets.map { expenses[$0] }
+        for record in records {
+            modelContext.delete(record)
+        }
+        try? modelContext.save()
+    }
+}
+
+/// Donemin gunluk net cubuk grafigi.
+private struct DailyNetChart: View {
+    let days: [Date]
+    let daily: [Date: EarningsSummary]
+    let kind: PeriodKind
+
+    private func net(on day: Date) -> Double {
+        daily[day]?.netEarnings ?? 0
+    }
+
+    private func barColor(on day: Date) -> Color {
+        net(on: day) >= 0 ? Theme.accent : Theme.negative
+    }
+
+    private var strideCount: Int {
+        kind == .month ? 7 : 1
+    }
+
+    private var axisFormat: Date.FormatStyle {
+        if kind == .month {
+            return Date.FormatStyle().locale(Formatters.locale).day()
+        }
+        return Date.FormatStyle().locale(Formatters.locale).weekday(.abbreviated)
+    }
+
+    var body: some View {
+        Chart(days, id: \.self) { day in
+            BarMark(
+                x: .value("Gün", day, unit: .day),
+                y: .value("Net", net(on: day))
+            )
+            .foregroundStyle(barColor(on: day))
+        }
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .day, count: strideCount)) { _ in
+                AxisValueLabel(format: axisFormat)
+            }
+        }
+        .frame(height: 180)
+        .padding(.vertical, 8)
     }
 }
