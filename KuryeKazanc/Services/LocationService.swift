@@ -97,7 +97,11 @@ final class LocationService: NSObject {
         lastAcceptedLocation = nil
         movementAnchor = nil
         manager.pausesLocationUpdatesAutomatically = !keepAliveWhenStationary
-        markMovement(at: .now)
+        // Yalnizca yeni vardiyada sifirla; devam ederken (uygulama yeniden acilinca) kayitli son hareket korunur,
+        // yoksa 20 dk duragan sayaci her acilista basa doner.
+        if resetDistance {
+            markMovement(at: .now)
+        }
 
         switch authorizationStatus {
         case .notDetermined:
