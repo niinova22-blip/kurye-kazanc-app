@@ -121,9 +121,13 @@ workflows:
       vars:
         <<: *common_vars
         RUN_UI_TESTS: "true"                 # TestFlight'a gitmeden once UI testleri sart
+      # Uygulama + paylas eklentisi: iki profil (App Group yetenekli). Onkosul: README > Imzalama.
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.kuryekazanc.app
+        provisioning_profiles:
+          - kurye-kazanc-appstore
+          - kurye-kazanc-share-appstore
+        certificates:
+          - selfwake-distribution
     triggering:
       events:
         - push

@@ -28,6 +28,10 @@ targets:
       - path: KuryeKazanc
         excludes:
           - "Supporting/Info.plist"
+          - "Supporting/*.entitlements"
+    dependencies:
+      - target: KuryeShareExtension
+        embed: true
     settings:
       base:
         # Bundle ID gizli bilgi degildir; App Store Connect'teki kayitla ayni olmali (codemagic.yaml'daki BUNDLE_ID ile de).
@@ -44,6 +48,27 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
+        CODE_SIGN_ENTITLEMENTS: KuryeKazanc/Supporting/KuryeKazanc.entitlements
+
+  # Fotograflar > Paylas > Kurye Kazanc. Gorseli App Group gelen kutusuna birakir (bkz. ScreenshotInbox).
+  KuryeShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: KuryeShareExtension
+        excludes:
+          - "Info.plist"
+          - "*.entitlements"
+      - path: KuryeKazanc/Services/Screenshots/ScreenshotInbox.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kuryekazanc.app.share
+        INFOPLIST_FILE: KuryeShareExtension/Info.plist
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Kurye Kazanç"
+        CODE_SIGN_ENTITLEMENTS: KuryeShareExtension/KuryeShareExtension.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
 
   KuryeKazancTests:
     type: bundle.unit-test

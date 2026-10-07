@@ -21,6 +21,10 @@ struct TodayView: View {
     @AppStorage(AppPreferences.weeklyGoalKey) private var weeklyGoal = 0.0
 
     @State private var activeSheet: Sheet?
+    /// Paylas eklentisinden gelen, sirada bekleyen ekran goruntuleri.
+    @State private var inboxQueue: [ImportedScreenshot] = []
+
+    private let inbox = LaunchOptions.current.isUITesting ? ScreenshotInbox(directory: nil) : .shared
 
     private let day: Date
 
@@ -139,13 +143,19 @@ struct TodayView: View {
                     addMenu
                 }
             }
-            .task { await scanner.scan(knownIdentifiers: knownIDs) }
+            .task {
+                await processInbox()
+                await scanner.scan(knownIdentifiers: knownIDs)
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
-                    Task { await scanner.scan(knownIdentifiers: knownIDs) }
+                    Task {
+                        await processInbox()
+                        await scanner.scan(knownIdentifiers: knownIDs)
+                    }
                 }
             }
-            .sheet(item: $activeSheet) { sheet in
+            .sheet(item: $activeSheet, onDismiss: showNextFromInbox) { sheet in
                 switch sheet {
                 case .addEarning(let session, let opensPicker):
                     EarningFormView(session: session, defaultPlatform: defaultPlatform, opensPhotoPicker: opensPicker)
@@ -283,6 +293,25 @@ struct TodayView: View {
     }
 
     // MARK: - Eylemler
+
+    /// Paylas eklentisinin biraktigi gorselleri okur, siler ve sirayla forma aktarir.
+    private func processInbox() async {
+        let importer = ScreenshotImporter()
+        for url in inbox.pending() {
+            defer { inbox.remove(url) }
+            guard let data = try? Data(contentsOf: url),
+                  let result = try? await importer.importImage(data: data, assetIdentifier: nil) else { continue }
+            inboxQueue.append(result)
+        }
+        if activeSheet == nil {
+            showNextFromInbox()
+        }
+    }
+
+    private func showNextFromInbox() {
+        guard !inboxQueue.isEmpty else { return }
+        activeSheet = .importedScreenshot(inboxQueue.removeFirst())
+    }
 
     private func shiftStatus(elapsed: TimeInterval) -> String {
         let isLocationAvailable = workSession.location.isAuthorized || !workSession.location.isEnabled
