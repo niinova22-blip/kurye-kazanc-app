@@ -6,22 +6,18 @@ import SwiftData
 @Observable
 final class OnboardingViewModel {
     enum Step: Int, CaseIterable {
-        case welcome, vehicle, platforms, permissions
+        case vehicle, platforms, location, sharing
     }
 
-    var step: Step = .welcome
-    var name = ""
+    var step: Step = .vehicle
     var vehicleType: VehicleType = .motorcycle
     var selectedPlatformCodes: Set<String> = []
 
     var canContinue: Bool {
-        switch step {
-        case .welcome, .vehicle, .permissions: true
-        case .platforms: !selectedPlatformCodes.isEmpty
-        }
+        step == .platforms ? !selectedPlatformCodes.isEmpty : true
     }
 
-    var isLastStep: Bool { step == .permissions }
+    var isLastStep: Bool { step == .sharing }
 
     func next() {
         guard let next = Step(rawValue: step.rawValue + 1) else { return }
@@ -53,7 +49,8 @@ final class OnboardingViewModel {
             context.insert(new)
             return new
         }()
-        courier.name = name.nilIfBlank ?? "Kurye"
+        // Isim onboarding'de sorulmaz; Profil'den degistirilebilir
+        if courier.name.nilIfBlank == nil { courier.name = "Kurye" }
         courier.vehicleType = vehicleType
         courier.defaultPlatforms = chosen
         try context.save()

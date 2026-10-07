@@ -197,14 +197,7 @@ final class OnboardingUITests: XCTestCase {
         app.launch()
 
         let next = app.buttons["onboarding.next"]
-        XCTAssertTrue(next.waitForExistence(timeout: 10))
-
-        let name = app.textFields["onboarding.name"]
-        name.tap()
-        name.typeText("Test")
-        next.tap()                                   // -> arac
-
-        XCTAssertTrue(app.buttons["onboarding.vehicle.scooter"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["onboarding.vehicle.scooter"].waitForExistence(timeout: 10))
         app.buttons["onboarding.vehicle.scooter"].tap()
         next.tap()                                   // -> platformlar
 
@@ -212,10 +205,13 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(next.isEnabled, "Platform secmeden devam edilmemeli")
         app.buttons["onboarding.platform.getir"].tap()
         XCTAssertTrue(next.isEnabled)
-        next.tap()                                   // -> konum bilgisi
+        next.tap()                                   // -> konum
 
-        XCTAssertTrue(app.staticTexts["Konum yalnızca çalışırken"].waitForExistence(timeout: 5))
-        next.tap()                                   // Bitir
+        XCTAssertTrue(app.staticTexts["Konum yalnızca vardiyada"].waitForExistence(timeout: 5))
+        next.tap()                                   // -> paylasim
+
+        XCTAssertTrue(app.staticTexts["Bölgendeki kuryelerle karşılaştır"].waitForExistence(timeout: 5))
+        next.tap()                                   // Basla (paylasim acilmadan)
 
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
     }

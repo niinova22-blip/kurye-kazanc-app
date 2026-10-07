@@ -220,8 +220,9 @@ final class FormViewModelTests: XCTestCase {
         defaults.removePersistentDomain(forName: #function)
 
         let vm = OnboardingViewModel()
+        XCTAssertEqual(vm.step, .vehicle)
         XCTAssertTrue(vm.canContinue)
-        vm.next(); vm.next()
+        vm.next()
         XCTAssertEqual(vm.step, .platforms)
         XCTAssertFalse(vm.canContinue) // en az bir platform
         vm.togglePlatform("getir")
@@ -229,7 +230,9 @@ final class FormViewModelTests: XCTestCase {
         vm.togglePlatform("getir")
         XCTAssertTrue(vm.canContinue)
         vm.vehicleType = .car
-        vm.name = "  "
+        vm.next(); vm.next()
+        XCTAssertEqual(vm.step, .sharing)
+        XCTAssertTrue(vm.isLastStep)
 
         try vm.complete(in: context, platforms: platforms, defaults: defaults)
 
