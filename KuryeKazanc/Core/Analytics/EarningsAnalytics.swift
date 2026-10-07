@@ -87,18 +87,28 @@ struct EarningsAnalytics {
     }
 
     func platformStats(_ entries: [EarningEntry]) -> [PlatformStat] {
-        Dictionary(grouping: entries) { $0.platformCode ?? "other" }
-            .map { code, items in
-                PlatformStat(
-                    platformCode: code,
-                    total: items.reduce(0) { $0 + $1.gross + $1.bonus },
-                    hours: EarningsCalculator.mergedDuration(of: items.map { (start: $0.start, end: $0.end) }) / 3600,
-                    packages: items.reduce(0) { $0 + ($1.packageCount ?? 0) },
-                    distanceKm: items.reduce(0) { $0 + max(0, $1.distanceKm) },
-                    estimatedNet: items.reduce(0) { $0 + estimatedNet($1) }
-                )
+        // Derleyicinin tip cikarimi zaman asimina ugramasin diye adim adim
+        let groups: [String: [EarningEntry]] = Dictionary(grouping: entries) { $0.platformCode ?? "other" }
+        var stats: [PlatformStat] = []
+        for (code, items) in groups {
+            var total = 0.0
+            var packages = 0
+            var distance = 0.0
+            var net = 0.0
+            for item in items {
+                total += item.gross + item.bonus
+                packages += item.packageCount ?? 0
+                distance += max(0, item.distanceKm)
+                net += estimatedNet(item)
             }
-            .sorted { $0.total > $1.total }
+            let intervals: [(start: Date, end: Date)] = items.map { (start: $0.start, end: $0.end) }
+            let hours = EarningsCalculator.mergedDuration(of: intervals) / 3600
+            stats.append(PlatformStat(
+                platformCode: code, total: total, hours: hours, packages: packages,
+                distanceKm: distance, estimatedNet: net
+            ))
+        }
+        return stats.sorted { $0.total > $1.total }
     }
 
     /// Yuzde degisim; onceki donem 0 ise nil ("—").
