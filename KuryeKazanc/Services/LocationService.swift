@@ -25,6 +25,12 @@ final class LocationService: NSObject {
     private(set) var isTracking = false
     private(set) var sessionDistanceMeters: Double
     private(set) var lastLocation: CLLocation?
+    private(set) var lastMovementDate: Date?
+    private(set) var isMonitoringSignificantChanges = false
+    /// Her konum olayinda (GPS veya onemli konum degisikligi) cagrilir: otomatik vardiya karari icin.
+    @ObservationIgnored var onLocationEvent: (@MainActor () -> Void)?
+    /// Son anlamli hareketin olculdugu nokta (>= 50 m).
+    @ObservationIgnored private var movementAnchor: CLLocation?
 
     /// UI testlerinde (simulatorde izin diyalogu testleri kilitlemesin diye) kapatilir.
     let isEnabled: Bool
@@ -44,6 +50,7 @@ final class LocationService: NSObject {
         self.isEnabled = isEnabled
         self.defaults = defaults
         self.sessionDistanceMeters = defaults.double(forKey: Self.distanceKey)
+        self.lastMovementDate = defaults.object(forKey: AppPreferences.lastMovementKey) as? Date
         self.authorizationStatus = manager.authorizationStatus
         super.init()
         manager.delegate = self
@@ -79,13 +86,18 @@ final class LocationService: NSObject {
     // MARK: - Calisiyorum modu
 
     /// - Parameter resetDistance: Yeni oturumda true; uygulama yeniden acilip oturum devam ederken false.
-    func startTracking(resetDistance: Bool) {
+    /// - Parameter keepAliveWhenStationary: Otomatik vardiyada true: iOS durunca konumu duraklatmasin,
+    ///   yoksa 20 dk duragan kalma hic olculemez (vardiya bitmez).
+    func startTracking(resetDistance: Bool, keepAliveWhenStationary: Bool = false) {
         guard isEnabled else { return }
         if resetDistance {
             sessionDistanceMeters = 0
             defaults.set(0.0, forKey: Self.distanceKey)
         }
         lastAcceptedLocation = nil
+        movementAnchor = nil
+        manager.pausesLocationUpdatesAutomatically = !keepAliveWhenStationary
+        markMovement(at: .now)
 
         switch authorizationStatus {
         case .notDetermined:
@@ -98,6 +110,23 @@ final class LocationService: NSObject {
         }
     }
 
+    func markMovement(at date: Date) {
+        lastMovementDate = date
+        defaults.set(date, forKey: AppPreferences.lastMovementKey)
+    }
+
+    /// Otomatik mod: ~500 m'de bir uyandirir; uygulama kapaliysa iOS arka planda yeniden baslatir.
+    func startSignificantChangeMonitoring() {
+        guard isEnabled, CLLocationManager.significantLocationChangeMonitoringAvailable() else { return }
+        manager.startMonitoringSignificantLocationChanges()
+        isMonitoringSignificantChanges = true
+    }
+
+    func stopSignificantChangeMonitoring() {
+        manager.stopMonitoringSignificantLocationChanges()
+        isMonitoringSignificantChanges = false
+    }
+
     /// Takibi durdurur ve oturum mesafesini (km) dondurur.
     @discardableResult
     func stopTracking() -> Double {
@@ -108,6 +137,7 @@ final class LocationService: NSObject {
             manager.showsBackgroundLocationIndicator = false
             isTracking = false
         }
+        manager.pausesLocationUpdatesAutomatically = true
         let km = sessionDistanceMeters / 1000
         sessionDistanceMeters = 0
         defaults.set(0.0, forKey: Self.distanceKey)
@@ -182,9 +212,25 @@ final class LocationService: NSObject {
         lastLocation = latest
         resumeOneShot(with: latest)
 
-        guard isTracking else { return }
-        for location in locations {
-            accumulateDistance(with: location)
+        if isTracking {
+            for location in locations {
+                accumulateDistance(with: location)
+                updateMovementAnchor(with: location)
+            }
+        }
+        onLocationEvent?()
+    }
+
+    /// 50 m'den fazla yer degistirme = anlamli hareket.
+    private func updateMovementAnchor(with location: CLLocation) {
+        guard location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 50 else { return }
+        guard let anchor = movementAnchor else {
+            movementAnchor = location
+            return
+        }
+        if location.distance(from: anchor) >= 50 {
+            movementAnchor = location
+            markMovement(at: location.timestamp)
         }
     }
 
