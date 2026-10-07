@@ -47,8 +47,10 @@ final class EarningFormViewModel {
     /// "Bu alanlari kontrol et" ile vurgulanan alanlar.
     var fieldsToReview: Set<Field> = []
     var ocrState: OCRState = .idle
-    /// Son OCR'da Vision'in okudugu ham satirlar (kalibrasyon raporu icin).
-    private(set) var recognizedLines: [String] = []
+    /// Son ekran goruntusu ice aktarimi (kanit + degerlendirme).
+    private(set) var imported: ImportedScreenshot?
+    /// Ekrandan okunan degerlerin karsilastirma tabani (kullanici degistirdi mi?).
+    @ObservationIgnored private var readBaseline: ReadValues?
     var isResolvingRegion = false
 
     private(set) var editingRecord: EarningRecord?
@@ -56,10 +58,56 @@ final class EarningFormViewModel {
 
     var isEditing: Bool { editingRecord != nil }
 
+    /// Ekrandan okunan (saatler haric) degerler.
+    struct ReadValues: Equatable {
+        var platformCode: String?
+        var day: Date
+        var gross: Double
+        var bonus: Double
+        var packages: Int?
+    }
+
+    var assessmentIssues: [String] { imported?.assessment.issues ?? [] }
+
+    /// Kaydedilince alinacak seviye.
+    var pendingVerification: VerificationLevel {
+        if let editingRecord, imported == nil {
+            // Duzenleme: okunan degerler degistiyse ocrEdited, yoksa mevcut seviye
+            guard editingRecord.source == .ocr else { return .manual }
+            return userEditedReadValues ? .ocrEdited : editingRecord.verification
+        }
+        return VerificationLevel.resolve(
+            isFromScreenshot: imported != nil,
+            userEditedReadValues: userEditedReadValues,
+            candidate: imported?.assessment.candidate ?? .manual
+        )
+    }
+
+    private var currentReadValues: ReadValues {
+        ReadValues(
+            platformCode: platform?.code,
+            day: calendar.startOfDay(for: date),
+            gross: TurkishNumberParser.parseDecimal(grossText) ?? -1,
+            bonus: TurkishNumberParser.parseDecimal(bonusText) ?? 0,
+            packages: TurkishNumberParser.parseInt(packageText)
+        )
+    }
+
+    private var userEditedReadValues: Bool {
+        guard let readBaseline else { return false }
+        let current = currentReadValues
+        return current.platformCode != readBaseline.platformCode
+            || current.day != readBaseline.day
+            || abs(current.gross - readBaseline.gross) > 0.005
+            || abs(current.bonus - readBaseline.bonus) > 0.005
+            || (current.packages ?? 0) != (readBaseline.packages ?? 0)
+    }
+
     init(
         record: EarningRecord? = nil,
         session: WorkSessionSummary? = nil,
         defaultPlatform: Platform? = nil,
+        imported: ImportedScreenshot? = nil,
         now: Date = .now,
         calendar: Calendar = .current
     ) {
@@ -90,6 +138,13 @@ final class EarningFormViewModel {
             endTime = now
             startTime = calendar.date(byAdding: .hour, value: -4, to: now) ?? now
         }
+        // OCR kaynakli kayit duzenlenirken okunan degerler taban alinir
+        if let record, record.source == .ocr {
+            readBaseline = currentReadValues
+        }
+        if let imported {
+            apply(imported, platforms: defaultPlatform.map { [$0] } ?? [])
+        }
     }
 
     // MARK: - Alan guncelleme (kullanici etkilesimi -> vurgu kalkar)
@@ -107,22 +162,26 @@ final class EarningFormViewModel {
     // MARK: - OCR
 
     func importScreenshot(
-        _ image: UIImage,
-        recognizer: TextRecognizing,
-        parser: EarningsScreenshotParser = EarningsScreenshotParser(),
+        data: Data,
+        assetIdentifier: String?,
+        importer: ScreenshotImporter = ScreenshotImporter(),
         platforms: [Platform],
         referenceDate: Date = .now
     ) async {
         ocrState = .processing
         do {
-            let lines = try await recognizer.recognize(in: image).map(\.text)
-            recognizedLines = lines
-            let parsed = parser.parse(lines: lines, referenceDate: referenceDate)
-            apply(parsed, platforms: platforms)
+            let result = try await importer.importImage(data: data, assetIdentifier: assetIdentifier, referenceDate: referenceDate)
+            apply(result, platforms: platforms)
             ocrState = .finished
         } catch {
             ocrState = .failed(error.localizedDescription)
         }
+    }
+
+    func apply(_ imported: ImportedScreenshot, platforms: [Platform]) {
+        self.imported = imported
+        apply(imported.parsed, platforms: platforms)
+        readBaseline = currentReadValues
     }
 
     /// OCR sonucunu forma yazar. Hicbir alan bos birakilmaz; emin olunamayanlar vurgulanir.
@@ -163,6 +222,7 @@ final class EarningFormViewModel {
     /// TestFlight testcilerinin gelistiriciye gonderdigi OCR raporu. Satirlar dogrudan
     /// `EarningsScreenshotParserTests`'e yapistirilabilecek Swift dizisi bicimindedir.
     var ocrDiagnosticReport: String? {
+        let recognizedLines = imported?.lines.map(\.text) ?? []
         guard !recognizedLines.isEmpty else { return nil }
         let escaped = recognizedLines.map { line in
             "    \"" + line.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\","
@@ -241,6 +301,8 @@ final class EarningFormViewModel {
 
     @discardableResult
     func save(in context: ModelContext) throws -> EarningRecord {
+        // Seviye kayit alanlari degismeden ONCE hesaplanir
+        let level = pendingVerification
         let interval = resolvedInterval()
         let gross = TurkishNumberParser.parseDecimal(grossText) ?? 0
         let bonus = TurkishNumberParser.parseDecimal(bonusText) ?? 0
@@ -264,6 +326,18 @@ final class EarningFormViewModel {
                 packageCount: packages, source: source, calendar: calendar
             )
             context.insert(record)
+        }
+        record.verification = level
+        if let imported, record.evidence == nil {
+            let evidence = ScreenshotEvidence(
+                capturedAt: imported.capturedAt,
+                assetIdentifier: imported.assetIdentifier,
+                parsed: imported.parsed,
+                lines: imported.lines,
+                isGenuineScreenshot: imported.isGenuine
+            )
+            context.insert(evidence)
+            record.evidence = evidence
         }
         record.province = province.nilIfBlank
         record.district = district.nilIfBlank

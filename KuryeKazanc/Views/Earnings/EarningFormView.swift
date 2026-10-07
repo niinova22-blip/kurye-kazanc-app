@@ -14,21 +14,30 @@ struct EarningFormView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var showUnreviewedConfirmation = false
     @State private var saveError: String?
+    @State private var showPhotoPicker: Bool
 
     private let session: WorkSessionSummary?
-    private let recognizer: TextRecognizing
+    private let importer: ScreenshotImporter
+    private let initialImported: ImportedScreenshot?
 
+    /// - Parameters:
+    ///   - imported: Paylas eklentisi / otomatik tarama sonucu; form bununla dolu acilir.
+    ///   - opensPhotoPicker: "Ekran goruntusu" ile acildiginda secici hemen gosterilir.
     init(
         record: EarningRecord? = nil,
         session: WorkSessionSummary? = nil,
         defaultPlatform: Platform? = nil,
-        recognizer: TextRecognizing = VisionTextRecognitionService()
+        imported: ImportedScreenshot? = nil,
+        opensPhotoPicker: Bool = false,
+        importer: ScreenshotImporter = ScreenshotImporter()
     ) {
         _viewModel = State(initialValue: EarningFormViewModel(
-            record: record, session: session, defaultPlatform: defaultPlatform
+            record: record, session: session, defaultPlatform: defaultPlatform, imported: imported
         ))
+        _showPhotoPicker = State(initialValue: opensPhotoPicker)
         self.session = session
-        self.recognizer = recognizer
+        self.importer = importer
+        self.initialImported = imported
     }
 
     var body: some View {
@@ -159,11 +168,16 @@ struct EarningFormView: View {
             } message: {
                 Text(saveError ?? "")
             }
+            .photosPicker(isPresented: $showPhotoPicker, selection: $photoItem,
+                          matching: .screenshots, photoLibrary: .shared())
             .onChange(of: photoItem) { _, item in
                 guard let item else { return }
                 Task { await loadScreenshot(item) }
             }
             .task {
+                if let initialImported, viewModel.platform == nil {
+                    viewModel.apply(initialImported, platforms: platforms)
+                }
                 await viewModel.resolveRegionIfNeeded(using: location, from: session)
             }
         }
@@ -173,7 +187,7 @@ struct EarningFormView: View {
 
     private var ocrSection: some View {
         Section {
-            PhotosPicker(selection: $photoItem, matching: .images) {
+            PhotosPicker(selection: $photoItem, matching: .screenshots, photoLibrary: .shared()) {
                 Label("Ekran görüntüsünden doldur", systemImage: "text.viewfinder")
             }
             .accessibilityIdentifier("earningForm.ocrPicker")
@@ -187,9 +201,12 @@ struct EarningFormView: View {
                     Text("Metin okunuyor…").foregroundStyle(.secondary)
                 }
             case .finished:
-                Label("Alanlar dolduruldu. Kaydetmeden önce kontrol et.", systemImage: "checkmark.circle")
-                    .foregroundStyle(.green)
-                    .font(.subheadline)
+                VerificationBadge(level: viewModel.pendingVerification)
+                ForEach(viewModel.assessmentIssues, id: \.self) { issue in
+                    Label(issue, systemImage: "info.circle")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             case .failed(let message):
                 Label(message, systemImage: "xmark.octagon")
                     .foregroundStyle(.red)
@@ -204,7 +221,7 @@ struct EarningFormView: View {
                 .accessibilityIdentifier("earningForm.ocrReport")
             }
         } footer: {
-            Text("Trendyol GO ve Getir kazanç ekranları desteklenir. Görüntü cihazında işlenir, hiçbir yere gönderilmez.")
+            Text("Trendyol GO, Getir, Yemeksepeti ve Migros kazanç ekranları tanınır. Görüntü cihazında işlenir; görselin kendisi saklanmaz.")
         }
     }
 
@@ -230,12 +247,12 @@ struct EarningFormView: View {
 
     private func loadScreenshot(_ item: PhotosPickerItem) async {
         defer { photoItem = nil }
-        guard let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: data) else {
+        guard let data = try? await item.loadTransferable(type: Data.self) else {
             viewModel.ocrState = .failed("Görsel yüklenemedi.")
             return
         }
-        await viewModel.importScreenshot(image, recognizer: recognizer, platforms: platforms)
+        await viewModel.importScreenshot(data: data, assetIdentifier: item.itemIdentifier,
+                                         importer: importer, platforms: platforms)
     }
 
     private func attemptSave() {
