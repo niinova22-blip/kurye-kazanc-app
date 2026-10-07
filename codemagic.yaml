@@ -126,6 +126,7 @@ workflows:
         provisioning_profiles:
           - kurye-kazanc-appstore-v2
           - kurye-kazanc-share-appstore
+          - kurye-kazanc-liveactivity-appstore
         certificates:
           - selfwake-distribution
     triggering:

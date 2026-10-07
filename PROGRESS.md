@@ -168,3 +168,24 @@ Tasarım: `docs/superpowers/specs/2026-10-07-gridwise-tr-design.md` · Plan: `do
 - Paylaş eklentisi için Apple Developer önkoşulları (README → İmzalama) yapılmadan `ios-release` imzalamada düşer.
 - Şablonlar gerçek ekran örnekleriyle kalibre edilene kadar hiçbir kayıt "Doğrulandı" olmaz (beklenen).
 - Sonraki: 1.2 planı (Live Activity, widget, hareket algılama, PDF/CSV, Siri).
+
+## Oturum 4 — 2026-10-08: Sürüm 1.2 (derlenmedi)
+
+### Yapılanlar
+- **Otomatik vardiya** (`AutoShiftPolicy`, `MotionManager`, `AutoShiftEvent`): CMMotionActivityManager ile hareket algılaması (walking/running/driving), signifikant konum değişimi, çalışma saatleri penceresi, 30 dakika soğutma süresi (başlatmadan sonra en az 30 dk bekleme), 20 dakika hareketsizlik = vardiya bitişi. Bekleme durumundaki vardiyalar kazanç kaydedilene kadar tutulur.
+- **Otomatik km**: Vardiya başında ve bitişinde GPS koordinatlarından km hesaplaması.
+- **Live Activity** (`LiveActivityService`): "Vardiyayı bitir" düğmesi, Dynamic Island entegrasyonu.
+- **AppDelegate**: Arka planda (UIBackgroundModes'te) yeniden başlatma, bildirimlere yanıt verme.
+- **Profil "Otomatik vardiya" bölümü**: Kullanıcı ayarları (hareket, konum yoğunluğu, çalışma saatleri, soğutma, durdurma süresi).
+- **1.1 UI düzeltmeleri**: Form alanlarında klavye kapatma sorunu giderildi; kazanç paylaşım rızası açılınca konum yoğunluğu de açılıyor.
+
+### Testler
+- Core (Windows `swift test`): **89/89 test PASS** (AutoShiftPolicyTests 10, EarningsAnalyticsTests 6, EarningsCalculatorTests 17, EarningsScreenshotParserTests 11, GoalsTests 1, OCRTemplateTests 4, PendingShiftTests 3, PeriodRangeTests 5, RecognizedLineTests 1, ScreenshotSuggestionRuleTests 5, ScreenshotVerifierTests 10, TextHashTests 5, TurkishNumberParserTests 7, WorkHoursTests 4).
+
+### Derleme ve TestFlight durumu
+- **Sürüm 1.2 derlenmedi, ana dal (main) ve TestFlight'a gönderilmedi** — kullanıcı kararı. 
+- **1.3 öncesindeki ön koşul:** Canlı Etkinlik App ID `com.kuryekazanc.app.liveactivity` ve ilgili App Store profili Apple Developer'da oluşturulmalı. 1.3'ün ilk CI çalışması bunu doğrulayacak; profil eksikse imzalama başarısız olur. Oluşturma kararı kullanıcıya sorulacak.
+
+### Sonraki adım
+- 1.3: Şablonlar gerçek ekran örnekleriyle kalibre edilecek, Live Activity'ye ekstra test ve gerekli Apple Developer ayarları.
+- Kullanıcı: 1.2 kodunun stabil olduğundan emin olmak için sonraki oturumda 1.3 ile CI'ı tetiklemesi gerekmektedir.

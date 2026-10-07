@@ -60,6 +60,7 @@ scripts/ci/          CI yardımcı scriptleri
 3. Yeni App ID `com.kuryekazanc.app.share` (App Groups açık, aynı grup).
 4. Profiller: "Kurye Kazanc App Store" yeniden kaydedilir; yeni "Kurye Kazanc Share App Store" (`com.kuryekazanc.app.share`).
 5. Codemagic → Code signing identities → iOS provisioning profiles → Fetch: `kurye-kazanc-appstore-v2` (App Group yetenekli yeni profil) ve `kurye-kazanc-share-appstore`.
+6. (1.2+) Canlı Etkinlik eklentisi: App ID `com.kuryekazanc.app.liveactivity` (ek yetenek yok), App Store profili "Kurye Kazanc LiveActivity App Store" → Codemagic referansı `kurye-kazanc-liveactivity-appstore`. **1.3 TestFlight'ından önce, kullanıcıya sorularak** yapılır; yapılmadan `ios-release` imzalamada düşer.
 
 Gizli bilgiler koda yazılmaz; hepsi Codemagic arayüzünde tutulur:
 
