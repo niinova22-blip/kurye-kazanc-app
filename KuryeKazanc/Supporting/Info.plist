@@ -9,7 +9,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Kazanç kayıtlarına çalıştığın ilçe/semt bilgisini otomatik eklemek için konumunu kullanıyoruz.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Yalnızca "Çalışıyorum" modu açıkken, uygulama arka plandayken de mesafe ve bölge bilgisini kaydetmek için konumunu kullanıyoruz. Mod kapalıyken konum takibi yapılmaz.</string>
+	<string>Vardiya sırasında mesafeni ölçmek ve otomatik vardiya açıksa yola çıktığını anlayıp vardiyanı kendiliğinden başlatmak için konumunu kullanıyoruz. Konumun cihazından çıkmaz.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
