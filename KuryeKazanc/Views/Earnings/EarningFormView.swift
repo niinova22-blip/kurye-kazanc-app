@@ -15,6 +15,7 @@ struct EarningFormView: View {
     @State private var showUnreviewedConfirmation = false
     @State private var saveError: String?
     @State private var showPhotoPicker: Bool
+    @State private var appliedInitialImport = false
 
     private let session: WorkSessionSummary?
     private let importer: ScreenshotImporter
@@ -175,7 +176,9 @@ struct EarningFormView: View {
                 Task { await loadScreenshot(item) }
             }
             .task {
-                if let initialImported, viewModel.platform == nil {
+                // Init'te platform listesi yoktu; platformu eslestirmek icin bir kez yeniden uygulanir
+                if let initialImported, !appliedInitialImport {
+                    appliedInitialImport = true
                     viewModel.apply(initialImported, platforms: platforms)
                 }
                 await viewModel.resolveRegionIfNeeded(using: location, from: session)
