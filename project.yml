@@ -29,6 +29,7 @@ targets:
         excludes:
           - "Supporting/Info.plist"
           - "Supporting/*.entitlements"
+      - path: Shared
     dependencies:
       - target: KuryeShareExtension
         embed: true
