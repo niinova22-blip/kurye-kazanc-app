@@ -28,4 +28,27 @@ enum TodayViewModel {
         )
         return GoalProgress(target: target, achieved: daily.values.total.netEarnings)
     }
+
+    /// Vardiya surerken canli net TL/saat tahmini: bugunun neti / (kayitli calisma + gecen vardiya suresi).
+    /// Toplam 15 dakikadan azsa anlamsiz oldugundan nil.
+    static func liveNetPerHour(todayNet: Double, workedSeconds: TimeInterval, elapsed: TimeInterval) -> Double? {
+        let totalSeconds = max(0, workedSeconds) + max(0, elapsed)
+        let hours = totalSeconds / 3600
+        guard hours >= 0.25 else { return nil }
+        return todayNet / hours
+    }
+
+    /// Ice aktarma sonrasi kullaniciya gosterilecek kisa bildirimler (okunamayan / zaten kayitli gorseller).
+    static func importNotices(failures: Int, duplicates: Int) -> [String] {
+        var notices: [String] = []
+        if failures > 0 {
+            notices.append("\(failures) görsel okunamadı. Kazanç ekranının görüntüsünü paylaştığından emin ol.")
+        }
+        if duplicates == 1 {
+            notices.append("Bu ekran görüntüsü zaten kayıtlı.")
+        } else if duplicates > 1 {
+            notices.append("\(duplicates) ekran görüntüsü zaten kayıtlı.")
+        }
+        return notices
+    }
 }

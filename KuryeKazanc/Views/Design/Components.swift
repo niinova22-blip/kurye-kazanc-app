@@ -25,6 +25,46 @@ struct HeroAmount: View {
     }
 }
 
+/// Buyuk net rakaminin altindaki ikincil satir: "Brut X - Gider Y". Gider yalnizca sifirdan buyukse kirmizi.
+/// Buyuk yazi boyutlarinda tek satira sigmazsa alt alta dizilir.
+struct NetBreakdownLine: View {
+    let gross: Double
+    let expenses: Double
+    var identifier: String = "dashboard.breakdown"
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                grossText
+                Text("·")
+                expenseText
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                grossText
+                expenseText
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private var grossText: Text {
+        Text("Brüt \(Formatters.currency(gross))")
+    }
+
+    private var expenseText: some View {
+        Text("Gider \(Formatters.currency(expenses))")
+            .foregroundStyle(expenseColor)
+    }
+
+    private var expenseColor: Color {
+        expenses > 0 ? Theme.negative : Color.secondary
+    }
+}
+
 /// Yan yana kucuk metrikler: deger ustte, baslik altta. Kart degil; ayraclarla bolunmus tek satir.
 struct MetricStrip: View {
     struct Item: Identifiable {

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 /// Bugun sekmesi: net kazanc, net TL/saat, calisma suresi, mesafe, haftalik hedef ve vardiya dugmesi.
 struct TodayView: View {
@@ -7,30 +8,38 @@ struct TodayView: View {
     @Environment(WorkSessionManager.self) private var workSession
     @Environment(ScreenshotScanner.self) private var scanner
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     @Query private var todaysEarnings: [EarningRecord]
     @Query private var todaysExpenses: [ExpenseRecord]
     @Query private var weekEarnings: [EarningRecord]
     @Query private var weekExpenses: [ExpenseRecord]
     @Query private var couriers: [Courier]
-    /// Yalnizca assetIdentifier icin: kaydedilmis ekran goruntuleri tekrar onerilmez.
+    /// Kaydedilmis ekran goruntuleri (kimlik + metin ozeti) tekrar onerilmez / siraya alinmaz.
     @Query private var evidences: [ScreenshotEvidence]
 
     @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
     @AppStorage(AppPreferences.weeklyGoalKey) private var weeklyGoal = 0.0
+    @AppStorage(AppPreferences.dailyGoalKey) private var dailyGoal = 0.0
 
     @State private var activeSheet: Sheet?
-    /// Paylas eklentisinden gelen, sirada bekleyen ekran goruntuleri.
+    /// Paylas eklentisinden / coklu secimden gelen, sirada bekleyen ekran goruntuleri.
     @State private var inboxQueue: [ImportedScreenshot] = []
     @State private var isProcessingInbox = false
+    /// "+ > Ekran goruntusu": en fazla 5 ekran goruntusu secilir, sirayla forma aktarilir.
+    @State private var showScreenshotPicker = false
+    @State private var pickedItems: [PhotosPickerItem] = []
+    @State private var isImportingPicked = false
+    /// Okunamayan / zaten kayitli gorseller icin engellemeyen bildirimler.
+    @State private var notices: [String] = []
 
     private let inbox = LaunchOptions.current.isUITesting ? ScreenshotInbox(directory: nil) : .shared
 
     private let day: Date
 
     enum Sheet: Identifiable {
-        case addEarning(session: WorkSessionSummary?, opensPicker: Bool)
+        case addEarning(session: WorkSessionSummary?)
         case editEarning(EarningRecord)
         case importedScreenshot(ImportedScreenshot)
         case addExpense
@@ -82,105 +91,177 @@ struct TodayView: View {
     }
 
     var body: some View {
-        let summary = TodayViewModel.summary(
+        let summary: EarningsSummary = TodayViewModel.summary(
             earnings: todaysEarnings,
             expenses: todaysExpenses,
             costPerKm: costPerKm,
             autoEstimate: autoEstimate
         )
-        let goal = weekGoal
 
         NavigationStack {
-            List {
-                if let suggestion = scanner.suggestion {
-                    suggestionSection(suggestion)
-                }
-
-                Section {
-                    HStack(alignment: .center, spacing: 16) {
-                        HeroAmount(title: "Net kazanç", value: summary.netEarnings, identifier: "dashboard.netEarnings")
-                        if goal.isSet {
-                            VStack(spacing: 4) {
-                                GoalRing(progress: goal).frame(width: 56, height: 56)
-                                Text("Hafta %\(Int(goal.fraction * 100))")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    MetricStrip([
-                        .init(title: "Net ₺/saat", value: Formatters.perHour(summary.netPerHour), identifier: "dashboard.netPerHour"),
-                        .init(title: "Çalışma", value: Formatters.duration(summary.workDuration), identifier: "dashboard.workDuration"),
-                        .init(title: "Mesafe", value: Formatters.distance(summary.distanceKm), identifier: "dashboard.distance"),
-                    ])
-                    if summary.usesEstimatedExpenses {
-                        Text("Yakıt ve bakım km başına tahmini: \(Formatters.currency(summary.estimatedExpenses))")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+            todayList(summary)
+                .listStyle(.insetGrouped)
+                .navigationTitle("Bugün")
+                .toolbar { toolbarContent }
+                .task { await refreshImports() }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active {
+                        Task { await refreshImports() }
                     }
                 }
-                .listRowSeparator(.hidden)
-
-                Section {
-                    shiftButton
+                .sheet(item: $activeSheet, onDismiss: showNextFromInbox) { sheet in
+                    sheetContent(sheet)
                 }
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-
-                earningsSection
-                if !todaysExpenses.isEmpty {
-                    expensesSection
+                .photosPicker(isPresented: $showScreenshotPicker, selection: $pickedItems,
+                              maxSelectionCount: 5, matching: .screenshots, photoLibrary: .shared())
+                .onChange(of: pickedItems) { _, items in
+                    guard !items.isEmpty else { return }
+                    pickedItems = []
+                    Task { await importPicked(items) }
                 }
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Bugün")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text(Formatters.longDay(day))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    addMenu
-                }
-            }
-            .task {
-                await processInbox()
-                await scanner.scan(knownIdentifiers: knownIDs)
-            }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active {
-                    Task {
-                        await processInbox()
-                        await scanner.scan(knownIdentifiers: knownIDs)
-                    }
-                }
-            }
-            .sheet(item: $activeSheet, onDismiss: showNextFromInbox) { sheet in
-                switch sheet {
-                case .addEarning(let session, let opensPicker):
-                    EarningFormView(session: session, defaultPlatform: defaultPlatform, opensPhotoPicker: opensPicker)
-                case .editEarning(let record):
-                    EarningFormView(record: record)
-                case .importedScreenshot(let imported):
-                    EarningFormView(defaultPlatform: defaultPlatform, imported: imported)
-                case .addExpense:
-                    ExpenseFormView()
-                case .editExpense(let record):
-                    ExpenseFormView(record: record)
-                }
-            }
         }
     }
 
     // MARK: - Bolumler
 
+    private func todayList(_ summary: EarningsSummary) -> some View {
+        List {
+            if let suggestion = scanner.suggestion {
+                suggestionSection(suggestion)
+            }
+            noticesSection
+            heroSection(summary)
+
+            Section {
+                shiftPanel(summary)
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+
+            earningsSection
+            if !todaysExpenses.isEmpty {
+                expensesSection
+            }
+            scanSection
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Text(Formatters.longDay(day))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            addMenu
+        }
+    }
+
+    @ViewBuilder
+    private func sheetContent(_ sheet: Sheet) -> some View {
+        switch sheet {
+        case .addEarning(let session):
+            EarningFormView(session: session, defaultPlatform: defaultPlatform)
+        case .editEarning(let record):
+            EarningFormView(record: record)
+        case .importedScreenshot(let imported):
+            EarningFormView(defaultPlatform: defaultPlatform, imported: imported)
+        case .addExpense:
+            ExpenseFormView()
+        case .editExpense(let record):
+            ExpenseFormView(record: record)
+        }
+    }
+
     private var knownIDs: Set<String> {
         Set(evidences.compactMap(\.assetIdentifier))
     }
 
+    /// Kayitli kanitlarin metin ozetleri (bos ozet eslesme sayilmaz).
+    private var knownHashes: Set<String> {
+        let hashes: [String] = evidences.map(\.textHash).filter { !$0.isEmpty }
+        return Set(hashes)
+    }
+
+    /// Kayitli + sirada bekleyen ekran goruntulerinin metin ozetleri.
+    private var queuedAndKnownHashes: Set<String> {
+        let queued: [String] = inboxQueue.map(\.textHash).filter { !$0.isEmpty }
+        return knownHashes.union(queued)
+    }
+
     private func platformName(_ code: String?) -> String {
         Platform.defaults.first { $0.code == code }?.name ?? "Platform"
+    }
+
+    private func heroSection(_ summary: EarningsSummary) -> some View {
+        let goal: GoalProgress = weekGoal
+        let dayGoal = GoalProgress(target: dailyGoal, achieved: summary.netEarnings)
+        return Section {
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HeroAmount(title: "Net kazanç", value: summary.netEarnings, identifier: "dashboard.netEarnings")
+                    NetBreakdownLine(gross: summary.totalEarnings, expenses: summary.totalExpenses)
+                }
+                if goal.isSet {
+                    weekGoalRing(goal)
+                }
+            }
+            MetricStrip(metricItems(summary))
+            if summary.usesEstimatedExpenses {
+                Text("Yakıt ve bakım km başına tahmini: \(Formatters.currency(summary.estimatedExpenses))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            if dayGoal.isSet {
+                dailyGoalLine(dayGoal)
+            }
+        }
+        .listRowSeparator(.hidden)
+    }
+
+    private func metricItems(_ summary: EarningsSummary) -> [MetricStrip.Item] {
+        let perHour = MetricStrip.Item(
+            title: "Net ₺/saat", value: Formatters.perHour(summary.netPerHour), identifier: "dashboard.netPerHour"
+        )
+        let duration = MetricStrip.Item(
+            title: "Çalışma", value: Formatters.duration(summary.workDuration), identifier: "dashboard.workDuration"
+        )
+        let distance = MetricStrip.Item(
+            title: "Mesafe", value: Formatters.distance(summary.distanceKm), identifier: "dashboard.distance"
+        )
+        return [perHour, duration, distance]
+    }
+
+    private func weekGoalRing(_ goal: GoalProgress) -> some View {
+        VStack(spacing: 4) {
+            GoalRing(progress: goal).frame(width: 56, height: 56)
+            Text("Hafta %\(Int(goal.fraction * 100))")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private func dailyGoalLine(_ progress: GoalProgress) -> some View {
+        if progress.isReached {
+            Label("Günlük hedefe ulaştın", systemImage: "checkmark.circle.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                .accessibilityIdentifier("dashboard.dailyGoal")
+        } else {
+            Text(dailyGoalText(progress))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .accessibilityIdentifier("dashboard.dailyGoal")
+        }
+    }
+
+    private func dailyGoalText(_ progress: GoalProgress) -> String {
+        let target = Formatters.currency(progress.target)
+        let remaining = Formatters.currency(progress.remaining)
+        return "Günlük hedef: \(target) · kalan \(remaining)"
     }
 
     private func suggestionSection(_ suggestion: ImportedScreenshot) -> some View {
@@ -211,13 +292,60 @@ struct TodayView: View {
         }
     }
 
+    /// Ice aktarma sirasinda ilerleme; sonrasinda okunamayan / tekrar eden gorsel bildirimleri.
+    @ViewBuilder
+    private var noticesSection: some View {
+        if isImportingPicked || !notices.isEmpty {
+            Section {
+                if isImportingPicked {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Ekran görüntüleri okunuyor…")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                ForEach(notices, id: \.self) { notice in
+                    Label(notice, systemImage: "exclamationmark.triangle")
+                        .font(.subheadline)
+                        .foregroundStyle(.orange)
+                }
+                if !notices.isEmpty {
+                    Button("Tamam") { notices.removeAll() }
+                        .accessibilityIdentifier("today.dismissNotices")
+                }
+            }
+        }
+    }
+
+    /// Otomatik tarama kapaliysa davet satiri; fotograf izni kapatildiysa Ayarlar'a yonlendirme.
+    @ViewBuilder
+    private var scanSection: some View {
+        if scanner.isPermissionMissing {
+            Section {
+                Button(action: openSystemSettings) {
+                    Label("Fotoğraf izni kapalı — Ayarlar'dan aç", systemImage: "exclamationmark.triangle")
+                }
+                .accessibilityIdentifier("today.photoPermission")
+            }
+        } else if !scanner.isEnabled {
+            Section {
+                Button(action: enableScan) {
+                    Label("Ekran görüntülerini otomatik bul", systemImage: "text.viewfinder")
+                }
+                .accessibilityIdentifier("today.enableScan")
+            } footer: {
+                Text("Son 48 saatin kazanç ekranları öneri olarak gösterilir. Görüntüler cihazında işlenir.")
+            }
+        }
+    }
+
     private var addMenu: some View {
         Menu {
             Button("Ekran görüntüsü", systemImage: "text.viewfinder") {
-                activeSheet = .addEarning(session: nil, opensPicker: true)
+                showScreenshotPicker = true
             }
             Button("Elle kazanç", systemImage: "square.and.pencil") {
-                activeSheet = .addEarning(session: nil, opensPicker: false)
+                activeSheet = .addEarning(session: nil)
             }
             Button("Gider", systemImage: "fuelpump") { activeSheet = .addExpense }
         } label: {
@@ -227,17 +355,19 @@ struct TodayView: View {
         .accessibilityIdentifier("dashboard.addMenu")
     }
 
-    private var shiftButton: some View {
+    private func shiftPanel(_ summary: EarningsSummary) -> some View {
         VStack(spacing: 8) {
             Button(workSession.isWorking ? "Vardiyayı bitir" : "Vardiyayı başlat", action: toggleWork)
                 .buttonStyle(PrimaryActionButtonStyle(isDestructive: workSession.isWorking))
                 .accessibilityIdentifier("dashboard.workToggle")
             if workSession.isWorking, let start = workSession.sessionStart {
                 TimelineView(.periodic(from: start, by: 30)) { context in
-                    Text(shiftStatus(elapsed: context.date.timeIntervalSince(start)))
+                    Text(shiftStatus(elapsed: context.date.timeIntervalSince(start), summary: summary))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
+                        .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("dashboard.shiftStatus")
                 }
             } else {
                 Text("Süre ve mesafe ölçülür; konum yalnızca vardiya boyunca kullanılır.")
@@ -254,16 +384,6 @@ struct TodayView: View {
                 Text("Platformun kazanç ekranının görüntüsünü ekle — + düğmesinden.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                if !scanner.isEnabled {
-                    Button("Ekran görüntülerini otomatik bul") {
-                        Task {
-                            if await scanner.enable() {
-                                await scanner.scan(knownIdentifiers: knownIDs)
-                            }
-                        }
-                    }
-                    .accessibilityIdentifier("today.enableScan")
-                }
             } else {
                 ForEach(todaysEarnings) { record in
                     Button { activeSheet = .editEarning(record) } label: {
@@ -295,6 +415,26 @@ struct TodayView: View {
 
     // MARK: - Eylemler
 
+    /// Gelen kutusunu isler, sonra otomatik taramayi calistirir.
+    private func refreshImports() async {
+        await processInbox()
+        await scanner.scan(knownIdentifiers: knownIDs, knownTextHashes: knownHashes)
+    }
+
+    private func enableScan() {
+        Task {
+            if await scanner.enable() {
+                await scanner.scan(knownIdentifiers: knownIDs, knownTextHashes: knownHashes)
+            }
+        }
+    }
+
+    private func openSystemSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            openURL(url)
+        }
+    }
+
     /// Paylas eklentisinin biraktigi gorselleri okur, siler ve sirayla forma aktarir.
     private func processInbox() async {
         // .task ve scenePhase ayni anda tetikleyebilir: tek calisma
@@ -302,12 +442,51 @@ struct TodayView: View {
         isProcessingInbox = true
         defer { isProcessingInbox = false }
         let importer = ScreenshotImporter()
+        var batch = ImportBatch(seenHashes: queuedAndKnownHashes, seenAssets: knownIDs)
         for pending in inbox.pending() {
             guard let url = inbox.claim(pending) else { continue }
             defer { inbox.remove(url) }
-            guard let data = try? Data(contentsOf: url),
-                  let result = try? await importer.importImage(data: data, assetIdentifier: nil) else { continue }
-            inboxQueue.append(result)
+            var result: ImportedScreenshot?
+            if let data = try? Data(contentsOf: url) {
+                result = try? await importer.importImage(data: data, assetIdentifier: nil)
+            }
+            batch.add(result)
+        }
+        finish(batch)
+    }
+
+    /// Coklu secimle gelen ekran goruntulerini okur ve siraya ekler.
+    private func importPicked(_ items: [PhotosPickerItem]) async {
+        isImportingPicked = true
+        defer { isImportingPicked = false }
+        let importer = ScreenshotImporter()
+        var batch = ImportBatch(seenHashes: queuedAndKnownHashes, seenAssets: knownIDs)
+        for item in items {
+            let identifier: String? = item.itemIdentifier
+            if let identifier, batch.seenAssets.contains(identifier) {
+                batch.duplicates += 1
+                continue
+            }
+            let capturedAt: Date? = PhotoAssetInfo.creationDate(localIdentifier: identifier)
+            var result: ImportedScreenshot?
+            if let data = try? await item.loadTransferable(type: Data.self) {
+                result = try? await importer.importImage(
+                    data: data, assetIdentifier: identifier, capturedAt: capturedAt
+                )
+            }
+            batch.add(result)
+        }
+        finish(batch)
+    }
+
+    /// Kabul edilenleri siraya ekler, bildirimleri gosterir; form acik degilse ilkini acar.
+    private func finish(_ batch: ImportBatch) {
+        inboxQueue.append(contentsOf: batch.accepted)
+        let newNotices: [String] = TodayViewModel.importNotices(
+            failures: batch.failures, duplicates: batch.duplicates
+        )
+        for notice in newNotices where !notices.contains(notice) {
+            notices.append(notice)
         }
         if activeSheet == nil {
             showNextFromInbox()
@@ -319,13 +498,19 @@ struct TodayView: View {
         activeSheet = .importedScreenshot(inboxQueue.removeFirst())
     }
 
-    private func shiftStatus(elapsed: TimeInterval) -> String {
+    private func shiftStatus(elapsed: TimeInterval, summary: EarningsSummary) -> String {
         let isLocationAvailable = workSession.location.isAuthorized || !workSession.location.isEnabled
-        var parts = [Formatters.duration(elapsed)]
+        var parts: [String] = [Formatters.duration(elapsed)]
         if isLocationAvailable {
             parts.append(Formatters.distance(workSession.sessionDistanceKm))
         } else {
             parts.append("mesafe ölçülmüyor")
+        }
+        let estimate: Double? = TodayViewModel.liveNetPerHour(
+            todayNet: summary.netEarnings, workedSeconds: summary.workDuration, elapsed: elapsed
+        )
+        if let estimate {
+            parts.append("~\(Formatters.currency(estimate.rounded()))/saat tahmini")
         }
         return parts.joined(separator: " · ")
     }
@@ -335,7 +520,7 @@ struct TodayView: View {
         if workSession.isWorking {
             // Vardiya bitince kazanc formu sure + mesafe + bolgeyle on doldurulmus acilir
             if let summary = workSession.stop() {
-                activeSheet = .addEarning(session: summary, opensPicker: false)
+                activeSheet = .addEarning(session: summary)
             }
         } else {
             workSession.start()
@@ -349,6 +534,35 @@ struct TodayView: View {
         }
         modelContext.delete(model)
         try? modelContext.save()
+    }
+}
+
+/// Toplu ice aktarmada sayaclar ve tekrar kontrolu (kayitli + ayni partide gorulenler).
+private struct ImportBatch {
+    var seenHashes: Set<String>
+    var seenAssets: Set<String>
+    var failures = 0
+    var duplicates = 0
+    var accepted: [ImportedScreenshot] = []
+
+    /// nil veya metinsiz sonuc = okunamadi.
+    mutating func add(_ result: ImportedScreenshot?) {
+        guard let result, !result.lines.isEmpty else {
+            failures += 1
+            return
+        }
+        let hash: String = result.textHash
+        if !hash.isEmpty, seenHashes.contains(hash) {
+            duplicates += 1
+            return
+        }
+        if !hash.isEmpty {
+            seenHashes.insert(hash)
+        }
+        if let identifier = result.assetIdentifier {
+            seenAssets.insert(identifier)
+        }
+        accepted.append(result)
     }
 }
 

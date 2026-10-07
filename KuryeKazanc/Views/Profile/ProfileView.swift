@@ -7,6 +7,7 @@ struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(LocationService.self) private var location
+    @Environment(ScreenshotScanner.self) private var scanner
 
     @Query private var couriers: [Courier]
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
@@ -36,6 +37,7 @@ struct ProfileView: View {
                 goalsSection
                 expenseSection
                 locationSection
+                screenshotSection
                 sharingSection
                 dataSection
                 aboutSection
@@ -195,6 +197,37 @@ struct ProfileView: View {
         case .notDetermined: "Sorulmadı"
         default: "Bilinmiyor"
         }
+    }
+
+    // MARK: - Ekran goruntuleri
+
+    private var screenshotSection: some View {
+        Section {
+            Toggle("Ekran görüntülerini otomatik bul", isOn: autoScanBinding)
+                .accessibilityIdentifier("profile.autoScan")
+            if scanner.isPermissionMissing {
+                Button("Fotoğraf izni kapalı — Ayarlar'dan aç") { openSystemSettings() }
+                    .accessibilityIdentifier("profile.photoPermission")
+            }
+        } header: {
+            Text("Ekran görüntüleri")
+        } footer: {
+            Text("Açıksa uygulama açıldığında son 48 saatin kazanç ekranı görüntüleri öneri olarak gösterilir. Görüntüler yalnızca cihazında işlenir.")
+        }
+    }
+
+    /// Acmak fotograf izni ister (verilmezse kapali kalir); kapatmak taramayi durdurur.
+    private var autoScanBinding: Binding<Bool> {
+        Binding(
+            get: { scanner.isEnabled },
+            set: { newValue in
+                if newValue {
+                    Task { _ = await scanner.enable() }
+                } else {
+                    scanner.disable()
+                }
+            }
+        )
     }
 
     // MARK: - Paylasim
