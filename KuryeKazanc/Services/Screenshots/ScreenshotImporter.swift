@@ -12,6 +12,8 @@ struct ImportedScreenshot {
     var capturedAt: Date?
     var assetIdentifier: String?
     var isGenuine: Bool
+    /// Normalize OCR metninin ozeti (bkz. `TextHash`); ayni ekran ikinci kez kaydedilmesin.
+    var textHash: String = ""
 }
 
 struct ScreenshotImporter {
@@ -28,10 +30,11 @@ struct ScreenshotImporter {
                      referenceDate: Date = .now) async throws -> ImportedScreenshot {
         guard let image = UIImage(data: data) else { throw TextRecognitionError.invalidImage }
         let lines = try await recognizer.recognize(in: image)
+        let texts: [String] = lines.map(\.text)
         let metadata = Self.metadata(of: data)
         let captured = metadata.capturedAt ?? capturedAt
         // "Bugun"/"Dun" ekranin cekildigi gune gore cozulur (ertesi gun paylasilan goruntu kaymasin)
-        let parsed = parser.parse(lines: lines.map(\.text), referenceDate: captured ?? referenceDate)
+        let parsed = parser.parse(lines: texts, referenceDate: captured ?? referenceDate)
 
         let isGenuine = ScreenshotAuthenticity.isGenuine(
             assetIsScreenshot: assetIdentifier.flatMap(assetIsScreenshot),
@@ -43,7 +46,8 @@ struct ScreenshotImporter {
 
         return ImportedScreenshot(
             lines: lines, parsed: parsed, assessment: assessment,
-            capturedAt: captured, assetIdentifier: assetIdentifier, isGenuine: isGenuine
+            capturedAt: captured, assetIdentifier: assetIdentifier, isGenuine: isGenuine,
+            textHash: TextHash.of(texts)
         )
     }
 

@@ -33,6 +33,18 @@ final class ScreenshotImporterTests: XCTestCase {
         // Sablon kalibrasyonda -> dogrulanmamis
         XCTAssertEqual(result.assessment.candidate, .ocrUnverified)
         XCTAssertEqual(result.lines.count, 7)
+        XCTAssertEqual(result.textHash, TextHash.of(["Getir", "Kazançlarım", "Bugün", "Toplam Kazanç", "₺980,00", "Sipariş Sayısı", "11"]))
+    }
+
+    func testSameScreenGivesSameTextHash() async throws {
+        let importer = ScreenshotImporter(
+            recognizer: FakeRecognizer(lines: ["Getir", "Toplam Kazanç", "₺500"]),
+            assetIsScreenshot: { _ in nil }
+        )
+        let first = try await importer.importImage(data: screenshotPNG(), assetIdentifier: "A")
+        let second = try await importer.importImage(data: screenshotPNG(), assetIdentifier: "B")
+        XCTAssertFalse(first.textHash.isEmpty)
+        XCTAssertEqual(first.textHash, second.textHash)
     }
 
     func testPhotoKitSaysNotScreenshot() async throws {

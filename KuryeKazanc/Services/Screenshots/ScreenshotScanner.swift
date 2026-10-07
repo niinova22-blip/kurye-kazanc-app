@@ -62,6 +62,12 @@ final class ScreenshotScanner {
     private(set) var suggestion: ImportedScreenshot?
     /// Kullanici otomatik taramayi acti mi? (Gozlenir: dugme acilinca gizlenir.)
     private(set) var isEnabled: Bool
+    /// Tarama acik ama fotograf izni (Ayarlar'dan) geri alinmis: son taramada kutuphane erisilemedi.
+    private(set) var isPermissionMissing = false
+
+    /// Bu oturumda incelenip uygun bulunmayan goruntuler: her on plana geliste yeniden OCR'lanmasin.
+    /// Bellekte tutulur; uygulama yeniden acilinca bosalir.
+    @ObservationIgnored private(set) var rejectedIdentifiers: Set<String> = []
 
     @ObservationIgnored private let library: ScreenshotLibrary
     @ObservationIgnored private let importer: ScreenshotImporter
@@ -82,25 +88,61 @@ final class ScreenshotScanner {
         let granted = await library.requestAccess()
         defaults.set(granted, forKey: AppPreferences.screenshotScanEnabledKey)
         isEnabled = granted
+        isPermissionMissing = false
         return granted
     }
 
-    func scan(knownIdentifiers: Set<String>, now: Date = .now) async {
-        guard isEnabled, library.isAuthorized, !isScanning else {
+    /// Kullanici taramayi kapatti (veya izin geri alindiktan sonra "Kapat" dedi).
+    func disable() {
+        defaults.set(false, forKey: AppPreferences.screenshotScanEnabledKey)
+        isEnabled = false
+        isPermissionMissing = false
+        suggestion = nil
+    }
+
+    /// - Parameters:
+    ///   - knownIdentifiers: Kaniti kayitli PhotoKit kimlikleri.
+    ///   - knownTextHashes: Kayitli kanitlarin metin ozetleri; ayni ekranin baska kopyasi onerilmez.
+    func scan(knownIdentifiers: Set<String>, knownTextHashes: Set<String> = [], now: Date = .now) async {
+        guard isEnabled else {
+            isPermissionMissing = false
             suggestion = nil
             return
         }
+        guard library.isAuthorized else {
+            isPermissionMissing = true
+            suggestion = nil
+            return
+        }
+        isPermissionMissing = false
+        guard !isScanning else { return }
         isScanning = true
         defer { isScanning = false }
 
-        let dismissed = Set(defaults.stringArray(forKey: AppPreferences.dismissedScreenshotIDsKey) ?? [])
+        let dismissedList: [String] = defaults.stringArray(forKey: AppPreferences.dismissedScreenshotIDsKey) ?? []
+        let dismissed = Set<String>(dismissedList)
         let since = now.addingTimeInterval(-48 * 3600)
-        for item in await library.recentScreenshots(since: since, limit: 5) {
-            guard !knownIdentifiers.contains(item.identifier), !dismissed.contains(item.identifier),
-                  let data = await item.data(),
-                  let result = try? await importer.importImage(data: data, assetIdentifier: item.identifier,
-                                                               capturedAt: item.createdAt, referenceDate: now),
-                  result.parsed.platformCode != nil else { continue }
+        let items: [LibraryScreenshot] = await library.recentScreenshots(since: since, limit: 5)
+        for item in items {
+            let identifier = item.identifier
+            if knownIdentifiers.contains(identifier) || dismissed.contains(identifier)
+                || rejectedIdentifiers.contains(identifier) {
+                continue
+            }
+            // Veri alinamadiysa (iCloud indirmesi vb.) reddetme: sonraki taramada yeniden denenir
+            guard let data = await item.data() else { continue }
+            let result: ImportedScreenshot
+            do {
+                result = try await importer.importImage(data: data, assetIdentifier: identifier,
+                                                        capturedAt: item.createdAt, referenceDate: now)
+            } catch {
+                rejectedIdentifiers.insert(identifier)
+                continue
+            }
+            if knownTextHashes.contains(result.textHash) || !ScreenshotSuggestionRule.qualifies(result.parsed) {
+                rejectedIdentifiers.insert(identifier)
+                continue
+            }
             suggestion = result
             return
         }
