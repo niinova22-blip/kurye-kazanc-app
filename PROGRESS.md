@@ -171,21 +171,26 @@ Tasarım: `docs/superpowers/specs/2026-10-07-gridwise-tr-design.md` · Plan: `do
 
 ## Oturum 4 — 2026-10-08: Sürüm 1.2 (derlenmedi)
 
+Tasarım: `docs/superpowers/specs/2026-10-08-surum-1-2-otomatik-vardiya-design.md`
+
 ### Yapılanlar
-- **Otomatik vardiya** (`AutoShiftPolicy`, `MotionManager`, `AutoShiftEvent`): CMMotionActivityManager ile hareket algılaması (walking/running/driving), signifikant konum değişimi, çalışma saatleri penceresi, 30 dakika soğutma süresi (başlatmadan sonra en az 30 dk bekleme), 20 dakika hareketsizlik = vardiya bitişi. Bekleme durumundaki vardiyalar kazanç kaydedilene kadar tutulur.
-- **Otomatik km**: Vardiya başında ve bitişinde GPS koordinatlarından km hesaplaması.
-- **Live Activity** (`LiveActivityService`): "Vardiyayı bitir" düğmesi, Dynamic Island entegrasyonu.
-- **AppDelegate**: Arka planda (UIBackgroundModes'te) yeniden başlatma, bildirimlere yanıt verme.
-- **Profil "Otomatik vardiya" bölümü**: Kullanıcı ayarları (hareket, konum yoğunluğu, çalışma saatleri, soğutma, durdurma süresi).
-- **1.1 UI düzeltmeleri**: Form alanlarında klavye kapatma sorunu giderildi; kazanç paylaşım rızası açılınca konum yoğunluğu de açılıyor.
+- **Core (`KuryeKazanc/Core/Shift/`, saf):** `AutoShiftPolicy` (başlatma/bitirme/iptal kuralları), `WorkHours` (çalışma saatleri penceresi, gece yarısını aşabilir; varsayılan 09:00–01:00, "Her saatte" seçeneği), `MotionSample` (CoreMotion örneği; yalnızca orta/yüksek güvenli araç veya bisiklet hareket sayılır), `PendingShift` + `PendingShiftList` (en fazla 5, 24 saat), `LiveActivityThrottle` (güncelleme sıklığı).
+- **Servisler:** `CoreMotionActivityProvider` (CMMotionActivityManager geçmiş sorgusu), `ShiftNotifications` ("Vardiya başladı" + "Bu bir vardiya değil" eylemi, "Vardiya bitti" → kazanç formu), `LiveActivityController` (ActivityKit aç/güncelle/bitir/kapat), `AutoShiftCoordinator` (uyanma → hareket geçmişi → politika → başlat/bitir/iptal; bekleyen vardiyalar; tüm başlatma/bitirme buradan geçer). `LocationService`: önemli konum değişikliği izleme, son hareket zamanı (≥ 50 m), konum olayı bildirimi; `WorkSessionManager`: vardiya kaynağı (elle/otomatik), geri tarihli başlangıç, iptal.
+- **Otomatik km:** vardiya boyunca GPS ile biriken mesafe (mevcut "Çalışıyorum" takibi; otomatik vardiyada iOS duraklatmaz). Koordinat saklanmaz, yalnızca il/ilçe/semt metni.
+- **Uygulama:** `AppEnvironment` (tek nesne grafiği: SwiftUI sahnesi, AppDelegate ve Canlı Etkinlik Intent'i aynı örnekleri kullanır) + `AppDelegate` (konum olayıyla arka planda yeniden başlatmada izlemeyi kurar, bildirim eylemlerini işler).
+- **`KuryeLiveActivity` eklentisi:** kilit ekranı + Dynamic Island; süre, km, bugünkü net, ~₺/saat ve "Vardiyayı bitir" düğmesi (`EndShiftIntent`, `Shared/`). Canlı Etkinlikten bitirilen vardiya bekleyen vardiya olur, "Vardiya bitti" bildirimi kazanç formuna götürür.
+- **Arayüz:** Profil "Otomatik vardiya" bölümü (anahtar + çalışma saatleri, izin uyarısı); Bugün'de "Bu bir vardiya değil" satırı ve "Biten vardiyalar" bölümü; onboarding'de isteğe bağlı açma.
+- **Kurallar:** çalışma saatleri içinde son 10 dakikada 3 dakika kesintisiz hareket → başlar (başlangıç hareketin ilk görüldüğü an); "Bu bir vardiya değil" sonrası 30 dk yeniden başlamaz; 20 dk hareketsizlikte biter, bitiş = son hareket anı (süreç ölüyken geçen uzun duraklama da aynı şekilde kesilir); 5 dakikadan kısa ve 1 km'den az otomatik vardiya sessizce atılır; biten vardiya kazancı kaydedilene kadar bekler. Elle vardiya yalnızca kullanıcı bitirince biter.
+- **1.1 arayüz düzeltmeleri (bugün):** formlarda klavye kaydırınca ve "Bitti" ile kapanır; kazanç paylaşımı onayı konum yoğunluğunu da açar.
+- **Son inceleme düzeltmeleri:** Canlı Etkinlik "Vardiyayı bitir" artık süre/km'yi kaybetmez; arka planda başlayan vardiyanın Canlı Etkinliği ön plana dönüşte açılır; her GPS olayında hareket geçmişi sorgulanmaz; elle vardiya başlığı "Vardiya · elle".
 
 ### Testler
-- Core (Windows `swift test`): **89/89 test PASS** (AutoShiftPolicyTests 10, EarningsAnalyticsTests 6, EarningsCalculatorTests 17, EarningsScreenshotParserTests 11, GoalsTests 1, OCRTemplateTests 4, PendingShiftTests 3, PeriodRangeTests 5, RecognizedLineTests 1, ScreenshotSuggestionRuleTests 5, ScreenshotVerifierTests 10, TextHashTests 5, TurkishNumberParserTests 7, WorkHoursTests 4).
+- Core (Windows `swift test`): **90 test, 0 hata** (89 + saat geri alınınca Canlı Etkinlik güncellemesi).
+- Uygulama XCTest'leri (`AutoShiftCoordinatorTests` vb.) Windows'ta çalıştırılamadı; elle izlendi.
 
 ### Derleme ve TestFlight durumu
-- **Sürüm 1.2 derlenmedi, ana dal (main) ve TestFlight'a gönderilmedi** — kullanıcı kararı. 
-- **1.3 öncesindeki ön koşul:** Canlı Etkinlik App ID `com.kuryekazanc.app.liveactivity` ve ilgili App Store profili Apple Developer'da oluşturulmalı. 1.3'ün ilk CI çalışması bunu doğrulayacak; profil eksikse imzalama başarısız olur. Oluşturma kararı kullanıcıya sorulacak.
+- **Sürüm 1.2 derlenmedi, push edilmedi, TestFlight'a gönderilmedi** — kullanıcı kararı.
+- **1.3 TestFlight öncesi önkoşul:** Apple Developer'da Canlı Etkinlik eklentisi App ID'si `com.kuryekazanc.app.liveactivity` ve App Store profili oluşturulmalı; yoksa `ios-release` imzalamada düşer. Kullanıcıya sorulacak.
 
 ### Sonraki adım
-- 1.3: Şablonlar gerçek ekran örnekleriyle kalibre edilecek, Live Activity'ye ekstra test ve gerekli Apple Developer ayarları.
-- Kullanıcı: 1.2 kodunun stabil olduğundan emin olmak için sonraki oturumda 1.3 ile CI'ı tetiklemesi gerekmektedir.
+- 1.3 ile birlikte ilk CI derlemesi (uygulama + eklenti) ve uygulama testleri; gerçek cihazda otomatik vardiya ve Canlı Etkinlik denemesi.
