@@ -14,6 +14,9 @@ enum AppPreferences {
     /// Kullanicinin acik onay verdigi an (Unix zaman damgasi). Onay geri alininca silinir.
     static let dataSharingConsentDateKey = "dataSharingConsentDate"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
+    /// Haftalik / gunluk net kazanc hedefi (TL). 0 = ayarlanmadi.
+    static let weeklyGoalKey = "weeklyNetGoal"
+    static let dailyGoalKey = "dailyNetGoal"
 
     static let defaultCostPerKm = VehicleType.motorcycle.defaultCostPerKm
 }
