@@ -15,15 +15,20 @@ final class LiveActivityController: LiveActivityControlling {
     private var activity: Activity<ShiftActivityAttributes>?
 
     init() {
-        // Uygulama yeniden acildiginda suren etkinligi sahiplen
-        activity = Activity<ShiftActivityAttributes>.activities.first
+        // Uygulama yeniden acildiginda yalnizca suren (aktif) etkinligi sahiplen; bitmis olanlar ekranda kalabilir
+        activity = Activity<ShiftActivityAttributes>.activities.first { $0.activityState == .active }
     }
 
     func begin(start: Date, isAuto: Bool, state: ShiftActivityAttributes.ContentState) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-        if activity != nil {
-            update(state)
-            return
+        if let old = activity {
+            if old.activityState == .active, old.attributes.start == start, old.attributes.isAuto == isAuto {
+                update(state)
+                return
+            }
+            // Bitmis ya da baska vardiyaya ait etkinligi hemen kapat, yenisini ac
+            activity = nil
+            Task { await old.end(nil, dismissalPolicy: .immediate) }
         }
         let attributes = ShiftActivityAttributes(start: start, isAuto: isAuto)
         activity = try? Activity.request(attributes: attributes, content: ActivityContent(state: state, staleDate: nil), pushType: nil)
