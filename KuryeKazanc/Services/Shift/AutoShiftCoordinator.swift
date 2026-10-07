@@ -45,6 +45,11 @@ final class AutoShiftCoordinator {
     @ObservationIgnored private var isDeciding = false
     /// "Her zaman" yukseltmesi bu etkinlestirmede istendi mi (her etkinlestirmede bir kez).
     @ObservationIgnored private var alwaysUpgradeRequested = false
+    /// Son degerlendirmede (tick) gorulen son hareket. Surec oluyken gecen uzun duraganlik sonrasi
+    /// gelen ilk GPS hareketi bununla ayirt edilir. Acilista kayitli son hareketle baslar.
+    @ObservationIgnored private var observedLastMovement: Date?
+    /// Son hareket bundan yeniyse (GPS hareketi zaten kanitliyor) hareket gecmisi sorgulanmaz.
+    @ObservationIgnored private let motionRefreshMinAge: TimeInterval = 60
 
     init(
         workSession: WorkSessionManager,
@@ -75,6 +80,7 @@ final class AutoShiftCoordinator {
         self.isEnabled = defaults.bool(forKey: AppPreferences.autoShiftEnabledKey)
         let stored = PendingShiftList.decode(defaults.data(forKey: AppPreferences.pendingShiftsKey))
         self.pendingShifts = PendingShiftList.pruned(stored, now: clock())
+        self.observedLastMovement = location.lastMovementDate
     }
 
     private var hasAlwaysPermission: Bool {
@@ -136,7 +142,12 @@ final class AutoShiftCoordinator {
         refreshPermissionProblem()
         if workSession.isWorking {
             if workSession.origin == .auto {
-                await refreshMovementFromMotion()
+                // Surec oluyken (zamanlayici yok) 20 dk'yi asan duraganlik: yeni surus eski vardiyaya eklenmez
+                if endIfMovementResumedAfterGap() { return }
+                let now = clock()
+                if now.timeIntervalSince(effectiveLastMovement(now: now)) >= motionRefreshMinAge {
+                    await refreshMovementFromMotion()
+                }
             }
             tick()
             return
@@ -168,8 +179,16 @@ final class AutoShiftCoordinator {
                 finishAutoShift(end: lastMovement)
                 return
             }
+            observedLastMovement = lastMovement
         }
         pushActivityUpdate(now: now)
+    }
+
+    /// Arka planda baslayan vardiyada ActivityKit istegi basarisiz olabilir (uygulama on planda degil).
+    /// On plana donuste suren vardiyanin Canli Etkinligi yoksa acilir; varsa yalnizca guncellenir.
+    func ensureLiveActivity() {
+        guard workSession.isWorking, let start = workSession.sessionStart else { return }
+        liveActivity.begin(start: start, isAuto: workSession.origin == .auto, state: currentState(endedAt: nil))
     }
 
     // MARK: - Kullanici eylemleri
@@ -178,7 +197,7 @@ final class AutoShiftCoordinator {
         beginShift(at: clock(), origin: .manual)
     }
 
-    /// Bugun ekrani veya Canli Etkinlik "Vardiyayi bitir". Ozet kazanc formunu doldurur.
+    /// Bugun ekrani "Vardiyayi bitir": ozet dogrudan acilan kazanc formunu doldurur.
     @discardableResult
     func endShift() -> WorkSessionSummary? {
         guard workSession.isWorking else { return nil }
@@ -188,6 +207,15 @@ final class AutoShiftCoordinator {
         liveActivity.finish(state)
         notifier.clearAutoShiftStarted()
         return summary
+    }
+
+    /// Canli Etkinlik "Vardiyayi bitir": form acilamaz (uygulama arka planda olabilir), ozet
+    /// bekleyen vardiya olarak saklanir ve "Vardiya bitti" bildirimi gider. Kullanici acikca
+    /// bitirdigi icin kisa vardiya filtresi uygulanmaz: her zaman kazanc formuna ulasir (spec).
+    @discardableResult
+    func endShiftToPending() -> PendingShift? {
+        guard let summary = endShift() else { return nil }
+        return storeEndedShift(summary)
     }
 
     func cancelAutoShift() {
@@ -221,6 +249,7 @@ final class AutoShiftCoordinator {
         workSession.start(at: start, origin: origin)
         lastActivityUpdate = nil
         lastActivityMeters = 0
+        observedLastMovement = nil
         liveActivity.begin(start: start, isAuto: origin == .auto, state: currentState(endedAt: nil))
         startTimer()
     }
@@ -237,7 +266,13 @@ final class AutoShiftCoordinator {
             return
         }
         liveActivity.finish(state)
+        storeEndedShift(summary)
+    }
 
+    /// Biten vardiyayi bekleyen listeye yazar, "Vardiya bitti" bildirimini gonderir ve bolgeyi
+    /// arka planda ekler. Otomatik bitis ve Canli Etkinlik "bitir" ortak kullanir.
+    @discardableResult
+    private func storeEndedShift(_ summary: WorkSessionSummary) -> PendingShift {
         let pending = PendingShift(
             id: UUID(), start: summary.start, end: summary.end, distanceKm: summary.distanceKm,
             createdAt: clock(), province: nil, district: nil, neighborhood: nil
@@ -247,6 +282,7 @@ final class AutoShiftCoordinator {
         if let last = summary.lastLocation {
             Task { await self.attachRegion(to: pending.id, from: last) }
         }
+        return pending
     }
 
     private func attachRegion(to id: UUID, from last: CLLocation) async {
@@ -300,10 +336,15 @@ final class AutoShiftCoordinator {
         refreshPermissionProblem()
     }
 
-    /// Acikken once "Her zaman", sonra Hareket izni denetlenir. Mod kapaliyken dokunulmaz:
-    /// basarisiz enable() sonrasi "Ayarlar'dan ac" uyarisi (.motion) korunur; disable() temizler.
+    /// Acikken once "Her zaman", sonra Hareket izni denetlenir. Mod kapaliyken yalnizca basarisiz
+    /// enable() sonrasi kalan "Ayarlar'dan ac" uyarisi (.motion), izin Ayarlar'dan verilince temizlenir.
     private func refreshPermissionProblem() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            if permissionProblem == .motion, motion.isAuthorized {
+                permissionProblem = nil
+            }
+            return
+        }
         let problem: PermissionProblem?
         if !hasAlwaysPermission {
             problem = .locationAlways
@@ -324,19 +365,53 @@ final class AutoShiftCoordinator {
         return max(recorded, sessionStart)
     }
 
+    /// Son tick'ten bu yana GPS son hareketi 20 dk'den fazla ileri attiysa arada surec olu/askida
+    /// kalmis demektir (canli olsaydi tick vardiyayi bitirirdi). Vardiya aradan onceki son harekette biter.
+    /// - Returns: Vardiya bittiyse true.
+    private func endIfMovementResumedAfterGap() -> Bool {
+        guard workSession.isWorking, workSession.origin == .auto, let sessionStart = workSession.sessionStart else { return false }
+        let now = clock()
+        let previous: Date = max(observedLastMovement ?? sessionStart, sessionStart)
+        let latest: Date = effectiveLastMovement(now: now)
+        guard latest.timeIntervalSince(previous) >= policy.stationaryLimit else { return false }
+        finishAutoShift(end: previous)
+        return true
+    }
+
     /// Bitirme kurali "50 m konum degisimi ya da hareket ornegi" der: GPS hareket gormese de
     /// son hareketten sonra baslayan bir arac/bisiklet ornegi son hareket zamanini ileri alir.
+    /// Ornekler arasinda 20 dk'yi asan bosluk varsa (surec oluyken duraganlik) vardiya boslugun
+    /// basinda biter; sonraki surus eski vardiyaya eklenmez.
     private func refreshMovementFromMotion() async {
         guard let sessionStart = workSession.sessionStart else { return }
-        let now = clock()
-        let lastMovement: Date = effectiveLastMovement(now: now)
-        let samples: [MotionSample] = await motion.samples(from: lastMovement, to: now)
+        let queryFrom: Date = effectiveLastMovement(now: clock())
+        let samples: [MotionSample] = await motion.samples(from: queryFrom, to: clock())
         // Bekleme sirasinda vardiya bitmis ya da degismis olabilir
-        guard workSession.isWorking, workSession.sessionStart == sessionStart else { return }
-        let moving: [MotionSample] = samples.filter { $0.isMoving && $0.start > lastMovement && $0.start <= now }
-        guard let latest = moving.map({ $0.start }).max() else { return }
-        if let current = location.lastMovementDate, current >= latest { return }
-        location.markMovement(at: latest)
+        guard workSession.isWorking, workSession.sessionStart == sessionStart, workSession.origin == .auto else { return }
+        let now = clock()
+        // Bekleme sirasinda GPS hareketi ileri almis olabilir: en yeni son hareketten bakilir
+        let lastMovement: Date = effectiveLastMovement(now: now)
+        let sorted: [MotionSample] = samples
+            .filter { $0.start > lastMovement && $0.start <= now }
+            .sorted { $0.start < $1.start }
+
+        // Hareketin en son goruldugu an: hareket ornegi bir sonraki ornege kadar surer; son ornegin
+        // yalnizca baslangici kesindir.
+        var seenUntil: Date = lastMovement
+        var sawMovement = false
+        for index in sorted.indices where sorted[index].isMoving {
+            let sample = sorted[index]
+            if sample.start.timeIntervalSince(seenUntil) >= policy.stationaryLimit {
+                finishAutoShift(end: seenUntil)
+                return
+            }
+            let until: Date = index + 1 < sorted.count ? sorted[index + 1].start : sample.start
+            seenUntil = max(seenUntil, until)
+            sawMovement = true
+        }
+        guard sawMovement else { return }
+        if let current = location.lastMovementDate, current >= seenUntil { return }
+        location.markMovement(at: seenUntil)
     }
 
     private func refreshPending() {

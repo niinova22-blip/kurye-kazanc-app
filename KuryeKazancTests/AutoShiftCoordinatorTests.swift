@@ -191,4 +191,123 @@ final class AutoShiftCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.pendingShifts.first?.end, start.addingTimeInterval(900))
         XCTAssertEqual(activity.finished, 1)
     }
+
+    func testLiveActivityEndStoresPendingAndNotifies() async {
+        let coordinator = makeCoordinator()
+        driving(minutes: 30)
+        await coordinator.handleWake()
+        let start = workSession.sessionStart!
+        now = now.addingTimeInterval(120)
+        let pending = coordinator.endShiftToPending()
+        XCTAssertFalse(workSession.isWorking)
+        XCTAssertNotNil(pending)
+        XCTAssertEqual(coordinator.pendingShifts.count, 1)
+        XCTAssertEqual(coordinator.pendingShifts.first?.start, start)
+        XCTAssertEqual(coordinator.pendingShifts.first?.end, now, "Acik bitirmede bitis bitirme ani")
+        XCTAssertEqual(notifier.ended.count, 1)
+        XCTAssertEqual(activity.finished, 1)
+        XCTAssertEqual(activity.dismissed, 0)
+    }
+
+    func testLiveActivityEndKeepsEvenVeryShortShift() async {
+        let coordinator = makeCoordinator()
+        coordinator.startManualShift()
+        now = now.addingTimeInterval(30)
+        coordinator.endShiftToPending()
+        XCTAssertEqual(coordinator.pendingShifts.count, 1, "Kullanici acikca bitirdi: kisa vardiya filtresi yok")
+        XCTAssertEqual(notifier.ended.count, 1)
+        XCTAssertNil(coordinator.endShiftToPending(), "Suren vardiya yokken hicbir sey yapmaz")
+        XCTAssertEqual(coordinator.pendingShifts.count, 1)
+    }
+
+    func testEnsureLiveActivityRequestsForRunningShiftOnly() async {
+        let coordinator = makeCoordinator()
+        coordinator.ensureLiveActivity()
+        XCTAssertEqual(activity.begun, 0, "Vardiya yokken etkinlik acilmaz")
+        driving(minutes: 4)
+        await coordinator.handleWake()
+        XCTAssertEqual(activity.begun, 1)
+        // Arka planda istek basarisiz olmus olabilir: on plana donuste yeniden istenir
+        coordinator.ensureLiveActivity()
+        XCTAssertEqual(activity.begun, 2)
+    }
+
+    func testMotionAfterLongDeadGapEndsShiftAtLastMovement() async {
+        let coordinator = makeCoordinator()
+        driving(minutes: 30)
+        await coordinator.handleWake()
+        let movedAt = now
+        workSession.location.markMovement(at: movedAt)
+        // Surec oldu; 3 saat sonra yeni surus ornegi ve uyanma
+        motion.list = [MotionSample(start: movedAt.addingTimeInterval(3 * 3600), kind: .automotive, confidence: .high)]
+        now = movedAt.addingTimeInterval(3 * 3600 + 60)
+        await coordinator.handleWake()
+        XCTAssertFalse(workSession.isWorking)
+        XCTAssertEqual(coordinator.pendingShifts.count, 1)
+        XCTAssertEqual(coordinator.pendingShifts.first?.end, movedAt, "Bitis bosluktan onceki son hareket")
+        XCTAssertEqual(notifier.ended.count, 1)
+    }
+
+    func testMotionGapBetweenSamplesEndsShiftBeforeGap() async {
+        let coordinator = makeCoordinator()
+        driving(minutes: 30)
+        await coordinator.handleWake()
+        let movedAt = now
+        workSession.location.markMovement(at: movedAt)
+        // 5. dk'da surus, 6. dk'da durus; 2 saat sonra yeni surus
+        motion.list = [
+            MotionSample(start: movedAt.addingTimeInterval(300), kind: .automotive, confidence: .high),
+            MotionSample(start: movedAt.addingTimeInterval(360), kind: .stationary, confidence: .high),
+            MotionSample(start: movedAt.addingTimeInterval(7200), kind: .automotive, confidence: .high),
+        ]
+        now = movedAt.addingTimeInterval(7260)
+        await coordinator.handleWake()
+        XCTAssertFalse(workSession.isWorking)
+        XCTAssertEqual(coordinator.pendingShifts.first?.end, movedAt.addingTimeInterval(360), "Son hareket durus ornegine kadar surer")
+    }
+
+    func testGpsMovementAfterLongDeadGapEndsShiftAtLastMovement() async {
+        let coordinator = makeCoordinator()
+        driving(minutes: 30)
+        await coordinator.handleWake()
+        let movedAt = now
+        workSession.location.markMovement(at: movedAt)
+        coordinator.tick()
+        XCTAssertTrue(workSession.isWorking)
+        motion.list = []
+        // Surec oldu; 3 saat sonra ilk GPS hareketi geldi
+        workSession.location.markMovement(at: movedAt.addingTimeInterval(3 * 3600))
+        now = movedAt.addingTimeInterval(3 * 3600 + 5)
+        await coordinator.handleWake()
+        XCTAssertFalse(workSession.isWorking)
+        XCTAssertEqual(coordinator.pendingShifts.first?.end, movedAt)
+    }
+
+    func testFreshGpsMovementSkipsMotionQueryAndKeepsShift() async {
+        let coordinator = makeCoordinator()
+        driving(minutes: 30)
+        await coordinator.handleWake()
+        let start = workSession.sessionStart!
+        workSession.location.markMovement(at: start.addingTimeInterval(300))
+        coordinator.tick()
+        // GPS 30 sn once hareket gordu: hareket gecmisi sorgulanmaz (sorgulansaydi 910. sn isaretlenirdi)
+        motion.list = [MotionSample(start: start.addingTimeInterval(910), kind: .automotive, confidence: .high)]
+        workSession.location.markMovement(at: start.addingTimeInterval(900))
+        now = start.addingTimeInterval(930)
+        await coordinator.handleWake()
+        XCTAssertTrue(workSession.isWorking)
+        XCTAssertEqual(workSession.location.lastMovementDate, start.addingTimeInterval(900))
+    }
+
+    func testMotionPermissionWarningClearsWhenGrantedWhileDisabled() async {
+        let coordinator = makeCoordinator(enabled: false)
+        motion.isAuthorized = false
+        let enabled = await coordinator.enable()
+        XCTAssertFalse(enabled)
+        XCTAssertEqual(coordinator.permissionProblem, .motion)
+        motion.isAuthorized = true
+        await coordinator.handleWake()
+        XCTAssertNil(coordinator.permissionProblem, "Izin Ayarlar'dan verildi: uyari kalkar")
+        XCTAssertFalse(coordinator.isEnabled)
+    }
 }

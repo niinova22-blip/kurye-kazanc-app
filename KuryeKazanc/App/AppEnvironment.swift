@@ -48,9 +48,10 @@ final class AppEnvironment {
             todayNet: { todaySummary().netEarnings },
             todayWorkedSeconds: { todaySummary().workDuration }
         )
-        // Canli Etkinlik "Vardiyayi bitir": iOS uygulamayi arka planda soguk baslatsa da bagli olsun
+        // Canli Etkinlik "Vardiyayi bitir": iOS uygulamayi arka planda soguk baslatsa da bagli olsun.
+        // Form acilamaz: ozet bekleyen vardiya olur, "Vardiya bitti" bildirimi kazanc formuna goturur.
         ShiftIntentBridge.endShift = { [weak self] in
-            _ = self?.autoShift.endShift()
+            _ = self?.autoShift.endShiftToPending()
         }
     }
 

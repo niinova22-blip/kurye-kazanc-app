@@ -23,7 +23,11 @@ struct KuryeKazancApp: App {
                     // On plana donus: Ayarlar'da verilen izinler ve suren vardiya yeniden degerlendirilir
                     guard phase == .active else { return }
                     let autoShift = environment.autoShift
-                    Task { await autoShift.handleWake() }
+                    Task { @MainActor in
+                        await autoShift.handleWake()
+                        // Arka planda baslayan vardiyanin Canli Etkinligi acilamamis olabilir: simdi istenir
+                        autoShift.ensureLiveActivity()
+                    }
                 }
         }
         .modelContainer(environment.container)
