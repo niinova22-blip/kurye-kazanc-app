@@ -14,6 +14,14 @@ struct ParsedEarning: Equatable {
     var totalIncludesBonus: Bool
     /// Guvenle okunamayan ve TAHMINLE doldurulan alanlar -> "bu alanlari kontrol et" uyarisi.
     var fieldsToReview: Set<Field>
+    /// Eslesen sablonun kimligi; platform taninamadiysa nil.
+    var templateID: String? = nil
+    var templateVersion: Int? = nil
+    var templateStatus: OCRTemplate.Status? = nil
+    /// Ekranda gorulen parmak izi metni sayisi.
+    var fingerprintMatches: Int = 0
+    /// Ekran gunluk mu haftalik mi?
+    var period: OCRTemplate.Period = .unknown
 
     /// Bizim modelimizdeki brut (bonus haric) kazanc.
     var grossEarning: Double {
@@ -26,7 +34,7 @@ struct ParsedEarning: Equatable {
 /// Kural: hicbir alan bos birakilmaz. Etiketle bulunamayan alan icin en iyi tahmin yazilir
 /// (toplam: en buyuk tutar, bonus: 0, paket: 0, tarih: bugun) ve alan `fieldsToReview`'a eklenir.
 struct EarningsScreenshotParser {
-    var templates: [EarningsScreenshotTemplate] = [TrendyolGoTemplate(), GetirTemplate()]
+    var templates: [OCRTemplate] = BundledTemplates.all
     var calendar: Calendar = .current
 
     func parse(lines rawLines: [String], referenceDate: Date = .now) -> ParsedEarning {
@@ -38,13 +46,15 @@ struct EarningsScreenshotParser {
         var review = Set<ParsedEarning.Field>()
 
         // 1) Platform
-        let template: EarningsScreenshotTemplate
-        if let detected = detectTemplate(in: normalized) {
+        let template: OCRTemplate
+        let detected = detectTemplate(in: normalized)
+        if let detected {
             template = detected
         } else {
-            template = GenericTemplate()
+            template = BundledTemplates.generic
             review.insert(.platform)
         }
+        let fullText = normalized.joined(separator: " ")
 
         // 2) Toplam kazanc
         let excludedForTotal = template.bonusLabels + template.packageLabels
@@ -86,15 +96,20 @@ struct EarningsScreenshotParser {
             totalEarning: total ?? 0,
             bonus: bonus!,
             totalIncludesBonus: template.totalIncludesBonus,
-            fieldsToReview: review
+            fieldsToReview: review,
+            templateID: detected?.id,
+            templateVersion: detected?.version,
+            templateStatus: detected?.status,
+            fingerprintMatches: detected?.fingerprintMatches(in: fullText) ?? 0,
+            period: template.period(in: fullText)
         )
     }
 
     // MARK: - Platform
 
-    func detectTemplate(in lines: [String]) -> EarningsScreenshotTemplate? {
+    func detectTemplate(in lines: [String]) -> OCRTemplate? {
         let text = lines.joined(separator: " ")
-        var best: (template: EarningsScreenshotTemplate, score: Int)?
+        var best: (template: OCRTemplate, score: Int)?
         for template in templates {
             let score = template.detectionKeywords.reduce(0) { count, keyword in
                 count + (TextPatterns.containsWord(keyword, in: text) ? 1 : 0)
