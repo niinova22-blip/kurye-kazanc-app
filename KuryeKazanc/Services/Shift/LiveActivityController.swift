@@ -6,6 +6,8 @@ protocol LiveActivityControlling {
     func begin(start: Date, isAuto: Bool, state: ShiftActivityAttributes.ContentState)
     func update(_ state: ShiftActivityAttributes.ContentState)
     func finish(_ state: ShiftActivityAttributes.ContentState)
+    /// Iptal edilen veya kisa sayilip atilan vardiya: ozet gostermeden hemen kapatir.
+    func dismiss()
 }
 
 /// ActivityKit: vardiya basinda acar, guncellemeleri iletir, bitince 5 dk ozetle kapatir.
@@ -44,5 +46,11 @@ final class LiveActivityController: LiveActivityControlling {
         self.activity = nil
         let dismissal = Date().addingTimeInterval(300)
         Task { await activity.end(ActivityContent(state: state, staleDate: nil), dismissalPolicy: .after(dismissal)) }
+    }
+
+    func dismiss() {
+        guard let activity else { return }
+        self.activity = nil
+        Task { await activity.end(nil, dismissalPolicy: .immediate) }
     }
 }

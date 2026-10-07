@@ -29,6 +29,8 @@ final class LocationService: NSObject {
     private(set) var isMonitoringSignificantChanges = false
     /// Her konum olayinda (GPS veya onemli konum degisikligi) cagrilir: otomatik vardiya karari icin.
     @ObservationIgnored var onLocationEvent: (@MainActor () -> Void)?
+    /// Konum izni degistiginde cagrilir: otomatik vardiya "Her zaman" yukseltmesini ister ve uyariyi gunceller.
+    @ObservationIgnored var onAuthorizationChange: (@MainActor (CLAuthorizationStatus) -> Void)?
     /// Son anlamli hareketin olculdugu nokta (>= 50 m).
     @ObservationIgnored private var movementAnchor: CLLocation?
 
@@ -209,6 +211,7 @@ final class LocationService: NSObject {
             pendingStart = false
             resumeOneShot(with: nil)
         }
+        onAuthorizationChange?(status)
     }
 
     fileprivate func handle(locations: [CLLocation]) {

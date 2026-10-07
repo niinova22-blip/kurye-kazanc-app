@@ -22,10 +22,11 @@ final class AutoShiftCoordinatorTests: XCTestCase {
 
     @MainActor
     final class FakeActivity: LiveActivityControlling {
-        var begun = 0, updates = 0, finished = 0
+        var begun = 0, updates = 0, finished = 0, dismissed = 0
         func begin(start: Date, isAuto: Bool, state: ShiftActivityAttributes.ContentState) { begun += 1 }
         func update(_ state: ShiftActivityAttributes.ContentState) { updates += 1 }
         func finish(_ state: ShiftActivityAttributes.ContentState) { finished += 1 }
+        func dismiss() { dismissed += 1 }
     }
 
     private var now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -83,7 +84,8 @@ final class AutoShiftCoordinatorTests: XCTestCase {
         coordinator.cancelAutoShift()
         XCTAssertFalse(workSession.isWorking)
         XCTAssertTrue(coordinator.pendingShifts.isEmpty)
-        XCTAssertEqual(activity.finished, 1)
+        XCTAssertEqual(activity.dismissed, 1, "Iptalde ozet gosterilmez")
+        XCTAssertEqual(activity.finished, 0)
 
         now = now.addingTimeInterval(600)
         driving(minutes: 5)
@@ -116,6 +118,8 @@ final class AutoShiftCoordinatorTests: XCTestCase {
         XCTAssertFalse(workSession.isWorking)
         XCTAssertTrue(coordinator.pendingShifts.isEmpty)
         XCTAssertTrue(notifier.ended.isEmpty)
+        XCTAssertEqual(activity.dismissed, 1)
+        XCTAssertEqual(activity.finished, 0)
     }
 
     func testManualShiftNeverAutoEnds() async {
@@ -153,5 +157,38 @@ final class AutoShiftCoordinatorTests: XCTestCase {
         await coordinator.handleWake()
         XCTAssertFalse(workSession.isWorking)
         XCTAssertEqual(coordinator.permissionProblem, .locationAlways)
+    }
+
+    func testStaleLastMovementDoesNotEndNewShiftInstantly() async {
+        let coordinator = makeCoordinator()
+        // Onceki vardiyadan kalan eski hareket zamani
+        workSession.location.markMovement(at: now.addingTimeInterval(-7200))
+        driving(minutes: 4)
+        await coordinator.handleWake()
+        XCTAssertTrue(workSession.isWorking)
+        now = now.addingTimeInterval(60)
+        coordinator.tick()
+        XCTAssertTrue(workSession.isWorking, "Son hareket vardiya baslangicindan once sayilmaz")
+    }
+
+    func testMotionSampleAfterLastMovementKeepsShiftAlive() async {
+        let coordinator = makeCoordinator()
+        driving(minutes: 30)
+        await coordinator.handleWake()
+        let start = workSession.sessionStart!
+        workSession.location.markMovement(at: start)
+        // GPS 50 m gormedi ama 15. dakikada arac hareketi var
+        motion.list = [MotionSample(start: start.addingTimeInterval(900), kind: .automotive, confidence: .high)]
+        now = start.addingTimeInterval(1500)
+        await coordinator.handleWake()
+        XCTAssertTrue(workSession.isWorking)
+        XCTAssertEqual(workSession.location.lastMovementDate, start.addingTimeInterval(900))
+
+        // Ayni ornek artik son hareketten sonra degil: hareketi tazelemez, 20 dk dolunca biter
+        now = start.addingTimeInterval(900 + 1200)
+        await coordinator.handleWake()
+        XCTAssertFalse(workSession.isWorking)
+        XCTAssertEqual(coordinator.pendingShifts.first?.end, start.addingTimeInterval(900))
+        XCTAssertEqual(activity.finished, 1)
     }
 }
