@@ -123,16 +123,16 @@ final class DashboardUITests: XCTestCase {
 
     func testHistoryAndSettingsTabs() {
         let app = launch(sampleData: true)
-        XCTAssertTrue(app.tabBars.buttons["Geçmiş"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["Analiz"].waitForExistence(timeout: 10))
 
-        app.tabBars.buttons["Geçmiş"].tap()
+        app.tabBars.buttons["Analiz"].tap()
         XCTAssertTrue(app.segmentedControls["history.periodPicker"].waitForExistence(timeout: 5))
         app.segmentedControls["history.periodPicker"].buttons["Gün"].tap()
         let net = app.staticTexts["history.netEarnings"]
         XCTAssertTrue(net.waitForExistence(timeout: 5))
         XCTAssertTrue(net.label.contains("850"), "Gunluk net 850 olmali, gelen: \(net.label)")
 
-        app.tabBars.buttons["Ayarlar"].tap()
+        app.tabBars.buttons["Profil"].tap()
         XCTAssertTrue(app.switches["settings.autoEstimate"].waitForExistence(timeout: 5))
         // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
         let sharing = app.switches["settings.dataSharing"]
@@ -142,10 +142,20 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(sharing.exists)
     }
 
+    func testAnalysisShowsPlatformComparison() {
+        let app = launch(sampleData: true)
+        XCTAssertTrue(app.tabBars.buttons["Analiz"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Analiz"].tap()
+        app.segmentedControls["history.periodPicker"].buttons["Gün"].tap()
+        let platforms = app.staticTexts["analysis.platform.getir"]
+        for _ in 0..<4 where !platforms.exists { app.swipeUp() }
+        XCTAssertTrue(platforms.exists)
+    }
+
     func testDataSharingRequiresExplicitConsent() {
         let app = launch(sampleData: false)
-        XCTAssertTrue(app.tabBars.buttons["Ayarlar"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Ayarlar"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Profil"].tap()
 
         let toggle = app.switches["settings.dataSharing"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
