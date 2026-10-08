@@ -205,10 +205,12 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 - **Servisler (`Services/Sync/`):** `SupabaseClient` (elle yazılmış REST; anonim oturum, Apple id_token, Keychain'de oturum, yalnızca HTTPS), `OutboxQueue` (Application Support/outbox.json, dosya korumalı), `SyncCoordinator` (rıza + kayıt → kuyruk, boşaltma, kalibrasyon, 12 saatte bir şablon çekimi; rıza yoksa ağ yok), `BackupService` + `AccountService` (Apple ile Giriş, yedekle/geri yükle, 24 saatte bir otomatik yedek, "Verilerimi sil").
 - **Arayüz:** Profil > "Hesap ve yedek", "Kalibrasyon" (ayrı açık rıza), "Gizlilik ve KVKK"; formda "Kalibrasyona gönder". KVKK aydınlatma ve açık rıza **taslakları** `docs/legal/`.
 - **Bağlantılar (Görev 8):** `AppEnvironment` istemciyi yalnızca Info.plist ayarı varsa kurar (UI testlerinde `nil`); `SyncCoordinator` + `AccountService` sahneye `.environment` ile verilir. Açılışta ve ön plana dönüşte şablon yenileme + kuyruk boşaltma. Kayıt sonrası kuyruğa ekleme + girişliyse yedek. Kayıt silinince bekleyen gönderimi düşer (`recordDeleted`, "Tüm kayıtları sil" → `allRecordsDeleted`). Paylaşım kapatılınca kuyruk temizlenir. Tüm ekran görüntüsü okumaları (form, paylaş gelen kutusu, çoklu seçim, otomatik tarama) birleşik şablonları kullanır. 1.2 öncesi "veri gönderilmez / yalnızca bu cihazda" metinleri 1.3'e göre düzeltildi.
+- **Son inceleme düzeltmeleri (2026-10-08):** "Verilerimi sil" artık eski (emekli) anonim/Apple kimliklerindeki veriyi de siler (emekli yenileme belirteçleri Keychain'de, yalnızca bu cihaz); ilk "Şimdi yedekle" öncesi uyarı (sunucudaki yedeği ezmesin); otomatik yedek yalnızca bir yedek tabanı (elle yedek / geri yükleme) varken; boşluksuz/önneksiz cep telefonu maskelenir; haftalık ekranlar vardiya olarak gönderilmez; Profil'de "Son gönderim"; Apple giriş hataları gösterilir; silme sürmekte olan gönderimi bekler; günlük sınır UTC gününe göre.
+- Ertelenen küçükler ve kararlar: `.superpowers/sdd/2026-10-09-surum-1-3-sunucu/progress.md` ("minor (deferred)", "parked", "Ruling:").
 - Sürüm **1.3.0**; `TESTFLIGHT_NOTES.md` 1.3.0 bölümü (1.2 + 1.3 yenilikleri, cihaz test listesi).
 
 ### Testler
-- Core (Windows `swift test`): **98 test, 0 hata**.
+- Core (Windows `swift test`): **100 test, 0 hata**.
 - Uygulama XCTest'leri (`SupabaseClientTests`, `SyncCoordinatorTests`, `BackupServiceTests` vb.) Windows'ta çalıştırılamadı; ilk CI derlemesinde çalışacak.
 
 ### Derleme ve TestFlight durumu
