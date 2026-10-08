@@ -389,10 +389,9 @@ struct EarningFormView: View {
         let coordinator: SyncCoordinator = sync
         let service: AccountService = account
         let context: ModelContext = modelContext
-        Task {
-            await service.backupIfDue(context: context)
-            await coordinator.flush()
-        }
+        // Gonderim yedegi beklemesin: ikisi ayri baslar
+        Task { await coordinator.flush() }
+        Task { await service.backupIfDue(context: context) }
     }
 }
 

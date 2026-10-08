@@ -116,21 +116,24 @@ final class AccountService {
         let payload: BackupPayload = try BackupService.makePayload(context: context, defaults: defaults, now: now)
         let data: Data = try BackupService.encode(payload)
         try await client.uploadBackup(data)
-        lastBackupDate = now
-        defaults.set(now.timeIntervalSince1970, forKey: AppPreferences.lastBackupDateKey)
+        setBackupDate(now)
     }
 
     /// Kayit kaydedildikten sonra (Gorev 8): Apple ile girisliyse ve son yedekten 24 saat
     /// gectiyse yedekler. Hata sessizce yutulur (bir sonraki kayitta tekrar denenir).
+    /// Yedek tabani (`lastBackupDate`) yoksa otomatik yedek ALINMAZ: sunucuda tek satir yedek var ve
+    /// yukleme onu degistirir. Yeni telefonda geri yuklemeden once kaydedilen tek vardiya ya da
+    /// "Tum kayitlari sil" sonrasi bos veri tam yedegi ezmesin. Taban: elle yedek veya geri yukleme.
     func backupIfDue(context: ModelContext) async {
-        guard client != nil, !isDeletePending else { return }
+        guard client != nil, !isDeletePending, lastBackupDate != nil else { return }
         refreshSessionState()
         guard isSignedInWithApple, isBackupDue else { return }
         try? await backupNow(context: context)
     }
 
+    /// Taban yoksa false (otomatik yedek elle ilk yedekten / geri yuklemeden sonra baslar).
     var isBackupDue: Bool {
-        guard let lastBackupDate else { return true }
+        guard let lastBackupDate else { return false }
         let elapsed: TimeInterval = clock().timeIntervalSince(lastBackupDate)
         // Saat geri alinmissa (elapsed < 0) beklemeden yedeklenir.
         return elapsed < 0 || elapsed >= AccountService.autoBackupInterval
@@ -149,7 +152,18 @@ final class AccountService {
         guard let data = try await client.downloadBackup() else { throw AccountError.noBackup }
         // Sunucu jsonb'yi yeniden kodlar: bayt karsilastirma yok, cozulur.
         let payload: BackupPayload = try BackupService.decode(data)
-        return try BackupService.restore(payload, into: context, platforms: platforms, defaults: defaults)
+        let result: (added: Int, skipped: Int) = try BackupService.restore(
+            payload, into: context, platforms: platforms, defaults: defaults
+        )
+        // Yerel veri artik yedegi kapsiyor: otomatik yedek bu andan itibaren guvenli.
+        setBackupDate(clock())
+        return result
+    }
+
+    /// Profil > "Tum kayitlari sil" sonrasi: taban silinir; bos veri otomatik yedekle sunucudaki
+    /// yedegi ezmesin. Kullanici isterse "Simdi yedekle" ile bilerek yedekler.
+    func localRecordsCleared() {
+        clearBackupDate()
     }
 
     // MARK: - Verilerimi sil
@@ -191,6 +205,11 @@ final class AccountService {
         if signedIn != isSignedInWithApple {
             isSignedInWithApple = signedIn
         }
+    }
+
+    private func setBackupDate(_ date: Date) {
+        lastBackupDate = date
+        defaults.set(date.timeIntervalSince1970, forKey: AppPreferences.lastBackupDateKey)
     }
 
     private func clearBackupDate() {

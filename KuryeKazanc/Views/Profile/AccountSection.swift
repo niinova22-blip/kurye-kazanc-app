@@ -36,7 +36,7 @@ struct AccountSection: View {
         } header: {
             Text("Hesap ve yedek")
         } footer: {
-            Text("Apple ile giriş yaparsan kayıtların ve ayarların sunucuya yedeklenir; yeni telefonda geri yükleyebilirsin. Giriş yapmazsan uygulama aynen çalışır.")
+            Text("Apple ile giriş yaparsan kayıtların ve ayarların sunucuya yedeklenir; yeni telefonda geri yükleyebilirsin. Otomatik yedek, ilk “Şimdi yedekle”den veya geri yüklemeden sonra başlar. Giriş yapmazsan uygulama aynen çalışır.")
         }
     }
 

@@ -342,7 +342,8 @@ final class BackupServiceTests: XCTestCase {
         fake.session = FakeAccountClient.makeSession(anonymous: false)
         let account = makeAccount(client: fake)
 
-        await account.backupIfDue(context: context)
+        // Taban: elle ilk yedek
+        try await account.backupNow(context: context)
         XCTAssertEqual(fake.uploadCount, 1)
         now = now.addingTimeInterval(23 * 3600)
         await account.backupIfDue(context: context)
@@ -350,6 +351,68 @@ final class BackupServiceTests: XCTestCase {
         now = now.addingTimeInterval(3600)
         await account.backupIfDue(context: context)
         XCTAssertEqual(fake.uploadCount, 2)
+    }
+
+    /// Yeni telefonda giris + geri yuklemeden once kayit: tam yedek tek kayitla ezilmesin.
+    func testBackupIfDue_withoutBaselineDoesNotUpload() async throws {
+        try seedRecords(in: context)
+        let fake = FakeAccountClient()
+        fake.session = FakeAccountClient.makeSession(anonymous: false)
+        fake.storedBackup = Data("tam-yedek".utf8)
+        let account = makeAccount(client: fake)
+        XCTAssertNil(account.lastBackupDate)
+        XCTAssertFalse(account.isBackupDue)
+
+        await account.backupIfDue(context: context)
+
+        XCTAssertEqual(fake.uploadCount, 0)
+        XCTAssertEqual(fake.storedBackup, Data("tam-yedek".utf8))
+        XCTAssertNil(account.lastBackupDate)
+    }
+
+    func testRestore_setsBaselineForAutomaticBackup() async throws {
+        try seedRecords(in: context)
+        let fake = FakeAccountClient()
+        fake.session = FakeAccountClient.makeSession(anonymous: false)
+        let account = makeAccount(client: fake)
+        try await account.backupNow(context: context)
+        XCTAssertEqual(fake.uploadCount, 1)
+
+        // Yeni cihaz: ayni sunucu, taban yok
+        let fresh = UserDefaults(suiteName: suiteName + "-yeni")!
+        defer { fresh.removePersistentDomain(forName: suiteName + "-yeni") }
+        let newDevice = AccountService(client: fake, defaults: fresh, clock: { [unowned self] in self.now })
+        let target = ModelContainerFactory.make(inMemory: true)
+        let targetContext = target.mainContext
+        DataSeeder.seedPlatformsIfNeeded(in: targetContext)
+        now = now.addingTimeInterval(3600)
+
+        _ = try await newDevice.restore(context: targetContext, platforms: platforms(in: targetContext))
+
+        XCTAssertEqual(newDevice.lastBackupDate, now)
+        XCTAssertEqual(fresh.double(forKey: AppPreferences.lastBackupDateKey), now.timeIntervalSince1970)
+        XCTAssertFalse(newDevice.isBackupDue)
+        now = now.addingTimeInterval(24 * 3600)
+        await newDevice.backupIfDue(context: targetContext)
+        XCTAssertEqual(fake.uploadCount, 2)
+    }
+
+    /// "Tum kayitlari sil" sonrasi bos veri otomatik yedekle sunucuya yazilmaz.
+    func testLocalRecordsCleared_clearsBaselineAndStopsAutomaticBackup() async throws {
+        try seedRecords(in: context)
+        let fake = FakeAccountClient()
+        fake.session = FakeAccountClient.makeSession(anonymous: false)
+        let account = makeAccount(client: fake)
+        try await account.backupNow(context: context)
+        XCTAssertEqual(fake.uploadCount, 1)
+
+        account.localRecordsCleared()
+
+        XCTAssertNil(account.lastBackupDate)
+        XCTAssertNil(defaults.object(forKey: AppPreferences.lastBackupDateKey))
+        now = now.addingTimeInterval(25 * 3600)
+        await account.backupIfDue(context: context)
+        XCTAssertEqual(fake.uploadCount, 1)
     }
 
     func testDeleteMyData_revokesConsentsClearsQueueAndKeepsLocalRecords() async throws {

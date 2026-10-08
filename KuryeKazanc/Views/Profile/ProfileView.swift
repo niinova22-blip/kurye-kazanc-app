@@ -9,6 +9,7 @@ struct ProfileView: View {
     @Environment(LocationService.self) private var location
     @Environment(ScreenshotScanner.self) private var scanner
     @Environment(SyncCoordinator.self) private var sync
+    @Environment(AccountService.self) private var account
 
     @Query private var couriers: [Courier]
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
@@ -317,6 +318,8 @@ struct ProfileView: View {
         try? modelContext.deleteAllRecords()
         // Silinen kayitlarin bekleyen gonderimleri de dusulur (sunucudakiler icin "Verilerimi sil")
         sync.allRecordsDeleted()
+        // Bos veri otomatik yedekle sunucudaki yedegi ezmesin
+        account.localRecordsCleared()
     }
 }
 

@@ -8,7 +8,7 @@ Her rıza **ayrı** alınır, varsayılan olarak **kapalıdır** ve Profil ekran
 
 ## 1. Anonim kazanç paylaşımı
 
-Kurye Kazanç Aydınlatma Metni'ni okudum. Ekran görüntüsüyle doğrulanmış vardiyalarıma ait şu verilerin — platform, il ve ilçe, araç türü, haftanın günü ve 15 dakikalık başlangıç dilimi, süre, brüt kazanç, bonus, paket sayısı, yuvarlanmış mesafe, doğrulama seviyesi, ekran şablonu ve ekran metninin özeti — anonim bir oturum kimliğiyle, kuryelerin bölge ve platform bazında net kazançlarını karşılaştırabilmesi amacıyla işlenmesine **açık rıza veriyorum**.
+Kurye Kazanç Aydınlatma Metni'ni okudum. Ekran görüntüsünden okunup değiştirilmeyen vardiyalarıma ait şu verilerin — platform, il ve ilçe, araç türü, haftanın günü ve 15 dakikalık başlangıç dilimi, süre, brüt kazanç, bonus, paket sayısı, yuvarlanmış mesafe, doğrulama seviyesi, ekran şablonu ve ekran metninin özeti — anonim bir oturum kimliğiyle, kuryelerin bölge ve platform bazında net kazançlarını karşılaştırabilmesi amacıyla işlenmesine **açık rıza veriyorum**.
 
 Adımın, ekran görüntülerimin, semt ve tam konumumun, telefon numaramın ve e-posta adresimin gönderilmediğini biliyorum.
 

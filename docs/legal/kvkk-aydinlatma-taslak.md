@@ -26,7 +26,7 @@ Kişisel veriler **yalnızca kurye ilgili özelliği açıp açık rıza verdiğ
 
 ### 3.1 Anonim kazanç paylaşımı ("Kazançlarımı anonim paylaş")
 
-Yalnızca ekran görüntüsüyle doğrulanmış kayıtlar (doğrulama seviyesi `verified` veya `ocrUnverified`) gönderilir. Elle girilen veya OCR sonrası düzeltilen kayıtlar gönderilmez.
+Yalnızca ekran görüntüsünden okunup değiştirilmeyen kayıtlar (doğrulama seviyesi `verified` veya `ocrUnverified`) gönderilir. Elle girilen veya OCR sonrası düzeltilen kayıtlar gönderilmez.
 
 | Veri | Açıklama |
 |---|---|

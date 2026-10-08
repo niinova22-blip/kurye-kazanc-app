@@ -15,7 +15,7 @@ struct CommunityView: View {
                             .accessibilityHidden(true)
                         Text("Bölgendeki kuryelerle karşılaştır")
                             .font(.title3.weight(.semibold))
-                        Text("İlçende saat başı ortalama net kazanç, en yoğun saatler ve kazanç haritası. Yalnızca ekran görüntüsüyle doğrulanmış veriler kullanılır.")
+                        Text("İlçende saat başı ortalama net kazanç, en yoğun saatler ve kazanç haritası. Yalnızca ekran görüntüsünden okunup değiştirilmeyen kayıtlar kullanılır.")
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 8)
