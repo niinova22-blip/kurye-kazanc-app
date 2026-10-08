@@ -9,6 +9,8 @@ final class FakeAccountClient: SupabaseServing {
     /// Sunucuda duran yedek (uploadBackup yazar, downloadBackup okur).
     var storedBackup: Data?
     var deleteError: Error?
+    /// Yukleme surerken calisir (yedek ortasinda baska islem denemek icin).
+    var onUpload: (() async -> Void)?
 
     private(set) var uploadCount: Int = 0
     private(set) var deleteCount: Int = 0
@@ -40,6 +42,7 @@ final class FakeAccountClient: SupabaseServing {
     func uploadBackup(_ payload: Data) async throws {
         guard let session, !session.isAnonymous else { throw SupabaseError.notSignedIn }
         uploadCount += 1
+        await onUpload?()
         // Sunucu jsonb'yi yeniden kodlar: bayt ayni kalmaz.
         let value = try JSONDecoder().decode(JSONValue.self, from: payload)
         storedBackup = try JSONEncoder().encode(value)
@@ -213,16 +216,24 @@ final class BackupServiceTests: XCTestCase {
         XCTAssertEqual(first.grossEarning, 1234)
     }
 
-    func testRestore_doesNotOverwriteLocalPreference() throws {
+    /// Geri yukleme acik kullanici istegi: yedekteki tercih cihazdakini ezer (onboarding costPerKm'i
+    /// her zaman yazar; yeni telefonda "yalnizca bossa" kurali hic islemezdi).
+    func testRestore_overwritesLocalPreferenceWithBackup() throws {
         defaults.set(2.0, forKey: AppPreferences.costPerKmKey)
+        defaults.set(5000.0, forKey: AppPreferences.weeklyGoalKey)
         let payload = BackupPayload(
             version: 1, earnings: [], expenses: [],
-            preferences: [AppPreferences.costPerKmKey: 3.5, AppPreferences.dailyGoalKey: 900, "isWorking": 1],
+            preferences: [
+                AppPreferences.costPerKmKey: 3.5, AppPreferences.dailyGoalKey: 900,
+                AppPreferences.weeklyGoalKey: .nan, "isWorking": 1
+            ],
             createdAt: now
         )
         _ = try BackupService.restore(payload, into: context, platforms: [], defaults: defaults)
-        XCTAssertEqual(defaults.double(forKey: AppPreferences.costPerKmKey), 2.0)
+        XCTAssertEqual(defaults.double(forKey: AppPreferences.costPerKmKey), 3.5)
         XCTAssertEqual(defaults.double(forKey: AppPreferences.dailyGoalKey), 900)
+        // Sonlu olmayan deger yazilmaz, yerel kalir.
+        XCTAssertEqual(defaults.double(forKey: AppPreferences.weeklyGoalKey), 5000)
         XCTAssertNil(defaults.object(forKey: "isWorking"))
     }
 
@@ -396,5 +407,65 @@ final class BackupServiceTests: XCTestCase {
         XCTAssertTrue(account.isSignedInWithApple)
         // Riza yine de kapandi (yerel, ag gerektirmez).
         XCTAssertFalse(defaults.bool(forKey: AppPreferences.dataSharingOptInKey))
+    }
+
+    /// Silme sunucuda basarisiz olduysa (oturum korunur) yedek alinmaz: silinmesi istenen veri
+    /// sunucuya yeniden yazilmasin.
+    func testDeleteMyData_failedDeleteBlocksBackups() async throws {
+        try seedRecords(in: context)
+        let fake = FakeAccountClient()
+        fake.session = FakeAccountClient.makeSession(anonymous: false)
+        fake.deleteError = SupabaseError.network
+        let account = makeAccount(client: fake)
+
+        do {
+            try await account.deleteMyData(context: context)
+            XCTFail("Sunucu hatasi iletilmeli")
+        } catch {}
+        XCTAssertTrue(account.isSignedInWithApple)
+
+        await account.backupIfDue(context: context)
+        XCTAssertEqual(fake.uploadCount, 0)
+        do {
+            try await account.backupNow(context: context)
+            XCTFail("Silme bitmeden yedek alinmamali")
+        } catch {
+            XCTAssertEqual(error as? AccountError, .busy)
+        }
+        XCTAssertEqual(fake.uploadCount, 0)
+
+        // Tekrar deneme basarili: veri silinir, cikis yapilir.
+        fake.deleteError = nil
+        try await account.deleteMyData(context: context)
+        XCTAssertEqual(fake.deleteCount, 2)
+        XCTAssertFalse(account.isSignedInWithApple)
+    }
+
+    /// Yedek yuklenirken "Verilerimi sil" reddedilir: yukleme silmeden sonra bitip veriyi geri yazmasin.
+    func testDeleteMyData_duringBackupThrowsBusy() async throws {
+        try seedRecords(in: context)
+        defaults.set(true, forKey: AppPreferences.dataSharingOptInKey)
+        let fake = FakeAccountClient()
+        fake.session = FakeAccountClient.makeSession(anonymous: false)
+        let account = makeAccount(client: fake)
+        var deleteError: Error?
+        fake.onUpload = { [unowned self] in
+            do {
+                try await account.deleteMyData(context: self.context)
+            } catch {
+                deleteError = error
+            }
+        }
+
+        try await account.backupNow(context: context)
+        fake.onUpload = nil
+
+        XCTAssertEqual(deleteError as? AccountError, .busy)
+        XCTAssertEqual(fake.uploadCount, 1)
+        XCTAssertEqual(fake.deleteCount, 0)
+        XCTAssertEqual(fake.signOutCount, 0)
+        // Reddedilen silme rizalara dokunmaz.
+        XCTAssertTrue(defaults.bool(forKey: AppPreferences.dataSharingOptInKey))
+        XCTAssertTrue(account.isSignedInWithApple)
     }
 }

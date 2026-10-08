@@ -59,8 +59,8 @@ extension BackupError: LocalizedError {
 
 /// Yedek yukunu SwiftData'dan olusturur ve geri yukler (spec 4).
 ///
-/// Geri yukleme birlestirir: id'si cihazda zaten olan kayit atlanir (yerel hal korunur),
-/// cihazda ayarlanmis tercih ezilmez.
+/// Geri yukleme birlestirir: id'si cihazda zaten olan kayit atlanir (yerel hal korunur);
+/// yedekteki bilinen tercihler cihazdakini ezer.
 @MainActor
 enum BackupService {
     static let currentVersion: Int = 1
@@ -221,11 +221,12 @@ enum BackupService {
         item.amount.isFinite
     }
 
-    /// Yalnizca bilinen anahtarlar ve yalnizca cihazda henuz ayarlanmamislarsa.
+    /// Geri yukleme kullanicinin acik istegi: yedekteki tercih cihazdakini ezer (onboarding
+    /// costPerKm'i her zaman yazdigi icin "yalnizca bossa" kurali yeni telefonda hic islemezdi).
+    /// Yalnizca bilinen anahtarlar ve sonlu degerler.
     private static func restorePreferences(_ preferences: [String: Double], into defaults: UserDefaults) {
         for key in preferenceKeys {
             guard let value = preferences[key], value.isFinite else { continue }
-            guard defaults.object(forKey: key) == nil else { continue }
             defaults.set(value, forKey: key)
         }
     }

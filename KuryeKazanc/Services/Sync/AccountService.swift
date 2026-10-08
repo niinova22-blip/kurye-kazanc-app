@@ -8,15 +8,19 @@ enum AccountError: Error, Equatable {
     case serverUnavailable
     /// Hesapta yedek yok.
     case noBackup
+    /// Yedekleme veya "Verilerimi sil" suruyor.
+    case busy
 }
 
 extension AccountError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .serverUnavailable:
-            return "Sunucu şu an kullanılamıyor."
+            return "Hesap özellikleri bu sürümde kullanılamıyor."
         case .noBackup:
             return "Bu hesapta yedek bulunamadı."
+        case .busy:
+            return "Yedekleme veya silme sürüyor, biraz sonra tekrar dene."
         }
     }
 }
@@ -45,6 +49,9 @@ final class AccountService {
     private let syncCoordinator: SyncCoordinator?
     private let clock: () -> Date
     @ObservationIgnored private var isBackingUp: Bool = false
+    /// "Verilerimi sil" basladi ve henuz basariyla bitmedi (yalnizca bellekte). Bu surede yedek
+    /// alinmaz: silinmesi istenen veri sunucuya yeniden yazilmasin. Yalnizca basarida temizlenir.
+    @ObservationIgnored private var isDeletePending: Bool = false
 
     init(
         client: (any SupabaseServing)?,
@@ -93,6 +100,7 @@ final class AccountService {
     /// Tum kazanc/gider + tercihler sunucuya. Apple ile girisli degilse `.notSignedIn`.
     func backupNow(context: ModelContext) async throws {
         guard let client else { throw AccountError.serverUnavailable }
+        guard !isDeletePending else { throw AccountError.busy }
         refreshSessionState()
         guard isSignedInWithApple else { throw SupabaseError.notSignedIn }
         // Otomatik ve elle yedek ust uste binmesin; ikincisi sessizce biter.
@@ -115,7 +123,7 @@ final class AccountService {
     /// Kayit kaydedildikten sonra (Gorev 8): Apple ile girisliyse ve son yedekten 24 saat
     /// gectiyse yedekler. Hata sessizce yutulur (bir sonraki kayitta tekrar denenir).
     func backupIfDue(context: ModelContext) async {
-        guard client != nil else { return }
+        guard client != nil, !isDeletePending else { return }
         refreshSessionState()
         guard isSignedInWithApple, isBackupDue else { return }
         try? await backupNow(context: context)
@@ -146,18 +154,22 @@ final class AccountService {
 
     // MARK: - Verilerimi sil
 
-    /// Sirasi: (1) paylasim/konum/kalibrasyon rizalari kapatilir ve kuyruk bosaltilir (yerel, her zaman),
+    /// Sirasi: (0) yedek suruyorsa `.busy`, (1) paylasim/konum/kalibrasyon rizalari kapatilir ve kuyruk bosaltilir (yerel, her zaman),
     /// (2) sunucuda `delete_my_data` (oturum varsa), (3) cikis.
     /// Sunucu cagrisi basarisizsa hata firlatilir ve oturum KORUNUR: kullanici tekrar deneyebilsin
     /// (cikis yapilsaydi o kimligin verisine bir daha ulasilamazdi).
     /// `context`: yerel kayitlar bilerek SILINMEZ (Profil'deki "Tum kayitlari sil" ayri); imza
     /// arayuzle uyumlu kalsin diye alinir.
+    /// Yedek yukleniyorsa `.busy` (yukleme silmeden sonra bitip veriyi geri yazmasin).
     func deleteMyData(context: ModelContext) async throws {
+        guard !isBackingUp else { throw AccountError.busy }
+        isDeletePending = true
         revokeConsents()
         if let client {
             try await client.deleteMyData()
         }
         signOut()
+        isDeletePending = false
     }
 
     /// Riza anahtarlari ONCE yazilir; koordinator kuyrugu bu degerlere gore bosaltir.
