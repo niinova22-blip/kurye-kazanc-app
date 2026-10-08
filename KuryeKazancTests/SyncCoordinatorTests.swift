@@ -302,17 +302,40 @@ final class SyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(sync.lastSyncDate, now)
     }
 
-    func testRateLimited_waitsUntilNextDay() async {
+    func testRateLimited_defersAllShiftsUntilNextDay() async {
         setConsents(sharing: true, calibration: false)
-        fake.shiftResults = [.rateLimited]
+        fake.shiftResults = [.rateLimited, .ok]
         let sync = makeCoordinator(client: fake)
+        sync.recordSaved(makeRecord(level: .ocrUnverified), vehicle: "motorcycle")
         sync.recordSaved(makeRecord(level: .ocrUnverified), vehicle: "motorcycle")
 
         await sync.flush()
 
-        XCTAssertEqual(queue.items.count, 1)
-        XCTAssertEqual(queue.items.first?.failures, 0)
-        XCTAssertEqual(queue.items.first?.notBefore, OutboxPolicy.nextDay(after: now, calendar: calendar))
+        // Ikinci oge bu turda denenmez; ikisi de ertesi gune kalir
+        let nextDay: Date = OutboxPolicy.nextDay(after: now, calendar: calendar)
+        XCTAssertEqual(fake.submittedShifts.count, 1)
+        XCTAssertEqual(queue.items.count, 2)
+        XCTAssertEqual(queue.items.map(\.notBefore), [nextDay, nextDay])
+        XCTAssertEqual(queue.items.map(\.failures), [0, 0])
+    }
+
+    func testTransient_stopsFlushBeforeNextItem() async {
+        setConsents(sharing: true, calibration: false)
+        fake.shiftResults = [.transient, .ok]
+        let sync = makeCoordinator(client: fake)
+        let first = makeRecord(level: .ocrUnverified)
+        let second = makeRecord(level: .ocrUnverified)
+        sync.recordSaved(first, vehicle: "motorcycle")
+        sync.recordSaved(second, vehicle: "motorcycle")
+
+        await sync.flush()
+
+        XCTAssertEqual(fake.submittedShifts.count, 1)
+        XCTAssertEqual(fake.submittedShifts.first?.clientRecordID, first.id.uuidString.lowercased())
+        XCTAssertEqual(queue.items.count, 2)
+        XCTAssertEqual(queue.items.first { $0.id == first.id }?.failures, 1)
+        XCTAssertEqual(queue.items.first { $0.id == second.id }?.failures, 0)
+        XCTAssertEqual(queue.items.first { $0.id == second.id }?.notBefore, now)
     }
 
     // MARK: - Riza geri alma (Review Focus 5)
@@ -388,6 +411,27 @@ final class SyncCoordinatorTests: XCTestCase {
         await sync.flush()
         XCTAssertEqual(fake.submittedCalibrations.count, 2)
         XCTAssertEqual(fake.submittedCalibrations.last?.map(\.text), ["Getir", "IBAN ***"])
+        XCTAssertTrue(queue.items.isEmpty)
+    }
+
+    func testCalibration_resendRemovesQueuedCopy() async {
+        setConsents(sharing: false, calibration: true)
+        fake.calibrationResults = [.transient, .ok]
+        let sync = makeCoordinator(client: fake)
+        let evidence = makeEvidence(lines: ["Getir", "Toplam Kazanç", "₺980,00"])
+
+        let first = await sync.sendCalibration(evidence)
+        XCTAssertEqual(first, .transient)
+        XCTAssertEqual(queue.items.count, 1)
+
+        // Elle tekrar gonderim basarili: kuyruktaki kopya da silinir
+        let second = await sync.sendCalibration(evidence)
+        XCTAssertEqual(second, .ok)
+        XCTAssertTrue(queue.items.isEmpty)
+
+        now = now.addingTimeInterval(61)
+        await sync.flush()
+        XCTAssertEqual(fake.submittedCalibrations.count, 2)
         XCTAssertTrue(queue.items.isEmpty)
     }
 

@@ -166,8 +166,21 @@ final class SyncCoordinator {
             }
             return
         }
+        if result == .rateLimited {
+            deferAll(of: item.kind)
+        }
         guard isUnchanged else { return }
         queue.replace(rescheduled(item, after: result))
+    }
+
+    /// Gunluk sinir kullaniciya ozgu: o turdeki tum bekleyen ogeler ertesi gune kalir.
+    private func deferAll(of kind: OutboxItem.Kind) {
+        let nextDay: Date = OutboxPolicy.nextDay(after: clock(), calendar: calendar)
+        for queued in queue.items where queued.kind == kind && queued.notBefore < nextDay {
+            var updated: OutboxItem = queued
+            updated.notBefore = nextDay
+            queue.replace(updated)
+        }
     }
 
     private func rescheduled(_ item: OutboxItem, after result: OutboxResult) -> OutboxItem {
@@ -211,6 +224,9 @@ final class SyncCoordinator {
             lines: SyncCoordinator.maskedLines(evidence.lines)
         )
         guard !sample.lines.isEmpty else { return .invalid }
+        // Ayni ornegin kuyruktaki kopyasi da gonderilmesin (sunucu kalibrasyonda tekrar ayiklamaz);
+        // basarisizlikta asagida yeniden kuyruga alinir.
+        queue.remove(id: evidence.id)
         let sampleID: UUID = evidence.id
         let result: OutboxResult = await client.submitCalibration(
             platformCode: sample.platformCode, templateID: sample.templateID, lines: sample.lines
@@ -228,6 +244,9 @@ final class SyncCoordinator {
         guard let data = try? JSONEncoder().encode(sample) else { return }
         let fresh = OutboxItem(id: id, kind: .calibration, payload: data, failures: 0, notBefore: clock())
         queue.enqueue(rescheduled(fresh, after: result))
+        if result == .rateLimited {
+            deferAll(of: .calibration)
+        }
     }
 
     static func maskedLines(_ lines: [RecognizedLine]) -> [RecognizedLine] {
@@ -289,7 +308,7 @@ final class SyncCoordinator {
         let directory: URL = templatesFileURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         guard let data = try? JSONEncoder().encode(templates) else { return }
-        try? data.write(to: templatesFileURL, options: [.atomic])
+        try? data.write(to: templatesFileURL, options: OutboxQueue.writeOptions)
     }
 
     // MARK: - Kalici durum

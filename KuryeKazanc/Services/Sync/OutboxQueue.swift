@@ -87,10 +87,19 @@ final class OutboxQueue {
         return (try? JSONDecoder().decode([OutboxItem].self, from: data)) ?? []
     }
 
+    /// Atomik yazim; iOS'ta cihazin ilk kilit acilisina kadar dosya korumali.
+    static var writeOptions: Data.WritingOptions {
+        #if os(iOS)
+        return [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
+        #else
+        return [.atomic]
+        #endif
+    }
+
     private func save() {
         let directory: URL = fileURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         guard let data = try? JSONEncoder().encode(items) else { return }
-        try? data.write(to: fileURL, options: [.atomic])
+        try? data.write(to: fileURL, options: OutboxQueue.writeOptions)
     }
 }
