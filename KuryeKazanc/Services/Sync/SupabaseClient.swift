@@ -21,6 +21,8 @@ final class SupabaseClient: SupabaseServing {
     static let refreshMargin: TimeInterval = 60
     /// Bu durumlarda RPC sonucu gecici sayilir (tekrar denenir); diger 4xx kalici `.invalid`.
     static let transientStatuses: Set<Int> = [401, 403, 404, 408, 425, 429]
+    /// Yalnizca bu yanitlar "yenileme anahtari olu" demektir; digerlerinde (429, 5xx, ag) oturum korunur.
+    static let refreshRejectedStatuses: Set<Int> = [400, 401, 403]
 
     private struct HTTPResult {
         let status: Int
@@ -39,6 +41,8 @@ final class SupabaseClient: SupabaseServing {
     private(set) var session: AuthSession?
     /// Ayni anda gelen cagrilar tek bir yenileme/kayit islemini paylasir.
     private var pendingAuth: Task<AuthSession, Error>?
+    /// Cikis ve Apple girisinde artar; eski donemde baslamis yenileme sonucunu yazamaz.
+    private var authEpoch: Int = 0
 
     init(
         config: SupabaseConfig,
@@ -91,14 +95,22 @@ final class SupabaseClient: SupabaseServing {
         let body: Data = try encoder.encode(IDTokenBody(provider: "apple", idToken: idToken, nonce: nonce))
         let query: [URLQueryItem] = [URLQueryItem(name: "grant_type", value: "id_token")]
         let fresh: AuthSession = try await requestSession(path: "auth/v1/token", query: query, body: body)
+        invalidatePendingAuth()
         apply(fresh)
         return fresh
     }
 
     /// Yalnizca yerel oturumu siler; sunucu cagrisi yok.
     func signOut() {
-        pendingAuth = nil
+        invalidatePendingAuth()
         apply(nil)
+    }
+
+    /// Suren yenileme/kayit islemini iptal eder; sonucu artik oturuma yazilamaz.
+    private func invalidatePendingAuth() {
+        authEpoch += 1
+        pendingAuth?.cancel()
+        pendingAuth = nil
     }
 
     // MARK: - Yedek ve silme
@@ -201,17 +213,24 @@ final class SupabaseClient: SupabaseServing {
     }
 
     private func validSession(allowSignup: Bool, forceRenew: Bool) async throws -> AuthSession {
+        if session == nil, let reloaded = store.load() {
+            // Baska bir yerde (or. arka plan) kaydedilmis oturum: anonim kayittan once bir kez bak.
+            session = reloaded
+        }
         if !forceRenew, let current = session, isFresh(current) {
             return current
         }
         if let pending = pendingAuth {
             return try await pending.value
         }
+        let epoch: Int = authEpoch
         let task = Task<AuthSession, Error> {
-            try await self.renewSession(allowSignup: allowSignup)
+            try await self.renewSession(allowSignup: allowSignup, epoch: epoch)
         }
         pendingAuth = task
-        defer { pendingAuth = nil }
+        defer {
+            if pendingAuth == task { pendingAuth = nil }
+        }
         return try await task.value
     }
 
@@ -220,23 +239,32 @@ final class SupabaseClient: SupabaseServing {
         return remaining > SupabaseClient.refreshMargin
     }
 
-    /// Once refresh_token ile yenile; sunucu reddederse (4xx) yeni anonim kayit (izinliyse).
-    /// Ag/5xx hatasinda oturum degismez, hata yukari tasinir.
-    private func renewSession(allowSignup: Bool) async throws -> AuthSession {
+    /// Once refresh_token ile yenile; sunucu reddederse (400/401/403) yeni anonim kayit (izinliyse).
+    /// Ag, 429, 5xx gibi hatalarda oturum degismez, hata yukari tasinir.
+    /// `epoch` degistiyse (cikis / Apple girisi) sonuc yazilmaz: CancellationError.
+    private func renewSession(allowSignup: Bool, epoch: Int) async throws -> AuthSession {
         if let current = session {
             do {
                 let refreshed: AuthSession = try await refresh(using: current.refreshToken)
+                try ensureEpoch(epoch)
                 apply(refreshed)
                 return refreshed
-            } catch SupabaseError.http(let status) where (400..<500).contains(status) {
+            } catch SupabaseError.http(let status) where SupabaseClient.refreshRejectedStatuses.contains(status) {
                 // Yenileme anahtari gecersiz: eski oturum kullanilamaz.
+                try ensureEpoch(epoch)
                 apply(nil)
             }
         }
         guard allowSignup else { throw SupabaseError.notSignedIn }
+        try ensureEpoch(epoch)
         let fresh: AuthSession = try await signUpAnonymously()
+        try ensureEpoch(epoch)
         apply(fresh)
         return fresh
+    }
+
+    private func ensureEpoch(_ epoch: Int) throws {
+        guard epoch == authEpoch else { throw CancellationError() }
     }
 
     private func refresh(using refreshToken: String) async throws -> AuthSession {

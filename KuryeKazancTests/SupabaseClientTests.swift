@@ -1,11 +1,13 @@
 import XCTest
 @testable import KuryeKazanc
 
-/// Sahte ag: yol -> yanit kuyrugu. Kuyrukta tek yanit kalinca o yanit tekrar tekrar doner.
+/// Sahte ag: yol (ya da "yol?sorgu") -> yanit kuyrugu. Kuyrukta tek yanit kalinca o yanit tekrar tekrar doner.
+/// `delay` > 0 ise yanit gecikmeli verilir (suren bir istegi taklit etmek icin).
 final class StubProtocol: URLProtocol {
     struct Stub {
         let status: Int
         let body: String
+        var delay: TimeInterval = 0
     }
 
     struct Recorded {
@@ -39,17 +41,34 @@ final class StubProtocol: URLProtocol {
         lock.unlock()
     }
 
-    private static func next(for path: String) -> Stub {
+    /// Once "yol?sorgu" anahtari, yoksa yalnizca yol aranir.
+    private static func next(for path: String, query: String) -> Stub {
         lock.lock()
         defer { lock.unlock() }
-        guard var queue = routes[path], let first = queue.first else {
+        let fullKey: String = query.isEmpty ? path : "\(path)?\(query)"
+        let key: String = routes[fullKey] != nil ? fullKey : path
+        guard var queue = routes[key], let first = queue.first else {
             return Stub(status: 404, body: "{}")
         }
         if queue.count > 1 {
             queue.removeFirst()
-            routes[path] = queue
+            routes[key] = queue
         }
         return first
+    }
+
+    /// Gecikmeli teslimde kendini zayif tutmak icin (Sendable kapanis uyarisi olmasin).
+    private struct WeakBox: @unchecked Sendable {
+        weak var target: StubProtocol?
+    }
+
+    private let stateLock = NSLock()
+    private var stopped: Bool = false
+
+    private var isStopped: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return stopped
     }
 
     /// URLProtocol icinde httpBody nil gelir; govde akistan okunur.
@@ -92,7 +111,19 @@ final class StubProtocol: URLProtocol {
             headers: StubProtocol.lowercasedHeaders(request), body: bodyText
         )
         StubProtocol.record(item)
-        let stub: Stub = StubProtocol.next(for: url.path)
+        let stub: Stub = StubProtocol.next(for: url.path, query: url.query ?? "")
+        if stub.delay > 0 {
+            let box = WeakBox(target: self)
+            DispatchQueue.global().asyncAfter(deadline: .now() + stub.delay) {
+                box.target?.deliver(stub, url: url)
+            }
+        } else {
+            deliver(stub, url: url)
+        }
+    }
+
+    private func deliver(_ stub: Stub, url: URL) {
+        guard !isStopped else { return }
         let headerFields: [String: String] = ["Content-Type": "application/json"]
         guard let response = HTTPURLResponse(
             url: url, statusCode: stub.status, httpVersion: "HTTP/1.1", headerFields: headerFields
@@ -105,7 +136,11 @@ final class StubProtocol: URLProtocol {
         client?.urlProtocolDidFinishLoading(self)
     }
 
-    override func stopLoading() {}
+    override func stopLoading() {
+        stateLock.lock()
+        stopped = true
+        stateLock.unlock()
+    }
 }
 
 final class MemorySessionStore: SessionStore {
@@ -380,12 +415,97 @@ final class SupabaseClientTests: XCTestCase {
         XCTAssertNil(store.stored)
     }
 
+    // Yenileme 429: anahtar olu degil; oturum korunur, sonuc gecici.
+    @MainActor
+    func testRateLimitedRefreshKeepsStoredSession() async {
+        StubProtocol.reset([
+            SupabaseClientTests.tokenPath: [.init(status: 429, body: #"{"error":"too_many_requests"}"#)],
+            SupabaseClientTests.signupPath: [.init(status: 200, body: SupabaseClientTests.anonSessionJSON)],
+        ])
+        let old: AuthSession = session(expiresIn: -10)
+        let store = MemorySessionStore(old)
+        let client = makeClient(store: store)
+
+        let result: OutboxResult = await client.submitShift(samplePayload())
+
+        XCTAssertEqual(result, .transient)
+        XCTAssertEqual(store.stored, old)
+        XCTAssertEqual(client.session, old)
+        XCTAssertEqual(StubProtocol.requests.map { $0.path }, [SupabaseClientTests.tokenPath], "Anonim kayit yapilmamali")
+    }
+
+    /// Istenen yola istek dusene kadar bekler (en fazla ~2 sn).
+    @MainActor
+    private func waitForRequest(path: String) async {
+        for _ in 0..<200 {
+            if StubProtocol.requests.contains(where: { $0.path == path }) { return }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTFail("\(path) istegi gelmedi")
+    }
+
+    // Yenileme surerken cikis: yenileme sonucu oturumu geri getirmez.
+    @MainActor
+    func testSignOutDuringPendingRefreshKeepsSessionCleared() async {
+        StubProtocol.reset([
+            SupabaseClientTests.tokenPath: [.init(status: 200, body: SupabaseClientTests.refreshedJSON, delay: 0.3)],
+            SupabaseClientTests.signupPath: [.init(status: 200, body: SupabaseClientTests.anonSessionJSON)],
+            SupabaseClientTests.shiftPath: [.init(status: 200, body: #""ok""#)],
+        ])
+        let store = MemorySessionStore(session(expiresIn: -10))
+        let client = makeClient(store: store)
+        let pending = Task { await client.submitShift(self.samplePayload()) }
+        await waitForRequest(path: SupabaseClientTests.tokenPath)
+
+        client.signOut()
+        let result: OutboxResult = await pending.value
+        try? await Task.sleep(nanoseconds: 400_000_000)
+
+        XCTAssertEqual(result, .transient)
+        XCTAssertNil(store.stored)
+        XCTAssertNil(client.session)
+        let paths: [String] = StubProtocol.requests.map { $0.path }
+        XCTAssertFalse(paths.contains(SupabaseClientTests.signupPath))
+        XCTAssertFalse(paths.contains(SupabaseClientTests.shiftPath))
+    }
+
+    // Yenileme surerken Apple girisi: Apple oturumu korunur.
+    @MainActor
+    func testAppleSignInDuringPendingRefreshWins() async throws {
+        let appleJSON =
+            #"{"access_token":"acc-apple","refresh_token":"ref-apple","expires_in":3600,"user":{"id":"user-apple","is_anonymous":false}}"#
+        StubProtocol.reset([
+            "\(SupabaseClientTests.tokenPath)?grant_type=refresh_token": [
+                .init(status: 200, body: SupabaseClientTests.refreshedJSON, delay: 0.3),
+            ],
+            "\(SupabaseClientTests.tokenPath)?grant_type=id_token": [.init(status: 200, body: appleJSON)],
+            SupabaseClientTests.shiftPath: [.init(status: 200, body: #""ok""#)],
+        ])
+        let store = MemorySessionStore(session(expiresIn: -10, anonymous: true))
+        let client = makeClient(store: store)
+        let pending = Task { await client.submitShift(self.samplePayload()) }
+        await waitForRequest(path: SupabaseClientTests.tokenPath)
+
+        let apple: AuthSession = try await client.signInWithApple(idToken: "id-token", nonce: "nonce")
+        let result: OutboxResult = await pending.value
+        try? await Task.sleep(nanoseconds: 400_000_000)
+
+        XCTAssertEqual(apple.userID, "user-apple")
+        XCTAssertEqual(result, .transient)
+        XCTAssertEqual(store.stored, apple)
+        XCTAssertEqual(client.session, apple)
+        let appleRequest = StubProtocol.requests.first { $0.query == "grant_type=id_token" }
+        XCTAssertNotNil(appleRequest)
+        XCTAssertTrue(appleRequest?.body.contains(#""provider":"apple""#) ?? false)
+    }
+
     // (f) fromBundle bos degerde nil; ayni kural yardimci init ile sinanir.
     func testConfigRequiresBothValues() {
         XCTAssertNil(SupabaseConfig(urlString: "", anonKey: "anahtar"))
         XCTAssertNil(SupabaseConfig(urlString: "https://abc.supabase.co", anonKey: ""))
         XCTAssertNil(SupabaseConfig(urlString: "   ", anonKey: "  "))
         XCTAssertNil(SupabaseConfig(urlString: "abc", anonKey: "anahtar"))
+        XCTAssertNil(SupabaseConfig(urlString: "http://abc.supabase.co", anonKey: "anahtar"), "Yalnizca HTTPS")
         let config = SupabaseConfig(urlString: "https://abc.supabase.co", anonKey: "anahtar")
         XCTAssertEqual(config?.url.host, "abc.supabase.co")
         XCTAssertEqual(config?.anonKey, "anahtar")

@@ -37,11 +37,20 @@ final class KeychainStore: SessionStore {
         return try? JSONDecoder().decode(AuthSession.self, from: data)
     }
 
+    /// nil: kaydi siler. Aksi halde once gunceller; kayit yoksa ekler (silip eklemekten farkli olarak
+    /// arada oturumsuz bir an olusmaz).
     func save(_ s: AuthSession?) {
-        // Once eskiyi sil; sonra (varsa) yenisini ekle. Ekleme/guncelleme ayrimi gerekmez.
-        _ = SecItemDelete(baseQuery() as CFDictionary)
-        guard let session = s else { return }
+        guard let session = s else {
+            _ = SecItemDelete(baseQuery() as CFDictionary)
+            return
+        }
         guard let data = try? JSONEncoder().encode(session) else { return }
+        let changes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+        ]
+        let updateStatus: OSStatus = SecItemUpdate(baseQuery() as CFDictionary, changes as CFDictionary)
+        guard updateStatus == errSecItemNotFound else { return }
         var attributes: [String: Any] = baseQuery()
         attributes[kSecValueData as String] = data
         attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock

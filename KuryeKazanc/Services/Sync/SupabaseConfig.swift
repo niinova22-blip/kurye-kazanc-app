@@ -23,7 +23,8 @@ extension SupabaseConfig {
         let trimmedKey: String = anonKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedURL.isEmpty, !trimmedKey.isEmpty else { return nil }
         guard let parsed = URL(string: trimmedURL) else { return nil }
-        guard let scheme = parsed.scheme?.lowercased(), scheme == "https" || scheme == "http" else { return nil }
+        // Yalnizca HTTPS: oturum anahtarlari duz metin baglantida gitmez.
+        guard parsed.scheme?.lowercased() == "https" else { return nil }
         guard let host = parsed.host, !host.isEmpty else { return nil }
         self.init(url: parsed, anonKey: trimmedKey)
     }
