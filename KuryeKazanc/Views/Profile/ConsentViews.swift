@@ -66,11 +66,11 @@ struct DataSharingConsentView: View {
             title: "Anonim kazanç paylaşımı",
             purpose: "Amaç: kuryelerin bölge ve platform bazında gerçek net kazançlarını görebilmesi.",
             shared: [
-                "Kazanç, bonus, paket sayısı (yalnızca ekran görüntüsüyle doğrulananlar)",
+                "Kazanç, bonus, paket sayısı (yalnızca ekran görüntüsünden okunup değiştirilmeyen kayıtlar)",
                 "Çalışma süresi ve mesafe (yuvarlanmış)",
-                "Platform, il ve ilçe",
+                "Platform, il, ilçe ve araç türü",
                 "Haftanın günü ve 15 dakikalık zaman dilimi",
-                "Konum yoğunluğu: vardiyada bulunduğun ~500 m'lik bölge hücreleri (Profil'den ayrıca kapatılabilir)",
+                "Konum yoğunluğu: vardiyada bulunduğun ~500 m'lik bölge hücreleri (sonraki sürümde; Profil'den ayrıca kapatılabilir)",
             ],
             never: [
                 "Adın ve profil bilgilerin",
@@ -78,7 +78,7 @@ struct DataSharingConsentView: View {
                 "Semt ve tam konumun",
                 "Telefon numarası, e-posta",
             ],
-            note: "Karşılığında bölgendeki kuryelerle karşılaştırmayı görürsün. İstediğin an kapatıp sunucudaki verilerini sildirebilirsin. Bu sürümde veri gönderimi henüz yok; onayın kaydedilir.",
+            note: "Onaydan sonra kaydettiğin uygun vardiyalar gönderilir; geçmiş kayıtlar gönderilmez. Topluluk özellikleri açıldığında bölgendeki kuryelerle karşılaştırmayı görürsün. İstediğin an kapatabilirsin; bekleyen gönderimler silinir. Gönderilmiş vardiyalarını Profil > Verilerimi sil ile sunucudan sildirebilirsin.",
             acceptIdentifier: "consent.accept",
             onAccept: onAccept
         )
@@ -103,7 +103,7 @@ struct LocationSharingConsentView: View {
                 "Vardiyanın ilk ve son 10 dakikası (evinin bulunamaması için)",
                 "Hesabınla bağlantı (her hafta değişen takma kimlik kullanılır)",
             ],
-            note: "Konum verisi hesabına bağlı olmadığı için sonradan tek tek silinemez. Bu sürümde veri gönderimi henüz yok; onayın kaydedilir.",
+            note: "Konum verisi hesabına bağlı olmadığı için sonradan tek tek silinemez. Konum yoğunluğu bu sürümde henüz gönderilmiyor; onayın kaydedilir.",
             acceptIdentifier: "consent.location.accept",
             onAccept: onAccept
         )

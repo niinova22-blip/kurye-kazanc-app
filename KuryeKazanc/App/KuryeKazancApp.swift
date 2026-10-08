@@ -19,6 +19,12 @@ struct KuryeKazancApp: App {
                 .environment(environment.workSession)
                 .environment(environment.scanner)
                 .environment(environment.autoShift)
+                .environment(environment.sync)
+                .environment(environment.account)
+                .task {
+                    // Acilis: sablonlar (12 saatte bir) ve bekleyen gonderimler. Riza yoksa ag yok.
+                    await syncNow()
+                }
                 .onChange(of: scenePhase) { _, phase in
                     // On plana donus: Ayarlar'da verilen izinler ve suren vardiya yeniden degerlendirilir
                     guard phase == .active else { return }
@@ -28,9 +34,18 @@ struct KuryeKazancApp: App {
                         // Arka planda baslayan vardiyanin Canli Etkinligi acilamamis olabilir: simdi istenir
                         autoShift.ensureLiveActivity()
                     }
+                    Task { await syncNow() }
                 }
         }
         .modelContainer(environment.container)
+    }
+
+    /// Once sablonlar, sonra kuyruk. Ust uste cagrilar koordinatorde tek calismaya iner.
+    @MainActor
+    private func syncNow() async {
+        let sync: SyncCoordinator = environment.sync
+        await sync.refreshTemplatesIfNeeded()
+        await sync.flush()
     }
 }
 

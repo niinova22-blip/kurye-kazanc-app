@@ -72,9 +72,19 @@ Gizli bilgiler koda yazılmaz; hepsi Codemagic arayüzünde tutulur:
 
 Bundle ID (`com.kuryekazanc.app`) gizli değildir; `project.yml` ve `codemagic.yaml`'da aynı olmalı ve App Store Connect'te kayıtlı olmalıdır.
 
+## Sunucu (1.3+)
+
+Supabase (eu-central-1): anonim oturum + isteğe bağlı Apple ile Giriş, vardiya gönderimi, kalibrasyon örnekleri,
+OCR şablonları ve yedek. Kurulum, göçler ve test betikleri: [supabase/README.md](supabase/README.md).
+
+Uygulama sunucu adresini ve anon anahtarı Info.plist'teki `SupabaseURL` / `SupabaseAnonKey` değerlerinden okur.
+Bu değerler yoksa (ve UI testlerinde) sunucu kapalıdır: eşitleme ve hesap özellikleri hiç ağ isteği yapmaz.
+
 ## Gizlilik notu
 
 Kazanç/gider kayıtları kişisel bilgi içermez; yalnızca cihazda üretilmiş rastgele bir UUID taşır.
-Ham GPS koordinatı saklanmaz, yalnızca il/ilçe/semt. V1'de hiçbir veri cihaz dışına gönderilmez.
+Ham GPS koordinatı saklanmaz, yalnızca il/ilçe/semt. Cihaz dışına yalnızca kullanıcı açarsa veri çıkar:
+anonim paylaşım açıksa ekran görüntüsünden okunup değiştirilmeyen kayıtların vardiya özeti, kalibrasyon açıksa
+maskelenmiş ekran metni, Apple ile giriş yapıldıysa yedek. Ekran görüntülerinin kendisi asla gönderilmez.
 
 İlerleme kaydı: [PROGRESS.md](PROGRESS.md)

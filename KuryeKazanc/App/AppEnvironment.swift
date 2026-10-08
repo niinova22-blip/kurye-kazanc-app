@@ -13,6 +13,8 @@ final class AppEnvironment {
     let workSession: WorkSessionManager
     let scanner: ScreenshotScanner
     let autoShift: AutoShiftCoordinator
+    let sync: SyncCoordinator
+    let account: AccountService
 
     private init() {
         let launch = LaunchOptions.current
@@ -32,10 +34,20 @@ final class AppEnvironment {
         self.location = location
         let workSession = WorkSessionManager(location: location)
         self.workSession = workSession
+        // Sunucu: Info.plist ayari yoksa ya da UI testindeyse istemci yok; esitleme ve hesap no-op (ag yok).
+        // Profildeki @AppStorage rizalari .standard'a yazdigi icin ikisi de .standard kullanir.
+        var client: SupabaseClient?
+        if !launch.isUITesting, let config = SupabaseConfig.fromBundle {
+            client = SupabaseClient(config: config, store: KeychainStore())
+        }
+        let sync = SyncCoordinator(client: client, queue: OutboxQueue(fileURL: OutboxQueue.defaultFileURL()))
+        self.sync = sync
+        account = AccountService(client: client, syncCoordinator: sync)
+        let templates: @MainActor () -> [OCRTemplate] = { sync.mergedTemplates() }
         if let testDefaults {
-            scanner = ScreenshotScanner(defaults: testDefaults)
+            scanner = ScreenshotScanner(defaults: testDefaults, templates: templates)
         } else {
-            scanner = ScreenshotScanner(library: PhotoKitScreenshotLibrary())
+            scanner = ScreenshotScanner(library: PhotoKitScreenshotLibrary(), templates: templates)
         }
         let todaySummary = AppEnvironment.cachedTodaySummary(in: container.mainContext)
         autoShift = AutoShiftCoordinator(

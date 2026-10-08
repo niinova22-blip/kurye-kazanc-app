@@ -103,6 +103,18 @@ final class SyncCoordinator {
         return try? JSONEncoder().encode(payload)
     }
 
+    /// Kayit silindi: bekleyen vardiyasi gonderilmeden cikarilir (yerel islem, ag yok).
+    /// Kalibrasyon ogeleri kanit id'si tasir; onlara dokunulmaz.
+    func recordDeleted(id: UUID) {
+        guard queue.items.contains(where: { $0.id == id && $0.kind == .shift }) else { return }
+        queue.remove(id: id)
+    }
+
+    /// "Tum kayitlari sil": bekleyen tum vardiyalar gonderilmeden silinir (yerel islem, ag yok).
+    func allRecordsDeleted() {
+        queue.removeAll(kind: .shift)
+    }
+
     // MARK: - Gonderim
 
     /// Zamani gelmis ogeleri sirayla gonderir. Gecici hatada durur (ag yok varsayilir);

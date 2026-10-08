@@ -9,8 +9,11 @@ struct EarningFormView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(LocationService.self) private var location
     @Environment(SyncCoordinator.self) private var sync
+    @Environment(AccountService.self) private var account
 
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
+    /// Arac turu paylasilan vardiya ozetine girer.
+    @Query private var couriers: [Courier]
     /// Kayitli kanitlar: ayni ekran goruntusu ikinci kez eklenirse uyarilir.
     @Query private var evidences: [ScreenshotEvidence]
 
@@ -321,11 +324,14 @@ struct EarningFormView: View {
         }
         let identifier: String? = item.itemIdentifier
         let capturedAt: Date? = PhotoAssetInfo.creationDate(localIdentifier: identifier)
+        // Sunucudan gelen guncel sablonlar da kullanilir (gomulu + uzak)
+        var configured: ScreenshotImporter = importer
+        configured.parser.templates = sync.mergedTemplates()
         await viewModel.importScreenshot(
             data: data,
             assetIdentifier: identifier,
             capturedAt: capturedAt,
-            importer: importer,
+            importer: configured,
             platforms: platforms,
             knownTextHashes: knownHashes
         )
@@ -366,11 +372,26 @@ struct EarningFormView: View {
 
     private func save() {
         do {
-            try viewModel.save(in: modelContext)
+            let record: EarningRecord = try viewModel.save(in: modelContext)
+            afterSave(record)
             onSaved?()
             dismiss()
         } catch {
             saveError = error.localizedDescription
+        }
+    }
+
+    /// Paylasim rizasi varsa uygun kayit kuyruga girer; Apple ile girisliyse 24 saatte bir yedek.
+    /// Riza yoksa ve giris yapilmadiysa ag kullanilmaz (koordinator ve hesap servisi kontrol eder).
+    private func afterSave(_ record: EarningRecord) {
+        let vehicle: String = (couriers.first?.vehicleType ?? .motorcycle).rawValue
+        sync.recordSaved(record, vehicle: vehicle)
+        let coordinator: SyncCoordinator = sync
+        let service: AccountService = account
+        let context: ModelContext = modelContext
+        Task {
+            await service.backupIfDue(context: context)
+            await coordinator.flush()
         }
     }
 }

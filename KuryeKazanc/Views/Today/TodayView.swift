@@ -8,6 +8,7 @@ struct TodayView: View {
     @Environment(WorkSessionManager.self) private var workSession
     @Environment(ScreenshotScanner.self) private var scanner
     @Environment(AutoShiftCoordinator.self) private var autoShift
+    @Environment(SyncCoordinator.self) private var sync
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
 
@@ -541,7 +542,7 @@ struct TodayView: View {
         guard !isProcessingInbox else { return }
         isProcessingInbox = true
         defer { isProcessingInbox = false }
-        let importer = ScreenshotImporter()
+        let importer = ScreenshotImporter(templates: sync.mergedTemplates())
         // Kayitli bir ekranla ayni metin yine forma gelir (form "daha once kaydedilmis" uyarir);
         // yalnizca ayni anda bekleyen kopyalar elenir.
         var batch = ImportBatch(seenHashes: pendingHashes, seenAssets: knownIDs)
@@ -561,7 +562,7 @@ struct TodayView: View {
     private func importPicked(_ items: [PhotosPickerItem]) async {
         isImportingPicked = true
         defer { isImportingPicked = false }
-        let importer = ScreenshotImporter()
+        let importer = ScreenshotImporter(templates: sync.mergedTemplates())
         var batch = ImportBatch(seenHashes: pendingHashes, seenAssets: knownIDs)
         for item in items {
             let identifier: String? = item.itemIdentifier
@@ -657,7 +658,10 @@ struct TodayView: View {
 
     private func delete(_ model: some PersistentModel) {
         if let record = model as? EarningRecord {
+            let id: UUID = record.id
             try? modelContext.deleteEarning(record)
+            // Silinen kaydin bekleyen gonderimi de dusulur
+            sync.recordDeleted(id: id)
             return
         }
         modelContext.delete(model)
@@ -725,4 +729,6 @@ private struct PendingShiftRow: View {
         .environment(environment.workSession)
         .environment(environment.scanner)
         .environment(environment.autoShift)
+        .environment(environment.sync)
+        .environment(environment.account)
 }

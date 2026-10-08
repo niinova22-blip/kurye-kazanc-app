@@ -194,3 +194,29 @@ Tasarım: `docs/superpowers/specs/2026-10-08-surum-1-2-otomatik-vardiya-design.m
 
 ### Sonraki adım
 - 1.3 ile birlikte ilk CI derlemesi (uygulama + eklenti) ve uygulama testleri; gerçek cihazda otomatik vardiya ve Canlı Etkinlik denemesi.
+
+## Oturum 5 — 2026-10-09: Sürüm 1.3.0 (sunucu; derlenmedi)
+
+Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan: `docs/superpowers/plans/2026-10-09-surum-1-3-sunucu.md`
+
+### Yapılanlar
+- **Core (saf):** saf Swift SHA-256 ve ekran metni özeti (`TextHash`), vardiya yükü (`ShiftPayload`: il/ilçe, hafta günü, 15 dk dilim, 0,5 km'ye yuvarlı mesafe; yalnızca `verified`/`ocrUnverified`), `OutboxPolicy` (üstel bekleme 1 dk → 6 sa, günlük sınırda ertesi gün), `CalibrationMasker` (IBAN, telefon, TC kimlik, e-posta), `TemplateMerger` (gömülü + uzak şablon).
+- **Sunucu (`supabase/`):** şema, RLS, `submit_shift` / `submit_calibration` / `delete_my_data` fonksiyonları, günlük hız sınırları, pgTAP testleri; `scripts/server/` betikleri (apply, seed_templates, test, e2e). Kurulum: `supabase/README.md`.
+- **Servisler (`Services/Sync/`):** `SupabaseClient` (elle yazılmış REST; anonim oturum, Apple id_token, Keychain'de oturum, yalnızca HTTPS), `OutboxQueue` (Application Support/outbox.json, dosya korumalı), `SyncCoordinator` (rıza + kayıt → kuyruk, boşaltma, kalibrasyon, 12 saatte bir şablon çekimi; rıza yoksa ağ yok), `BackupService` + `AccountService` (Apple ile Giriş, yedekle/geri yükle, 24 saatte bir otomatik yedek, "Verilerimi sil").
+- **Arayüz:** Profil > "Hesap ve yedek", "Kalibrasyon" (ayrı açık rıza), "Gizlilik ve KVKK"; formda "Kalibrasyona gönder". KVKK aydınlatma ve açık rıza **taslakları** `docs/legal/`.
+- **Bağlantılar (Görev 8):** `AppEnvironment` istemciyi yalnızca Info.plist ayarı varsa kurar (UI testlerinde `nil`); `SyncCoordinator` + `AccountService` sahneye `.environment` ile verilir. Açılışta ve ön plana dönüşte şablon yenileme + kuyruk boşaltma. Kayıt sonrası kuyruğa ekleme + girişliyse yedek. Kayıt silinince bekleyen gönderimi düşer (`recordDeleted`, "Tüm kayıtları sil" → `allRecordsDeleted`). Paylaşım kapatılınca kuyruk temizlenir. Tüm ekran görüntüsü okumaları (form, paylaş gelen kutusu, çoklu seçim, otomatik tarama) birleşik şablonları kullanır. 1.2 öncesi "veri gönderilmez / yalnızca bu cihazda" metinleri 1.3'e göre düzeltildi.
+- Sürüm **1.3.0**; `TESTFLIGHT_NOTES.md` 1.3.0 bölümü (1.2 + 1.3 yenilikleri, cihaz test listesi).
+
+### Testler
+- Core (Windows `swift test`): **98 test, 0 hata**.
+- Uygulama XCTest'leri (`SupabaseClientTests`, `SyncCoordinatorTests`, `BackupServiceTests` vb.) Windows'ta çalıştırılamadı; ilk CI derlemesinde çalışacak.
+
+### Derleme ve TestFlight durumu
+- **1.2 + 1.3 henüz derlenmedi**, push edilmedi, TestFlight'a gönderilmedi.
+- Info.plist'te `SupabaseURL` / `SupabaseAnonKey` yok → sunucu kapalı (Profil'de "Sunucu bu sürümde kapalı").
+
+### Sonraki adım (kullanıcı onaylı sıra)
+1. Supabase projesi (eu-central-1), Auth ayarları; betikler: apply → seed_templates → test → e2e; URL + anon anahtarı Info.plist'e.
+2. Apple Developer: `com.kuryekazanc.app`'te Sign in with Apple (profil yeniden üretilir → Codemagic referansı); Canlı Etkinlik App ID + profil — kullanıcıya sorarak.
+3. develop push → Codemagic `ios-ci`; derleme/test hatalarını düzelt.
+4. TestFlight'tan önce kullanıcıya sor.

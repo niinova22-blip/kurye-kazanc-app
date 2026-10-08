@@ -71,14 +71,18 @@ final class ScreenshotScanner {
 
     @ObservationIgnored private let library: ScreenshotLibrary
     @ObservationIgnored private let importer: ScreenshotImporter
+    /// Guncel sablonlar (gomulu + sunucu); her taramada okunur. nil ise importer'inkiler.
+    @ObservationIgnored private let templates: (@MainActor () -> [OCRTemplate])?
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var isScanning = false
 
     init(library: ScreenshotLibrary = PhotoKitScreenshotLibrary(),
          importer: ScreenshotImporter = ScreenshotImporter(),
-         defaults: UserDefaults = .standard) {
+         defaults: UserDefaults = .standard,
+         templates: (@MainActor () -> [OCRTemplate])? = nil) {
         self.library = library
         self.importer = importer
+        self.templates = templates
         self.defaults = defaults
         self.isEnabled = defaults.bool(forKey: AppPreferences.screenshotScanEnabledKey)
     }
@@ -127,6 +131,10 @@ final class ScreenshotScanner {
         let dismissed = Set<String>(dismissedList)
         let since = now.addingTimeInterval(-48 * 3600)
         let items: [LibraryScreenshot] = await library.recentScreenshots(since: since, limit: 5)
+        var importer: ScreenshotImporter = self.importer
+        if let templates {
+            importer.parser.templates = templates()
+        }
         for item in items {
             let identifier = item.identifier
             if knownIdentifiers.contains(identifier) || dismissed.contains(identifier)

@@ -259,6 +259,37 @@ final class SyncCoordinatorTests: XCTestCase {
         XCTAssertTrue(queue.items.isEmpty)
     }
 
+    func testRecordDeleted_removesOnlyItsShift() async {
+        setConsents(sharing: true, calibration: false)
+        let sync = makeCoordinator(client: fake)
+        let deleted = makeRecord(level: .ocrUnverified)
+        let kept = makeRecord(level: .verified)
+        sync.recordSaved(deleted, vehicle: "motorcycle")
+        sync.recordSaved(kept, vehicle: "motorcycle")
+        let calibrationID = UUID()
+        queue.enqueue(OutboxItem(id: calibrationID, kind: .calibration, payload: Data("c".utf8), failures: 0, notBefore: now))
+
+        sync.recordDeleted(id: deleted.id)
+        sync.recordDeleted(id: calibrationID) // vardiya degil: dokunulmaz
+
+        XCTAssertEqual(queue.items.map(\.id), [kept.id, calibrationID])
+        await sync.flush()
+        XCTAssertEqual(fake.submittedShifts.map(\.clientRecordID), [kept.id.uuidString.lowercased()])
+    }
+
+    func testAllRecordsDeleted_dropsPendingShiftsOnly() {
+        setConsents(sharing: true, calibration: true)
+        let sync = makeCoordinator(client: fake)
+        sync.recordSaved(makeRecord(level: .ocrUnverified), vehicle: "motorcycle")
+        let calibrationID = UUID()
+        queue.enqueue(OutboxItem(id: calibrationID, kind: .calibration, payload: Data("c".utf8), failures: 0, notBefore: now))
+
+        sync.allRecordsDeleted()
+
+        XCTAssertEqual(queue.items.map(\.id), [calibrationID])
+        XCTAssertEqual(fake.callCount, 0)
+    }
+
     // MARK: - Sonuclar (Review Focus 3)
 
     func testDuplicate_removedAndRemembered() async {

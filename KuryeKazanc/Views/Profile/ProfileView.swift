@@ -8,6 +8,7 @@ struct ProfileView: View {
     @Environment(\.openURL) private var openURL
     @Environment(LocationService.self) private var location
     @Environment(ScreenshotScanner.self) private var scanner
+    @Environment(SyncCoordinator.self) private var sync
 
     @Query private var couriers: [Courier]
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
@@ -247,10 +248,12 @@ struct ProfileView: View {
                     if newValue {
                         showConsentSheet = true // Acik onay olmadan acilmaz
                     } else {
+                        // Riza anahtari ONCE yazilir; koordinator bekleyen vardiyalari buna gore siler
                         dataSharingOptIn = false
                         consentTimestamp = 0
                         locationSharingOptIn = false
                         locationConsentTimestamp = 0
+                        sync.sharingConsentChanged(enabled: false)
                     }
                 }
             ))
@@ -272,7 +275,7 @@ struct ProfileView: View {
         } header: {
             Text("Paylaşım")
         } footer: {
-            Text("Kazanç paylaşımını açınca konum yoğunluğu da açılır; istersen ayrıca kapatabilirsin. Bu sürümde hiçbir veri gönderilmez; tercihlerin kaydedilir. Topluluk özellikleri açıldığında yalnızca ekran görüntüsüyle doğrulanmış kazançlar paylaşılır.")
+            Text("Açıkken, ekran görüntüsünden okunup değiştirilmeyen kazançlarının anonim vardiya özeti gönderilir; görselin kendisi, elle girilen ve düzeltilen kayıtlar gönderilmez. Kapatınca bekleyen gönderimler silinir. Konum yoğunluğu bu sürümde henüz gönderilmiyor; açarsan tercihin kaydedilir.")
         }
     }
 
@@ -283,7 +286,7 @@ struct ProfileView: View {
             Button("Tüm kayıtları sil", role: .destructive) { showDeleteConfirmation = true }
                 .accessibilityIdentifier("settings.deleteAll")
         } footer: {
-            Text("Tüm veriler yalnızca bu cihazda saklanır.")
+            Text("Kayıtların telefonunda saklanır; Apple ile giriş yaparsan sunucuya da yedeklenir. Bu düğme yalnızca telefondaki kayıtları siler; sunucudaki veriler için Hesap ve yedek > “Verilerimi sil”i kullan.")
         }
     }
 
@@ -312,6 +315,8 @@ struct ProfileView: View {
 
     private func deleteAllRecords() {
         try? modelContext.deleteAllRecords()
+        // Silinen kayitlarin bekleyen gonderimleri de dusulur (sunucudakiler icin "Verilerimi sil")
+        sync.allRecordsDeleted()
     }
 }
 

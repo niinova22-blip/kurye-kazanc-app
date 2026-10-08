@@ -66,6 +66,7 @@ struct AnalysisView: View {
 /// Secilen aralik icin @Query'leri tasiyan alt gorunum (aralik degisince yeniden olusturulur).
 private struct AnalysisContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(SyncCoordinator.self) private var sync
     @Query private var earnings: [EarningRecord]
     @Query private var expenses: [ExpenseRecord]
     @Query private var previousEarnings: [EarningRecord]
@@ -267,7 +268,10 @@ private struct AnalysisContentView: View {
     private func deleteEarnings(at offsets: IndexSet) {
         let records: [EarningRecord] = offsets.map { earnings[$0] }
         for record in records {
+            let id: UUID = record.id
             try? modelContext.deleteEarning(record)
+            // Silinen kaydin bekleyen gonderimi de dusulur
+            sync.recordDeleted(id: id)
         }
     }
 

@@ -209,7 +209,7 @@ struct OnboardingView: View {
                 .accessibilityHidden(true)
             Text("Bölgendeki kuryelerle karşılaştır")
                 .font(.title.bold())
-            Text("Anonim paylaşıma katılırsan, topluluk özellikleri açıldığında ilçendeki saat başı ortalama net kazancı ve en yoğun saatleri görürsün. Yalnızca ekran görüntüsüyle doğrulanmış kazançlar kullanılır; adın ve tam konumun asla paylaşılmaz.")
+            Text("Anonim paylaşıma katılırsan, topluluk özellikleri açıldığında ilçendeki saat başı ortalama net kazancı ve en yoğun saatleri görürsün. Yalnızca ekran görüntüsünden okunan kazançların anonim özeti gönderilir; adın, ekran görüntülerin ve tam konumun asla paylaşılmaz.")
                 .foregroundStyle(.secondary)
             if dataSharingOptIn {
                 Label("Katıldın — Profil'den istediğin an kapatabilirsin.", systemImage: "checkmark.circle.fill")
