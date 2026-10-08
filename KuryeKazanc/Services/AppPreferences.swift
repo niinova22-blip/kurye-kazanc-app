@@ -40,6 +40,8 @@ enum AppPreferences {
     static let templatesFetchedAtKey = "templatesFetchedAt"
     /// Sunucuya ulasmis (ok/duplicate) kayit id'leri; tekrar kuyruga girmez.
     static let sentRecordIDsKey = "sentRecordIDs"
+    /// Son basarili yedekleme (Unix zaman damgasi). Cikista silinir.
+    static let lastBackupDateKey = "lastBackupDate"
 
     static let defaultCostPerKm = VehicleType.motorcycle.defaultCostPerKm
 }
