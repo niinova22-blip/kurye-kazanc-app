@@ -32,6 +32,14 @@ enum AppPreferences {
     static let pendingShiftsKey = "autoShiftPending"
     /// Son anlamli hareketin zamani (otomatik vardiyanin bitisi icin).
     static let lastMovementKey = "lastMovementDate"
+    /// Kalibrasyon ornegi gonderimi (paylasimdan AYRI acik riza). Varsayilan KAPALI.
+    static let calibrationOptInKey = "calibrationOptIn"
+    /// Son basarili sunucu gonderimi (Unix zaman damgasi).
+    static let lastSyncDateKey = "lastSyncDate"
+    /// Uzak sablonlarin son cekildigi an (Unix zaman damgasi).
+    static let templatesFetchedAtKey = "templatesFetchedAt"
+    /// Sunucuya ulasmis (ok/duplicate) kayit id'leri; tekrar kuyruga girmez.
+    static let sentRecordIDsKey = "sentRecordIDs"
 
     static let defaultCostPerKm = VehicleType.motorcycle.defaultCostPerKm
 }

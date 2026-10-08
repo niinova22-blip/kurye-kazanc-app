@@ -23,6 +23,25 @@ struct ScreenshotImporter {
     /// Test icin: PhotoKit sorgusu yerine sabit deger.
     var assetIsScreenshot: (String) -> Bool? = ScreenshotImporter.photoKitIsScreenshot
 
+    /// - Parameter templates: Sunucuyla birlestirilmis sablonlar (`SyncCoordinator.mergedTemplates()`).
+    ///   nil ise ayristiricinin kendi sablonlari (gomulu) kullanilir.
+    init(
+        recognizer: TextRecognizing = VisionTextRecognitionService(),
+        parser: EarningsScreenshotParser = EarningsScreenshotParser(),
+        verifier: ScreenshotVerifier = ScreenshotVerifier(calendar: .current),
+        assetIsScreenshot: @escaping (String) -> Bool? = ScreenshotImporter.photoKitIsScreenshot,
+        templates: [OCRTemplate]? = nil
+    ) {
+        self.recognizer = recognizer
+        var configured: EarningsScreenshotParser = parser
+        if let templates {
+            configured.templates = templates
+        }
+        self.parser = configured
+        self.verifier = verifier
+        self.assetIsScreenshot = assetIsScreenshot
+    }
+
     /// - Parameters:
     ///   - capturedAt: Gorselin cekildigi an (PhotoKit); EXIF yoksa kullanilir.
     ///   - referenceDate: Simdi. Tarih yakinligi kontrolu buna gore yapilir.
