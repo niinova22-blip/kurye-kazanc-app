@@ -8,7 +8,7 @@ Her rıza **ayrı** alınır, varsayılan olarak **kapalıdır** ve Profil ekran
 
 ## 1. Anonim kazanç paylaşımı
 
-Kurye Kazanç Aydınlatma Metni'ni okudum. Ekran görüntüsünden okunup değiştirilmeyen vardiyalarıma ait şu verilerin — platform, il ve ilçe, araç türü, haftanın günü ve 15 dakikalık başlangıç dilimi, süre, brüt kazanç, bonus, paket sayısı, yuvarlanmış mesafe, doğrulama seviyesi, ekran şablonu ve ekran metninin özeti — anonim bir oturum kimliğiyle, kuryelerin bölge ve platform bazında net kazançlarını karşılaştırabilmesi amacıyla işlenmesine **açık rıza veriyorum**.
+Kurye Kazanç Aydınlatma Metni'ni okudum. Ekran görüntüsünden okunup değiştirilmeyen vardiyalarıma ait şu verilerin — platform, il ve ilçe, araç türü, haftanın günü ve 15 dakikalık başlangıç dilimi, süre, brüt kazanç, bonus, paket sayısı, yuvarlanmış mesafe, doğrulama seviyesi, ekran şablonu ve ekran metninin özeti — anonim bir oturum kimliğiyle (Apple ile giriş yaptıysam Apple hesabıma bağlı hesap kimliğiyle), kuryelerin bölge ve platform bazında net kazançlarını karşılaştırabilmesi amacıyla işlenmesine **açık rıza veriyorum**.
 
 Adımın, ekran görüntülerimin, semt ve tam konumumun, telefon numaramın ve e-posta adresimin gönderilmediğini biliyorum.
 
@@ -29,5 +29,5 @@ Yukarıdaki rızalardan herhangi birini verdiğimde, ilgili verilerimin hizmet s
 ## 5. Rızanın geri alınması ve silme
 
 - Rızamı Profil ekranındaki ilgili anahtarı kapatarak geri alabilirim; bekleyen (henüz gönderilmemiş) veriler gönderilmeden silinir.
-- Profil > Hesap ve yedek > **"Verilerimi sil"** ile sunucudaki gönderilmiş vardiyalarım, kalibrasyon örneklerim ve yedeğim silinir, paylaşım kapanır. Telefondaki kayıtlarım silinmez.
+- Profil > Hesap ve yedek > **"Verilerimi sil"** ile bu cihazdan kullandığım tüm kimliklerle (anonim kimlik ve Apple hesabıma bağlı kimlik) gönderilmiş vardiyalarım, kalibrasyon örneklerim ve yedeğim sunucudan silinir, paylaşım kapanır. Telefondaki kayıtlarım silinmez.
 - Diğer talepler için başvuru: [Başvuru e-postası]

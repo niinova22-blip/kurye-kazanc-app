@@ -10,7 +10,9 @@ struct CalibrationSection: View {
     var body: some View {
         Section {
             // Liste icinde Section'a eklenen degistiriciler her satira uygulanabilir: sheet anahtar satirinda durur.
+            // Sunucu yoksa acilamaz; acik kaldiysa kapatilabilsin.
             Toggle("Kalibrasyona katıl", isOn: enabledBinding)
+                .disabled(!sync.isServerAvailable && !calibrationOptIn)
                 .accessibilityIdentifier("profile.calibration")
                 .sheet(isPresented: $showConsentSheet) {
                     CalibrationConsentView {
@@ -20,7 +22,9 @@ struct CalibrationSection: View {
         } header: {
             Text("Kalibrasyon")
         } footer: {
-            Text("Platform ekranlarını tanımamıza yardım eder.")
+            Text(sync.isServerAvailable
+                 ? "Platform ekranlarını tanımamıza yardım eder."
+                 : "Sunucu bu sürümde kapalı; kalibrasyon kullanılamıyor.")
         }
     }
 

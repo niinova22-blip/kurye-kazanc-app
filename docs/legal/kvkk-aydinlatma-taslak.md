@@ -30,7 +30,7 @@ Yalnızca ekran görüntüsünden okunup değiştirilmeyen kayıtlar (doğrulama
 
 | Veri | Açıklama |
 |---|---|
-| Kullanıcı kimliği | Cihazda rastgele oluşturulan anonim oturum kimliği (ad, telefon, e-posta ile bağlantısı yoktur) |
+| Kullanıcı kimliği | Cihazda rastgele oluşturulan anonim oturum kimliği; kurye Apple ile giriş yaptıktan sonra Apple hesabına bağlı hesap kimliği (ad, telefon, e-posta ile bağlantısı yoktur) |
 | Kayıt kimliği | Kaydın rastgele kimliği (aynı kaydın tekrar gönderilmemesi için) |
 | Platform | Ör. Trendyol GO, Getir, Yemeksepeti, Migros |
 | İl, ilçe | Semt / mahalle ve tam konum gönderilmez |
@@ -104,6 +104,6 @@ haklarına sahiptir.
 
 ## 9. Başvuru yolu ve "Verilerimi sil"
 
-- **Uygulama içinden:** Profil > Hesap ve yedek > **"Verilerimi sil"**. Sunucudaki gönderilmiş vardiyalar, kalibrasyon örnekleri ve yedek silinir; tüm paylaşım rızaları kapatılır. Telefondaki kayıtlar silinmez (bunun için Profil > "Tüm kayıtları sil").
+- **Uygulama içinden:** Profil > Hesap ve yedek > **"Verilerimi sil"**. Bu cihazdan kullanılan tüm kimliklerle (anonim kimlik ve Apple hesabına bağlı kimlik) gönderilmiş vardiyalar, kalibrasyon örnekleri ve yedek sunucudan silinir; tüm paylaşım rızaları kapatılır. Bu amaçla cihazda daha önce kullanılan kimliklerin oturum anahtarları, yalnızca bu cihazda ve silme tamamlanana kadar saklanır. Telefondaki kayıtlar silinmez (bunun için Profil > "Tüm kayıtları sil").
 - **Yazılı başvuru:** [Adres] adresine veya [Başvuru e-postası] adresine, Veri Sorumlusuna Başvuru Usul ve Esasları Hakkında Tebliğ'e uygun olarak. Başvurular en geç 30 gün içinde ücretsiz sonuçlandırılır.
 - Anonim kimlikle gönderilen veriler kişiyle eşleştirilemediğinden, uygulama dışı başvurularda kimliğin doğrulanabilmesi için uygulamanın "Verilerimi sil" seçeneğinin kullanılması önerilir.

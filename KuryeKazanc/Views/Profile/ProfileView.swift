@@ -49,10 +49,10 @@ struct ProfileView: View {
             }
             .dismissesKeyboard()
             .navigationTitle("Profil")
-            .onAppear {
-                costText = TurkishNumberParser.format(costPerKm)
-                weeklyGoalText = weeklyGoal > 0 ? TurkishNumberParser.format(weeklyGoal) : ""
-                dailyGoalText = dailyGoal > 0 ? TurkishNumberParser.format(dailyGoal) : ""
+            .onAppear(perform: loadFieldTexts)
+            // Geri yukleme ayarlari degistirir (taban tarihi de degisir): alanlar yeniden okunur.
+            .onChange(of: account.lastBackupDate) { _, _ in
+                loadFieldTexts()
             }
             .sheet(isPresented: $showConsentSheet) {
                 DataSharingConsentView {
@@ -273,11 +273,21 @@ struct ProfileView: View {
             ))
             .disabled(!dataSharingOptIn)
             .accessibilityIdentifier("profile.locationSharing")
+
+            if dataSharingOptIn {
+                LabeledContent("Son gönderim", value: lastSyncText)
+                    .accessibilityIdentifier("profile.lastSync")
+            }
         } header: {
             Text("Paylaşım")
         } footer: {
             Text("Açıkken, ekran görüntüsünden okunup değiştirilmeyen kazançlarının anonim vardiya özeti gönderilir; görselin kendisi, elle girilen ve düzeltilen kayıtlar gönderilmez. Kapatınca bekleyen gönderimler silinir. Konum yoğunluğu bu sürümde henüz gönderilmiyor; açarsan tercihin kaydedilir.")
         }
+    }
+
+    private var lastSyncText: String {
+        guard let date = sync.lastSyncDate else { return "Henüz yok" }
+        return date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Formatters.locale))
     }
 
     // MARK: - Veri
@@ -312,6 +322,12 @@ struct ProfileView: View {
         if let url = URL(string: UIApplication.openSettingsURLString) {
             openURL(url)
         }
+    }
+
+    private func loadFieldTexts() {
+        costText = TurkishNumberParser.format(costPerKm)
+        weeklyGoalText = weeklyGoal > 0 ? TurkishNumberParser.format(weeklyGoal) : ""
+        dailyGoalText = dailyGoal > 0 ? TurkishNumberParser.format(dailyGoal) : ""
     }
 
     private func deleteAllRecords() {

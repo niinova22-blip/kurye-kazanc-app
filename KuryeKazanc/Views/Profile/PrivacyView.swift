@@ -43,7 +43,7 @@ struct PrivacyView: View {
         ),
         PrivacySection(
             title: "Açık rızanla işlenenler",
-            body: "Kazanç paylaşımı (açarsan): platform, il ve ilçe, araç türü, haftanın günü, 15 dakikalık başlangıç dilimi, süre, brüt kazanç, bonus, paket sayısı, yuvarlanmış mesafe, doğrulama seviyesi, şablon bilgisi, ekran metninin özeti (aynı kaydın iki kez sayılmaması için) ve kaydın rastgele kimliği. Yalnızca ekran görüntüsünden okunup değiştirilmeyen kayıtlar gönderilir; elle girilen veya okunan değeri düzeltilen kayıtlar gönderilmez.\n\nKalibrasyon (açarsan, yalnızca “Kalibrasyona gönder”e dokunduğunda): maskelenmiş OCR satırları, ekrandaki konumları, platform ve şablon adı. IBAN, telefon, TC kimlik numarası ve e-posta gönderilmeden önce maskelenir; ekranda yazan ad veya kurye numarası maskelenmez.\n\nHesap ve yedek (Apple ile giriş yaparsan): Apple'ın bu uygulamaya özel verdiği kullanıcı kimliği; kayıtların ve ayarların yedeği. Ad ve e-posta istenmez.\n\nGönderimler, cihazında rastgele oluşturulan bir kullanıcı kimliğiyle yapılır; adın, telefon numaran veya e-postan bu kimliğe bağlanmaz. Konum yoğunluğu bu sürümde gönderilmez."
+            body: "Kazanç paylaşımı (açarsan): platform, il ve ilçe, araç türü, haftanın günü, 15 dakikalık başlangıç dilimi, süre, brüt kazanç, bonus, paket sayısı, yuvarlanmış mesafe, doğrulama seviyesi, şablon bilgisi, ekran metninin özeti (aynı kaydın iki kez sayılmaması için) ve kaydın rastgele kimliği. Yalnızca ekran görüntüsünden okunup değiştirilmeyen kayıtlar gönderilir; elle girilen veya okunan değeri düzeltilen kayıtlar gönderilmez.\n\nKalibrasyon (açarsan, yalnızca “Kalibrasyona gönder”e dokunduğunda): maskelenmiş OCR satırları, ekrandaki konumları, platform ve şablon adı. IBAN, telefon, TC kimlik numarası ve e-posta gönderilmeden önce maskelenir; ekranda yazan ad veya kurye numarası maskelenmez.\n\nHesap ve yedek (Apple ile giriş yaparsan): Apple'ın bu uygulamaya özel verdiği kullanıcı kimliği; kayıtların ve ayarların yedeği. Ad ve e-posta istenmez.\n\nGönderimler, cihazında rastgele oluşturulan anonim bir kullanıcı kimliğiyle yapılır; Apple ile giriş yaptıktan sonra ise Apple hesabına bağlı hesap kimliğiyle. Adın, telefon numaran veya e-postan bu kimliklere bağlanmaz. Konum yoğunluğu bu sürümde gönderilmez."
         ),
         PrivacySection(
             title: "Amaç",
@@ -67,7 +67,7 @@ struct PrivacyView: View {
         ),
         PrivacySection(
             title: "Başvuru ve silme",
-            body: "Profil > Hesap ve yedek > “Verilerimi sil” sunucudaki gönderilmiş vardiyalarını, kalibrasyon örneklerini ve yedeğini siler, paylaşımları kapatır. Telefondaki kayıtların silinmez. Diğer talepler için: [Başvuru adresi]."
+            body: "Profil > Hesap ve yedek > “Verilerimi sil”, bu cihazdan kullandığın tüm kimliklerle (anonim kimlik ve Apple hesabına bağlı kimlik) gönderilmiş vardiyalarını, kalibrasyon örneklerini ve yedeğini sunucudan siler, paylaşımları kapatır. Telefondaki kayıtların silinmez. Diğer talepler için: [Başvuru adresi]."
         ),
     ]
 }

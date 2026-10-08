@@ -12,16 +12,15 @@ struct AccountSection: View {
     /// Apple istegine `hashed` gider; tamamlaninca `raw` Supabase'e gonderilir.
     @State private var rawNonce: String?
     @State private var showRestoreConfirmation = false
+    @State private var showFirstBackupConfirmation = false
     @State private var showDeleteConfirmation = false
     @State private var alertTitle: String = ""
     @State private var alertMessage: String?
 
-    /// Sunucu ayari yoksa hesap ozellikleri kapali.
-    private let isServerConfigured: Bool = SupabaseConfig.fromBundle != nil
-
     var body: some View {
         Section {
-            if isServerConfigured {
+            // Sunucu istemcisi yoksa hesap ozellikleri kapali.
+            if account.isServerAvailable {
                 if account.isSignedInWithApple {
                     signedInRows
                 } else {
@@ -36,8 +35,14 @@ struct AccountSection: View {
         } header: {
             Text("Hesap ve yedek")
         } footer: {
-            Text("Apple ile giriş yaparsan kayıtların ve ayarların sunucuya yedeklenir; yeni telefonda geri yükleyebilirsin. Otomatik yedek, ilk “Şimdi yedekle”den veya geri yüklemeden sonra başlar. Giriş yapmazsan uygulama aynen çalışır.")
+            if account.isServerAvailable {
+                footerText
+            }
         }
+    }
+
+    private var footerText: some View {
+        Text("Apple ile giriş yaparsan kayıtların ve ayarların sunucuya yedeklenir; yeni telefonda geri yükleyebilirsin. Otomatik yedek, ilk “Şimdi yedekle”den veya geri yüklemeden sonra başlar. Giriş yapmazsan uygulama aynen çalışır.")
     }
 
     // MARK: - Satirlar
@@ -59,9 +64,18 @@ struct AccountSection: View {
 
     @ViewBuilder
     private var signedInRows: some View {
-        Button("Şimdi yedekle", action: backupNow)
+        Button("Şimdi yedekle", action: backupTapped)
             .disabled(account.isBusy)
             .accessibilityIdentifier("profile.backupNow")
+            .confirmationDialog(
+                "Sunucuda bu hesaba ait bir yedek varsa bu cihazdakiyle değiştirilecek. Önce geri yüklemek ister misin?",
+                isPresented: $showFirstBackupConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Önce geri yükle", action: restore)
+                Button("Yine de yedekle", role: .destructive, action: backupNow)
+                Button("Vazgeç", role: .cancel) {}
+            }
 
         Button("Yedekten geri yükle") { showRestoreConfirmation = true }
             .disabled(account.isBusy)
@@ -97,7 +111,7 @@ struct AccountSection: View {
             .disabled(account.isBusy)
             .accessibilityIdentifier("profile.deleteMyData")
             .confirmationDialog(
-                "Sunucudaki gönderilmiş vardiyaların, kalibrasyon örneklerin ve yedeğin silinir; paylaşım kapanır. Telefondaki kayıtların silinmez.",
+                "Bu cihazdan gönderdiğin tüm veriler sunucudan silinir: anonim kimlikle ve Apple hesabınla gönderilmiş vardiyaların, kalibrasyon örneklerin ve yedeğin. Paylaşım kapanır. Telefondaki kayıtların silinmez.",
                 isPresented: $showDeleteConfirmation,
                 titleVisibility: .visible
             ) {
@@ -120,20 +134,42 @@ struct AccountSection: View {
 
     // MARK: - Eylemler
 
-    /// Iptal ya da basarisiz giris sessizdir (spec 5): anonim oturum surer.
+    /// Kullanici iptal ederse sessiz; diger hatalar gosterilir. Her durumda anonim oturum surer.
     private func handleSignIn(_ result: Result<ASAuthorization, Error>) {
-        guard case .success(let authorization) = result,
-              let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-              let tokenData = credential.identityToken,
-              let idToken = String(data: tokenData, encoding: .utf8),
-              let nonce = rawNonce else {
-            rawNonce = nil
+        let pendingNonce: String? = rawNonce
+        rawNonce = nil
+        let authorization: ASAuthorization
+        switch result {
+        case .success(let value):
+            authorization = value
+        case .failure(let error):
+            if let authError = error as? ASAuthorizationError, authError.code == .canceled { return }
+            showError(error)
             return
         }
-        rawNonce = nil
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = credential.identityToken,
+              let idToken = String(data: tokenData, encoding: .utf8),
+              let nonce = pendingNonce else {
+            showFailure("Apple ile giriş tamamlanamadı, tekrar dene.")
+            return
+        }
         let service: AccountService = account
         Task {
-            try? await service.completeAppleSignIn(idToken: idToken, rawNonce: nonce)
+            do {
+                try await service.completeAppleSignIn(idToken: idToken, rawNonce: nonce)
+            } catch {
+                showError(error)
+            }
+        }
+    }
+
+    /// Yedek tabani yoksa (yeni telefon / ilk yedek) once sunucudaki yedegi ezme uyarisi.
+    private func backupTapped() {
+        if account.hasBaseline {
+            backupNow()
+        } else {
+            showFirstBackupConfirmation = true
         }
     }
 
@@ -182,7 +218,11 @@ struct AccountSection: View {
     }
 
     private func showError(_ error: Error) {
+        showFailure(error.localizedDescription)
+    }
+
+    private func showFailure(_ message: String) {
         alertTitle = "İşlem tamamlanamadı"
-        alertMessage = error.localizedDescription
+        alertMessage = message
     }
 }
