@@ -146,6 +146,7 @@ final class StubProtocol: URLProtocol {
 final class MemorySessionStore: SessionStore {
     var stored: AuthSession?
     var saveCount: Int = 0
+    var retired: [AuthSession] = []
 
     init(_ initial: AuthSession? = nil) {
         stored = initial
@@ -156,6 +157,12 @@ final class MemorySessionStore: SessionStore {
     func save(_ s: AuthSession?) {
         stored = s
         saveCount += 1
+    }
+
+    func loadRetired() -> [AuthSession] { retired }
+
+    func saveRetired(_ list: [AuthSession]) {
+        retired = list
     }
 }
 
@@ -497,6 +504,108 @@ final class SupabaseClientTests: XCTestCase {
         let appleRequest = StubProtocol.requests.first { $0.query == "grant_type=id_token" }
         XCTAssertNotNil(appleRequest)
         XCTAssertTrue(appleRequest?.body.contains(#""provider":"apple""#) ?? false)
+    }
+
+    // MARK: - Emekli kimlikler
+
+    private static let deletePath = "/rest/v1/rpc/delete_my_data"
+    private static let appleJSON =
+        #"{"access_token":"acc-apple","refresh_token":"ref-apple","expires_in":3600,"user":{"id":"user-apple","is_anonymous":false}}"#
+
+    private func anonymousSession() -> AuthSession {
+        AuthSession(
+            accessToken: "acc-anon-old", refreshToken: "ref-anon-old",
+            expiresAt: SupabaseClientTests.now.addingTimeInterval(3600),
+            userID: "user-anon", isAnonymous: true
+        )
+    }
+
+    // Apple girisi anonim kimligi emekliye ayirir (gonderilmis vardiyalar o kimlikte kalir).
+    @MainActor
+    func testAppleSignInRetiresAnonymousIdentity() async throws {
+        StubProtocol.reset([
+            "\(SupabaseClientTests.tokenPath)?grant_type=id_token": [.init(status: 200, body: SupabaseClientTests.appleJSON)],
+        ])
+        let anonymous: AuthSession = anonymousSession()
+        let store = MemorySessionStore(anonymous)
+        let client = makeClient(store: store)
+
+        let apple: AuthSession = try await client.signInWithApple(idToken: "id-token", nonce: "nonce")
+
+        XCTAssertEqual(store.stored, apple)
+        XCTAssertEqual(store.retired, [anonymous])
+
+        // Cikis da kimligi emekliye ayirir
+        client.signOut()
+        XCTAssertEqual(store.retired.map(\.userID), ["user-anon", "user-apple"])
+    }
+
+    // Verilerimi sil: once gecerli oturum, sonra emekli kimlik (yenilenip kendi anahtariyla); liste bosalir.
+    @MainActor
+    func testDeleteMyDataDeletesCurrentAndRetiredIdentities() async throws {
+        StubProtocol.reset([
+            SupabaseClientTests.deletePath: [.init(status: 204, body: "")],
+            "\(SupabaseClientTests.tokenPath)?grant_type=refresh_token": [
+                .init(status: 200, body: SupabaseClientTests.anonSessionJSON),
+            ],
+        ])
+        let store = MemorySessionStore(session(expiresIn: 3600))
+        store.retired = [anonymousSession()]
+        let client = makeClient(store: store)
+
+        try await client.deleteMyData()
+
+        let requests = StubProtocol.requests
+        XCTAssertEqual(
+            requests.map { $0.path },
+            [SupabaseClientTests.deletePath, SupabaseClientTests.tokenPath, SupabaseClientTests.deletePath]
+        )
+        XCTAssertEqual(requests[0].headers["authorization"], "Bearer acc-old")
+        XCTAssertTrue(requests[1].body.contains(#""refresh_token":"ref-anon-old""#))
+        XCTAssertEqual(requests[2].headers["authorization"], "Bearer acc-anon")
+        XCTAssertTrue(store.retired.isEmpty)
+        XCTAssertNil(store.stored, "Silinen kimlik emekliye ayrilmadan birakilir")
+        XCTAssertNil(client.session)
+
+        // Sonraki cikis bos listeye bir sey eklemez
+        client.signOut()
+        XCTAssertTrue(store.retired.isEmpty)
+    }
+
+    // Emekli kimlikte gecici hata: hata firlatilir, kimlik listede kalir.
+    @MainActor
+    func testDeleteMyDataTransientRetiredFailureThrowsAndKeepsIdentity() async {
+        StubProtocol.reset([
+            SupabaseClientTests.tokenPath: [.init(status: 503, body: "{}")],
+        ])
+        let store = MemorySessionStore()
+        let retired: AuthSession = anonymousSession()
+        store.retired = [retired]
+        let client = makeClient(store: store)
+
+        do {
+            try await client.deleteMyData()
+            XCTFail("Gecici hata iletilmeli")
+        } catch {
+            XCTAssertEqual(error as? SupabaseError, .http(503))
+        }
+        XCTAssertEqual(store.retired, [retired])
+        XCTAssertFalse(StubProtocol.requests.contains { $0.path == SupabaseClientTests.deletePath })
+    }
+
+    // Emekli kimligin anahtari reddedilirse (olu) listeden cikar, hata yok.
+    @MainActor
+    func testDeleteMyDataDropsRetiredIdentityWithRejectedRefresh() async throws {
+        StubProtocol.reset([
+            SupabaseClientTests.tokenPath: [.init(status: 400, body: #"{"error":"invalid_grant"}"#)],
+        ])
+        let store = MemorySessionStore()
+        store.retired = [anonymousSession()]
+        let client = makeClient(store: store)
+
+        try await client.deleteMyData()
+
+        XCTAssertTrue(store.retired.isEmpty)
     }
 
     // (f) fromBundle bos degerde nil; ayni kural yardimci init ile sinanir.

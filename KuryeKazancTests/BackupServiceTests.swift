@@ -493,7 +493,7 @@ final class BackupServiceTests: XCTestCase {
             try await account.backupNow(context: context)
             XCTFail("Silme bitmeden yedek alinmamali")
         } catch {
-            XCTAssertEqual(error as? AccountError, .busy)
+            XCTAssertEqual(error as? AccountError, .deletePending)
         }
         XCTAssertEqual(fake.uploadCount, 0)
 

@@ -24,6 +24,9 @@ final class SyncCoordinator {
 
     @ObservationIgnored private var isFlushing: Bool = false
     @ObservationIgnored private var isRefreshingTemplates: Bool = false
+    /// Suren gonderim (flush / sendCalibration) sayisi; `waitUntilIdle` bunlarin bitmesini bekler.
+    @ObservationIgnored private var activeSends: Int = 0
+    @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
 
     /// - Parameter templatesFileURL: Testler icin; nil ise Application Support/remote_templates.json.
     init(
@@ -44,6 +47,9 @@ final class SyncCoordinator {
         self.remoteTemplates = SyncCoordinator.loadTemplates(from: fileURL)
         self.lastSyncDate = SyncCoordinator.date(forKey: AppPreferences.lastSyncDateKey, in: defaults)
     }
+
+    /// Sunucu ayari var mi (istemci olusturuldu mu).
+    var isServerAvailable: Bool { client != nil }
 
     // MARK: - Riza
 
@@ -88,7 +94,8 @@ final class SyncCoordinator {
     }
 
     private func shiftPayloadData(for record: EarningRecord, vehicle: String) -> Data? {
-        guard let evidence = record.evidence else { return nil }
+        // Haftalik ozet ekrani tek vardiya degildir: gonderilmez (yalnizca gunluk / belirsiz donem).
+        guard let evidence = record.evidence, evidence.period != .week else { return nil }
         let hash: String = TextHash.sha256(evidence.lines.map(\.text))
         let payload: ShiftPayload? = ShiftPayloadBuilder.make(
             recordID: record.id, platformCode: record.platform?.code,
@@ -124,7 +131,11 @@ final class SyncCoordinator {
         dropItemsWithoutConsent()
         guard isNetworkAllowed else { return }
         isFlushing = true
-        defer { isFlushing = false }
+        beginSend()
+        defer {
+            isFlushing = false
+            endSend()
+        }
 
         let now: Date = clock()
         var limitedKinds: Set<OutboxItem.Kind> = []
@@ -240,9 +251,11 @@ final class SyncCoordinator {
         // basarisizlikta asagida yeniden kuyruga alinir.
         queue.remove(id: evidence.id)
         let sampleID: UUID = evidence.id
+        beginSend()
         let result: OutboxResult = await client.submitCalibration(
             platformCode: sample.platformCode, templateID: sample.templateID, lines: sample.lines
         )
+        endSend()
         if result == .ok {
             markSynced(clock())
         }
@@ -266,6 +279,30 @@ final class SyncCoordinator {
             var masked: RecognizedLine = line
             masked.text = CalibrationMasker.mask(line.text)
             return masked
+        }
+    }
+
+    // MARK: - Bekleme
+
+    /// Suren gonderim yoksa hemen doner; varsa hepsi bitince doner ("Verilerimi sil" oncesi).
+    func waitUntilIdle() async {
+        guard activeSends > 0 else { return }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            idleWaiters.append(continuation)
+        }
+    }
+
+    private func beginSend() {
+        activeSends += 1
+    }
+
+    private func endSend() {
+        activeSends = max(0, activeSends - 1)
+        guard activeSends == 0 else { return }
+        let waiters: [CheckedContinuation<Void, Never>] = idleWaiters
+        idleWaiters = []
+        for waiter in waiters {
+            waiter.resume()
         }
     }
 

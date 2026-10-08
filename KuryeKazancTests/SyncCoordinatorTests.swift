@@ -9,6 +9,8 @@ final class FakeSupabase: SupabaseServing {
     var shiftResults: [OutboxResult] = [.ok]
     var calibrationResults: [OutboxResult] = [.ok]
     var templates: [OCRTemplate]? = []
+    /// Vardiya gonderimi surerken calisir (suren gonderimi taklit etmek icin).
+    var onSubmitShift: (() async -> Void)?
 
     private(set) var submittedShifts: [ShiftPayload] = []
     private(set) var submittedCalibrations: [[RecognizedLine]] = []
@@ -23,6 +25,7 @@ final class FakeSupabase: SupabaseServing {
 
     func submitShift(_ p: ShiftPayload) async -> OutboxResult {
         submittedShifts.append(p)
+        await onSubmitShift?()
         return Self.next(&shiftResults)
     }
 
@@ -220,6 +223,52 @@ final class SyncCoordinatorTests: XCTestCase {
         XCTAssertTrue(queue.items.isEmpty)
         await sync.flush()
         XCTAssertEqual(fake.submittedShifts.count, 1)
+    }
+
+    /// Haftalik ozet ekrani tek vardiya gibi gonderilmez.
+    func testWeeklyEvidence_notQueued() async {
+        setConsents(sharing: true, calibration: false)
+        let sync = makeCoordinator(client: fake)
+        let record = makeRecord(level: .ocrUnverified)
+        record.evidence?.periodRaw = OCRTemplate.Period.week.rawValue
+
+        sync.recordSaved(record, vehicle: "motorcycle")
+        await sync.flush()
+
+        XCTAssertTrue(queue.items.isEmpty)
+        XCTAssertTrue(fake.submittedShifts.isEmpty)
+
+        // Gunluk ekran gonderilir
+        let daily = makeRecord(level: .ocrUnverified)
+        daily.evidence?.periodRaw = OCRTemplate.Period.day.rawValue
+        sync.recordSaved(daily, vehicle: "motorcycle")
+        XCTAssertEqual(queue.items.map(\.id), [daily.id])
+    }
+
+    /// `waitUntilIdle` suren gonderim bitene kadar doner.
+    func testWaitUntilIdle_waitsForInFlightFlush() async {
+        setConsents(sharing: true, calibration: false)
+        let sync = makeCoordinator(client: fake)
+        sync.recordSaved(makeRecord(level: .ocrUnverified), vehicle: "motorcycle")
+        var events: [String] = []
+        fake.onSubmitShift = {
+            events.append("send-start")
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            events.append("send-end")
+        }
+
+        let flushTask = Task { await sync.flush() }
+        for _ in 0..<500 where fake.submittedShifts.isEmpty {
+            await Task.yield()
+        }
+        XCTAssertEqual(fake.submittedShifts.count, 1, "Gonderim baslamali")
+        await sync.waitUntilIdle()
+        events.append("idle")
+        await flushTask.value
+
+        XCTAssertEqual(events, ["send-start", "send-end", "idle"])
+        // Bos durumda hemen doner
+        await sync.waitUntilIdle()
     }
 
     func testResave_replacesQueuedItem() {

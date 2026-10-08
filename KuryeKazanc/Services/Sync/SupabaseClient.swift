@@ -96,13 +96,18 @@ final class SupabaseClient: SupabaseServing {
         let query: [URLQueryItem] = [URLQueryItem(name: "grant_type", value: "id_token")]
         let fresh: AuthSession = try await requestSession(path: "auth/v1/token", query: query, body: body)
         invalidatePendingAuth()
+        // Onceki (anonim ya da baska Apple) kimlik ayri bir kullanicidir: "Verilerimi sil" icin saklanir.
+        retire(session ?? store.load(), unlessUserID: fresh.userID)
+        // Ayni hesaba tekrar giris: o kimlik artik gecerli oturum, emekli listesinde tutulmaz.
+        removeRetired(userID: fresh.userID)
         apply(fresh)
         return fresh
     }
 
-    /// Yalnizca yerel oturumu siler; sunucu cagrisi yok.
+    /// Yalnizca yerel oturumu siler; sunucu cagrisi yok. Kimlik "Verilerimi sil" icin emekliye ayrilir.
     func signOut() {
         invalidatePendingAuth()
+        retire(session ?? store.load(), unlessUserID: nil)
         apply(nil)
     }
 
@@ -158,16 +163,84 @@ final class SupabaseClient: SupabaseServing {
         return try encoder.encode(first.payload)
     }
 
-    /// Sunucudaki tum verilerimi siler. Oturum yoksa sunucuda veri de yoktur.
+    /// Bu cihazin tum kimlikleriyle gonderilmis verileri siler: once gecerli oturum, sonra emekli
+    /// kimlikler. Gecerli oturumun verisi silinince oturum (emekliye ayrilmadan) birakilir.
+    /// Emekli kimlikte gecici hata: kimlik listede kalir, sonunda hata firlatilir (tekrar denenebilir).
     func deleteMyData() async throws {
-        guard session != nil else { return }
         let body: Data = try encoder.encode(EmptyBody())
-        let result: HTTPResult = try await sendAuthorized(allowSignup: false) { current in
-            self.makeRequest(
-                method: "POST", path: "rest/v1/rpc/delete_my_data", body: body, accessToken: current.accessToken
-            )
+        if session != nil {
+            do {
+                let result: HTTPResult = try await sendAuthorized(allowSignup: false) { current in
+                    self.makeRequest(
+                        method: "POST", path: "rest/v1/rpc/delete_my_data", body: body, accessToken: current.accessToken
+                    )
+                }
+                guard result.isSuccess else { throw SupabaseError.http(result.status) }
+                invalidatePendingAuth()
+                apply(nil)
+            } catch SupabaseError.notSignedIn where session == nil {
+                // Oturum anahtari reddedildi ve oturum dustu: bu kimlige artik ulasilamaz.
+            }
         }
-        guard result.isSuccess else { throw SupabaseError.http(result.status) }
+        try await deleteRetiredIdentities(body: body)
+    }
+
+    /// Her emekli kimlik gecerli oturum yapilmadan yenilenir ve onun anahtariyla silinir.
+    private func deleteRetiredIdentities(body: Data) async throws {
+        var failure: Error?
+        for identity in store.loadRetired() {
+            let renewed: AuthSession
+            do {
+                renewed = try await refresh(using: identity.refreshToken)
+            } catch SupabaseError.http(let status) where SupabaseClient.refreshRejectedStatuses.contains(status) {
+                // Anahtar olu: bu kimlige artik ulasilamaz, listeden cikar.
+                removeRetired(userID: identity.userID)
+                continue
+            } catch {
+                failure = error
+                continue
+            }
+            // Yenileme anahtari donusumlu: yeni anahtar saklanir (silme basarisiz olursa tekrar icin).
+            updateRetired(userID: identity.userID, with: renewed)
+            do {
+                let request: URLRequest = makeRequest(
+                    method: "POST", path: "rest/v1/rpc/delete_my_data", body: body, accessToken: renewed.accessToken
+                )
+                let result: HTTPResult = try await perform(request)
+                guard result.isSuccess else { throw SupabaseError.http(result.status) }
+                removeRetired(userID: identity.userID)
+            } catch {
+                failure = error
+            }
+        }
+        if let failure { throw failure }
+    }
+
+    // MARK: - Emekli kimlikler
+
+    /// Birakilan kimligi listeye ekler (ayni kullanici varsa yenisiyle degisir).
+    /// `unlessUserID` ile ayni kullaniciysa (ayni Apple hesabiyla tekrar giris) eklenmez.
+    private func retire(_ old: AuthSession?, unlessUserID: String?) {
+        guard let old, old.userID != unlessUserID else { return }
+        var list: [AuthSession] = store.loadRetired().filter { $0.userID != old.userID }
+        list.append(old)
+        store.saveRetired(list)
+    }
+
+    private func updateRetired(userID: String, with renewed: AuthSession) {
+        var list: [AuthSession] = store.loadRetired()
+        guard let index = list.firstIndex(where: { $0.userID == userID }) else { return }
+        var updated: AuthSession = renewed
+        updated.userID = userID
+        list[index] = updated
+        store.saveRetired(list)
+    }
+
+    private func removeRetired(userID: String) {
+        let list: [AuthSession] = store.loadRetired()
+        let remaining: [AuthSession] = list.filter { $0.userID != userID }
+        guard remaining.count != list.count else { return }
+        store.saveRetired(remaining)
     }
 
     // MARK: - RPC sonucu
@@ -246,7 +319,11 @@ final class SupabaseClient: SupabaseServing {
         if let current = session {
             do {
                 let refreshed: AuthSession = try await refresh(using: current.refreshToken)
-                try ensureEpoch(epoch)
+                guard epoch == authEpoch else {
+                    // Bu sirada kimlik emekliye ayrildi: eski anahtar artik gecersiz, yenisi saklanir.
+                    updateRetired(userID: current.userID, with: refreshed)
+                    throw CancellationError()
+                }
                 apply(refreshed)
                 return refreshed
             } catch SupabaseError.http(let status) where SupabaseClient.refreshRejectedStatuses.contains(status) {

@@ -10,6 +10,8 @@ enum AccountError: Error, Equatable {
     case noBackup
     /// Yedekleme veya "Verilerimi sil" suruyor.
     case busy
+    /// "Verilerimi sil" basarisiz oldu ve henuz tekrarlanmadi: yedek alinmaz.
+    case deletePending
 }
 
 extension AccountError: LocalizedError {
@@ -21,6 +23,8 @@ extension AccountError: LocalizedError {
             return "Bu hesapta yedek bulunamadı."
         case .busy:
             return "Yedekleme veya silme sürüyor, biraz sonra tekrar dene."
+        case .deletePending:
+            return "Verilerimi sil tamamlanmadı; önce onu tekrar dene."
         }
     }
 }
@@ -71,6 +75,13 @@ final class AccountService {
         }
     }
 
+    /// Sunucu ayari var mi (istemci olusturuldu mu). Arayuz hesap bolumunu buna gore gosterir.
+    var isServerAvailable: Bool { client != nil }
+
+    /// Yedek tabani var mi (elle yedek ya da geri yukleme yapildi mi). Yoksa ilk elle yedek
+    /// sunucudaki olasi yedegi ezebilir: arayuz once geri yuklemeyi onerir.
+    var hasBaseline: Bool { lastBackupDate != nil }
+
     // MARK: - Apple ile Giris
 
     /// 32 rastgele bayt -> base64url (`raw`); Apple'a `hashed` (SHA-256 hex) verilir.
@@ -100,7 +111,7 @@ final class AccountService {
     /// Tum kazanc/gider + tercihler sunucuya. Apple ile girisli degilse `.notSignedIn`.
     func backupNow(context: ModelContext) async throws {
         guard let client else { throw AccountError.serverUnavailable }
-        guard !isDeletePending else { throw AccountError.busy }
+        guard !isDeletePending else { throw AccountError.deletePending }
         refreshSessionState()
         guard isSignedInWithApple else { throw SupabaseError.notSignedIn }
         // Otomatik ve elle yedek ust uste binmesin; ikincisi sessizce biter.
@@ -169,7 +180,8 @@ final class AccountService {
     // MARK: - Verilerimi sil
 
     /// Sirasi: (0) yedek suruyorsa `.busy`, (1) paylasim/konum/kalibrasyon rizalari kapatilir ve kuyruk bosaltilir (yerel, her zaman),
-    /// (2) sunucuda `delete_my_data` (oturum varsa), (3) cikis.
+    /// (1b) suren gonderim bitene kadar beklenir (silmeden sonra sunucuya yazmasin),
+    /// (2) sunucuda `delete_my_data`: gecerli oturum ve bu cihazin emekli kimlikleri, (3) cikis.
     /// Sunucu cagrisi basarisizsa hata firlatilir ve oturum KORUNUR: kullanici tekrar deneyebilsin
     /// (cikis yapilsaydi o kimligin verisine bir daha ulasilamazdi).
     /// `context`: yerel kayitlar bilerek SILINMEZ (Profil'deki "Tum kayitlari sil" ayri); imza
@@ -179,7 +191,9 @@ final class AccountService {
         guard !isBackingUp else { throw AccountError.busy }
         isDeletePending = true
         revokeConsents()
+        await syncCoordinator?.waitUntilIdle()
         if let client {
+            defer { refreshSessionState() }
             try await client.deleteMyData()
         }
         signOut()
