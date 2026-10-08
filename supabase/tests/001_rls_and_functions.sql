@@ -15,7 +15,7 @@ $$;
 create or replace function tests._logout()
 returns void language plpgsql as $$
 begin
-    perform set_config('role', 'postgres', true);
+    perform set_config('role', 'none', true);
     perform set_config('request.jwt.claims', '', true);
 end;
 $$;
@@ -157,6 +157,34 @@ begin
     return next ok((select count(*) from public.ocr_templates where id = 'test.earnings') = 1, 'anon sablon okur');
     return next throws_ok($q$insert into public.ocr_templates (id, platform_code, version, status, body) values ('x','x',1,'active','{}')$q$,
         '42501', null, 'anon sablon yazamaz');
+    perform tests._logout();
+end;
+$$;
+
+create or replace function tests.test_submit_calibration()
+returns setof text language plpgsql as $$
+declare
+    a uuid := gen_random_uuid();
+    i integer;
+begin
+    perform tests._user(a, true);
+    perform tests._login(a, true);
+    return next is(public.submit_calibration('{"platform_code":"getir","template_id":"getir.earnings","lines":["a","b"]}'::jsonb), 'ok', 'kalibrasyon kabul');
+    return next is(public.submit_calibration('{"platform_code":"getir","lines":[]}'::jsonb), 'invalid', 'bos dizi gecersiz');
+    return next is(public.submit_calibration('{"platform_code":"getir","lines":"x"}'::jsonb), 'invalid', 'dizi olmayan lines gecersiz');
+    for i in 1..19 loop
+        perform public.submit_calibration('{"lines":["a"]}'::jsonb);
+    end loop;
+    return next is(public.submit_calibration('{"lines":["a"]}'::jsonb), 'rate_limited', 'gunde 20 sinir');
+    perform tests._logout();
+end;
+$$;
+
+create or replace function tests.test_anon_cannot_execute_submit_shift()
+returns setof text language plpgsql as $$
+begin
+    perform set_config('role', 'anon', true);
+    return next throws_ok($q$select public.submit_shift('{}'::jsonb)$q$, '42501', null, 'anon submit_shift calistiramaz');
     perform tests._logout();
 end;
 $$;

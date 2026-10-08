@@ -19,7 +19,7 @@ create table if not exists public.shifts (
     packages integer check (packages is null or packages between 0 and 500),
     distance_km numeric(6,1) not null default 0 check (distance_km >= 0 and distance_km <= 1500),
     level text not null check (level in ('verified','ocrUnverified')),
-    template_id text,
+    template_id text check (char_length(template_id) <= 64),
     template_version integer,
     text_hash text not null unique check (text_hash ~ '^[0-9a-f]{64}$'),
     created_at timestamptz not null default now()
@@ -39,9 +39,10 @@ create table if not exists public.ocr_templates (
 create table if not exists public.calibration_samples (
     id bigint generated always as identity primary key,
     user_id uuid not null references auth.users(id) on delete cascade,
-    platform_code text,
-    template_id text,
-    lines jsonb not null check (jsonb_typeof(lines) = 'array' and jsonb_array_length(lines) between 1 and 200),
+    platform_code text check (platform_code is null or platform_code ~ '^[a-z_]{2,32}$'),
+    template_id text check (char_length(template_id) <= 64),
+    lines jsonb not null check (jsonb_typeof(lines) = 'array' and jsonb_array_length(lines) between 1 and 200
+                                and pg_column_size(lines) <= 65536),
     created_at timestamptz not null default now()
 );
 create index if not exists calibration_user_created on public.calibration_samples (user_id, created_at);
@@ -64,19 +65,20 @@ create policy templates_read on public.ocr_templates for select to anon, authent
 -- Yedek: yalnizca sahibi ve anonim olmayan kullanici
 drop policy if exists backups_owner_select on public.backups;
 create policy backups_owner_select on public.backups for select to authenticated
-    using (user_id = auth.uid());
+    using (user_id = auth.uid() and (auth.jwt() ->> 'is_anonymous') = 'false');
 drop policy if exists backups_owner_insert on public.backups;
 create policy backups_owner_insert on public.backups for insert to authenticated
-    with check (user_id = auth.uid() and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false);
+    with check (user_id = auth.uid() and (auth.jwt() ->> 'is_anonymous') = 'false');
 drop policy if exists backups_owner_update on public.backups;
 create policy backups_owner_update on public.backups for update to authenticated
-    using (user_id = auth.uid())
-    with check (user_id = auth.uid() and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false);
+    using (user_id = auth.uid() and (auth.jwt() ->> 'is_anonymous') = 'false')
+    with check (user_id = auth.uid() and (auth.jwt() ->> 'is_anonymous') = 'false');
 drop policy if exists backups_owner_delete on public.backups;
 create policy backups_owner_delete on public.backups for delete to authenticated
-    using (user_id = auth.uid());
+    using (user_id = auth.uid() and (auth.jwt() ->> 'is_anonymous') = 'false');
 
 -- shifts ve calibration_samples icin hicbir politika yok: dogrudan erisim kapali.
+revoke all on public.ocr_templates, public.backups from anon, authenticated;
 revoke all on public.shifts from anon, authenticated;
 revoke all on public.calibration_samples from anon, authenticated;
 grant select on public.ocr_templates to anon, authenticated;
@@ -156,7 +158,8 @@ begin
         insert into public.calibration_samples (user_id, platform_code, template_id, lines)
         values (uid, payload ->> 'platform_code', payload ->> 'template_id', payload -> 'lines');
     exception
-        when check_violation or not_null_violation then
+        when check_violation or not_null_violation or invalid_text_representation
+             or invalid_parameter_value then
             return 'invalid';
     end;
     return 'ok';

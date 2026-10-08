@@ -26,4 +26,7 @@ node scripts/server/e2e.mjs             # anon anahtarla uctan uca kontrol
 
 - `shifts` ve `calibration_samples` tablolarina dogrudan erisim yoktur; yazma `submit_shift`
   ve `submit_calibration` fonksiyonlariyla yapilir.
+- Gunluk hiz siniri (vardiya 40, kalibrasyon 20) gunu UTC'ye gore sayar.
+- `e2e.mjs` her calistirmada bir anonim auth kullanicisi birakir (silinmez).
+- `test.mjs` bitince `tests` semasini siler.
 - Gizli degerler (erisim anahtari, anon anahtar, service role) yalnizca ortam degiskeninde tutulur.
