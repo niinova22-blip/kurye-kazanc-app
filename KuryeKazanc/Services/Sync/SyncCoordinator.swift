@@ -187,7 +187,7 @@ final class SyncCoordinator {
 
     /// Gunluk sinir kullaniciya ozgu: o turdeki tum bekleyen ogeler ertesi gune kalir.
     private func deferAll(of kind: OutboxItem.Kind) {
-        let nextDay: Date = OutboxPolicy.nextDay(after: clock(), calendar: calendar)
+        let nextDay: Date = OutboxPolicy.nextDay(after: clock())
         for queued in queue.items where queued.kind == kind && queued.notBefore < nextDay {
             var updated: OutboxItem = queued
             updated.notBefore = nextDay
@@ -199,7 +199,7 @@ final class SyncCoordinator {
         var updated: OutboxItem = item
         let now: Date = clock()
         if result == .rateLimited {
-            updated.notBefore = OutboxPolicy.nextDay(after: now, calendar: calendar)
+            updated.notBefore = OutboxPolicy.nextDay(after: now)
         } else {
             updated.failures += 1
             updated.notBefore = OutboxPolicy.nextAttempt(after: updated.failures, now: now)

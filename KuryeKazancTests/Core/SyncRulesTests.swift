@@ -76,6 +76,33 @@ final class SyncRulesTests: XCTestCase {
         XCTAssertEqual(CalibrationMasker.mask("Sipariş Sayısı 11"), "Sipariş Sayısı 11")
     }
 
+    func testMaskerCommonMobileFormats() {
+        XCTAssertEqual(CalibrationMasker.mask("532 123 45 67"), "***")
+        XCTAssertEqual(CalibrationMasker.mask("5321234567"), "***")
+        XCTAssertEqual(CalibrationMasker.mask("(532) 123 45 67"), "***")
+        XCTAssertEqual(CalibrationMasker.mask("+90 532 123 45 67"), "***")
+        XCTAssertEqual(CalibrationMasker.mask("0532 123 45 67"), "***")
+        XCTAssertEqual(CalibrationMasker.mask("05321234567"), "***")
+        XCTAssertEqual(CalibrationMasker.mask("Sabit 0212 123 45 67"), "Sabit ***")
+        XCTAssertEqual(CalibrationMasker.mask("₺1.234,50"), "₺1.234,50", "Tutar maskelenmez")
+        XCTAssertEqual(CalibrationMasker.mask("Toplam ₺12.345,67"), "Toplam ₺12.345,67")
+        XCTAssertEqual(CalibrationMasker.mask("Sipariş No 532123"), "Sipariş No 532123", "6 haneli siparis no maskelenmez")
+        XCTAssertEqual(CalibrationMasker.mask("#5321234567890"), "#5321234567890", "Uzun sayi icinden parca maskelenmez")
+    }
+
+    func testNextDayUsesUTCMidnight() {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(secondsFromGMT: 0)!
+        // Istanbul 8 Ekim 01:30 = UTC 7 Ekim 22:30 -> UTC 8 Ekim 00:05 (Istanbul 03:05)
+        let now = date(8, 1, 30)
+        let expected = utc.date(from: DateComponents(year: 2026, month: 10, day: 8, hour: 0, minute: 5))!
+        XCTAssertEqual(OutboxPolicy.nextDay(after: now), expected)
+        // Istanbul 8 Ekim 12:00 = UTC 09:00 -> UTC 9 Ekim 00:05
+        let noon = date(8, 12)
+        let expectedNoon = utc.date(from: DateComponents(year: 2026, month: 10, day: 9, hour: 0, minute: 5))!
+        XCTAssertEqual(OutboxPolicy.nextDay(after: noon), expectedNoon)
+    }
+
     func testTemplateMerger() {
         var newer = BundledTemplates.template(id: "getir.earnings")!
         newer.version = 2

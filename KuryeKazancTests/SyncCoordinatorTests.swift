@@ -343,7 +343,7 @@ final class SyncCoordinatorTests: XCTestCase {
         await sync.flush()
 
         // Ikinci oge bu turda denenmez; ikisi de ertesi gune kalir
-        let nextDay: Date = OutboxPolicy.nextDay(after: now, calendar: calendar)
+        let nextDay: Date = OutboxPolicy.nextDay(after: now)
         XCTAssertEqual(fake.submittedShifts.count, 1)
         XCTAssertEqual(queue.items.count, 2)
         XCTAssertEqual(queue.items.map(\.notBefore), [nextDay, nextDay])

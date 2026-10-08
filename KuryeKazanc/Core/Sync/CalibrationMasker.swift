@@ -8,8 +8,10 @@ enum CalibrationMasker {
         "TR\\s?\\d{2}(?:\\s?\\d){22}",
         // E-posta
         "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
-        // Telefon: +90 veya 0 ile baslayan 10 haneli mobil/sabit
-        "(?:\\+90\\s?|0)\\(?\\d{3}\\)?[\\s-]?\\d{3}[\\s-]?\\d{2}[\\s-]?\\d{2}",
+        // Cep telefonu: on ek (+90, 90, 0) istege bagli; 5 ile baslayan 10 hane (parantezli/bosluklu/bitisik)
+        "(?<!\\d)(?:\\+?90[\\s-]?|0)?\\(?5\\d{2}\\)?[\\s-]?\\d{3}[\\s-]?\\d{2}[\\s-]?\\d{2}(?!\\d)",
+        // Sabit hat: +90 veya 0 ile baslayan 10 hane
+        "(?<!\\d)(?:\\+90\\s?|0)\\(?\\d{3}\\)?[\\s-]?\\d{3}[\\s-]?\\d{2}[\\s-]?\\d{2}",
         // TC kimlik no: 11 hane
         "(?<!\\d)\\d{11}(?!\\d)",
     ]
