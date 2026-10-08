@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 
-/// Profil sekmesi: profil, hedefler, gider hesabi, konum izni, paylasim rizalari, veri.
+/// Profil sekmesi: profil, hedefler, gider hesabi, konum izni, paylasim rizalari, hesap ve yedek, kalibrasyon, veri.
 struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
@@ -40,6 +40,8 @@ struct ProfileView: View {
                 AutoShiftSection()
                 screenshotSection
                 sharingSection
+                AccountSection()
+                CalibrationSection()
                 dataSection
                 aboutSection
             }
@@ -288,6 +290,10 @@ struct ProfileView: View {
     private var aboutSection: some View {
         Section("Hakkında") {
             LabeledContent("Sürüm", value: appVersion)
+            NavigationLink("Gizlilik ve KVKK") {
+                PrivacyView()
+            }
+            .accessibilityIdentifier("profile.privacy")
         }
     }
 

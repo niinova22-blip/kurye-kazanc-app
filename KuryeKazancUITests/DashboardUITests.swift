@@ -16,7 +16,7 @@ final class DashboardUITests: XCTestCase {
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
             "-hasCompletedOnboarding", "YES", "-autoEstimateExpenses", "YES",
             // Paylasim tercihleri testler arasinda tasinmasin
-            "-dataSharingOptIn", "NO", "-locationSharingOptIn", "NO",
+            "-dataSharingOptIn", "NO", "-locationSharingOptIn", "NO", "-calibrationOptIn", "NO",
         ]
         if sampleData { app.launchArguments.append("-sample-data") }
         app.launch()
@@ -221,6 +221,17 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(toggle.exists)
         // UI testlerinde tercih bos alandan okunur: kapali baslar (izin istenmez)
         XCTAssertEqual(toggle.value as? String, "0", "Varsayilan kapali")
+    }
+
+    func testProfileCalibrationIsOffByDefault() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Profil"].tap()
+        // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
+        let toggle = app.switches["profile.calibration"]
+        for _ in 0..<8 where !toggle.exists { app.swipeUp() }
+        XCTAssertTrue(toggle.exists)
+        XCTAssertEqual(toggle.value as? String, "0", "Kalibrasyon varsayilan kapali olmali (opt-in)")
     }
 
     func testDashboardShowsGrossAndExpenseBreakdown() {

@@ -8,6 +8,7 @@ struct EarningFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(LocationService.self) private var location
+    @Environment(SyncCoordinator.self) private var sync
 
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
     /// Kayitli kanitlar: ayni ekran goruntusu ikinci kez eklenirse uyarilir.
@@ -19,6 +20,10 @@ struct EarningFormView: View {
     @State private var saveError: String?
     @State private var showPhotoPicker: Bool
     @State private var appliedInitialImport = false
+    @AppStorage(AppPreferences.calibrationOptInKey) private var calibrationOptIn = false
+    @State private var isSendingCalibration = false
+    /// Bu ekran goruntusu icin son kalibrasyon sonucu; yeni goruntu okununca sifirlanir.
+    @State private var calibrationResult: OutboxResult?
 
     private let session: WorkSessionSummary?
     private let importer: ScreenshotImporter
@@ -184,6 +189,10 @@ struct EarningFormView: View {
                 guard let item else { return }
                 Task { await loadScreenshot(item) }
             }
+            .onChange(of: viewModel.imported?.textHash) { _, _ in
+                // Yeni ekran goruntusu: kalibrasyon yeniden gonderilebilir
+                calibrationResult = nil
+            }
             .task {
                 // Init'te platform listesi yoktu; platformu eslestirmek icin bir kez yeniden uygulanir
                 if let initialImported, !appliedInitialImport {
@@ -232,6 +241,10 @@ struct EarningFormView: View {
                     .font(.subheadline)
             }
 
+            if calibrationOptIn, viewModel.imported != nil {
+                calibrationRow
+            }
+
             if BuildEnvironment.showsTesterTools, let report = viewModel.ocrDiagnosticReport {
                 ShareLink(item: report, subject: Text("Kurye Kazanç OCR raporu")) {
                     Label("Yanlış okuduysa: okunan metni geliştiriciye gönder", systemImage: "ladybug")
@@ -241,6 +254,42 @@ struct EarningFormView: View {
             }
         } footer: {
             Text("Trendyol GO, Getir, Yemeksepeti ve Migros kazanç ekranları tanınır. Görüntü cihazında işlenir; görselin kendisi saklanmaz.")
+        }
+    }
+
+    /// Kalibrasyon rizasi acik ve form OCR kanitliyken: maskelenmis satirlari gonder.
+    @ViewBuilder
+    private var calibrationRow: some View {
+        Button {
+            sendCalibration()
+        } label: {
+            HStack {
+                Label("Kalibrasyona gönder", systemImage: "paperplane")
+                if isSendingCalibration {
+                    Spacer()
+                    ProgressView()
+                }
+            }
+        }
+        // Basarili / kuyruga alinmis ornek ikinci kez gonderilmez
+        .disabled(isSendingCalibration || (calibrationResult != nil && calibrationResult != .invalid))
+        .accessibilityIdentifier("earningForm.calibrate")
+
+        if let calibrationResult {
+            Text(calibrationResultText(calibrationResult))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("earningForm.calibrateResult")
+        }
+    }
+
+    private func calibrationResultText(_ result: OutboxResult) -> String {
+        switch result {
+        case .ok, .duplicate: "Gönderildi, teşekkürler"
+        case .rateLimited: "Bugünlük sınır doldu"
+        // Gecici hata: ornek kuyruga alindi, baglanti gelince tekrar gonderilir
+        case .transient: "Gönderilemedi, sonra tekrar denenecek"
+        case .invalid: "Gönderilemedi"
         }
     }
 
@@ -280,6 +329,25 @@ struct EarningFormView: View {
             platforms: platforms,
             knownTextHashes: knownHashes
         )
+    }
+
+    private func sendCalibration() {
+        guard let imported = viewModel.imported else { return }
+        // Veritabanina eklenmeyen gecici kanit: yalnizca gonderim icin (kayitla kaydedilen kanit ayridir)
+        let evidence = ScreenshotEvidence(
+            capturedAt: imported.capturedAt,
+            assetIdentifier: imported.assetIdentifier,
+            parsed: imported.parsed,
+            lines: imported.lines,
+            isGenuineScreenshot: imported.isGenuine
+        )
+        let coordinator: SyncCoordinator = sync
+        isSendingCalibration = true
+        Task {
+            let result: OutboxResult = await coordinator.sendCalibration(evidence)
+            calibrationResult = result
+            isSendingCalibration = false
+        }
     }
 
     /// Kayitli kanitlarin metin ozetleri (bos ozet eslesme sayilmaz).

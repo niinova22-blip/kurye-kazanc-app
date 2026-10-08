@@ -109,3 +109,28 @@ struct LocationSharingConsentView: View {
         )
     }
 }
+
+/// Kalibrasyon ornegi gonderimi icin ayri acik riza.
+struct CalibrationConsentView: View {
+    let onAccept: () -> Void
+
+    var body: some View {
+        ConsentSheet(
+            title: "Kalibrasyon",
+            purpose: "Amaç: platform kazanç ekranlarını daha doğru tanımamız. Yalnızca kazanç formunda “Kalibrasyona gönder”e dokunduğunda gönderilir.",
+            shared: [
+                "Ekran görüntüsünden okunan metin satırları (maskelenmiş)",
+                "Satırların ekrandaki konumları (kutular)",
+                "Platform ve tanınan şablon adı",
+            ],
+            never: [
+                "Ekran görüntüsünün kendisi (görsel)",
+                "IBAN, telefon numarası, TC kimlik numarası, e-posta (gönderilmeden önce maskelenir)",
+                "Uygulamadaki adın ve profil bilgilerin",
+            ],
+            note: "Ekranda adın veya kurye numaran yazıyorsa o ekranı gönderme: isimler otomatik maskelenmez. İstediğin an kapatabilirsin; bekleyen örnekler gönderilmeden silinir. Gönderilmiş örneklerini Profil > Verilerimi sil ile sunucudan sildirebilirsin.",
+            acceptIdentifier: "consent.calibration.accept",
+            onAccept: onAccept
+        )
+    }
+}
