@@ -16,5 +16,10 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Supabase (surum 1.3). Bos birakilirsa sunucu kapali sayilir (SupabaseConfig.fromBundle == nil). -->
+	<key>SupabaseURL</key>
+	<string></string>
+	<key>SupabaseAnonKey</key>
+	<string></string>
 </dict>
 </plist>
