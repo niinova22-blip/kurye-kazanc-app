@@ -20,6 +20,9 @@ final class ScanResultsViewModel {
     /// Son kaydetmede dogrulamadan gecemeyip atlanan kalem sayisi.
     private(set) var skippedCount = 0
 
+    @ObservationIgnored private var hasLoaded = false
+    @ObservationIgnored private var itemFiles: [String: [URL]] = [:]
+    @ObservationIgnored private var orphanFiles: [URL] = []
     @ObservationIgnored private let store: BroadcastCaptureStore
     @ObservationIgnored private let importer: ScreenshotImporter
     @ObservationIgnored private let knownTextHashes: Set<String>
@@ -38,15 +41,36 @@ final class ScanResultsViewModel {
 
     var selectedCount: Int { rows.filter { $0.isSelected && !$0.isAlreadySaved }.count }
 
+    /// Ilk yuklemeden sonra tekrar cagrilarda secimler korunur.
+    func loadIfNeeded() {
+        guard !hasLoaded else { return }
+        load()
+    }
+
     func load() {
+        hasLoaded = true
         var inputs: [ScanInput] = []
+        var inputURLs: [URL] = []
+        var orphans: [URL] = []
+        let builder = ScanResultBuilder(calendar: calendar)
         for url in store.pending() {
-            // Bozuk dosya atlanir
-            guard let capture = store.load(url) else { continue }
+            // Bozuk dosya atlanir (kaydet / vazgecte silinir)
+            guard let capture = store.load(url) else { orphans.append(url); continue }
             let imported = importer.importCapture(lines: capture.lines, capturedAt: capture.capturedAt, referenceDate: now)
             inputs.append(ScanInput(parsed: imported.parsed, lines: capture.lines, capturedAt: capture.capturedAt))
+            inputURLs.append(url)
         }
-        rows = ScanResultBuilder(calendar: calendar).build(inputs).map { item in
+        var files: [String: [URL]] = [:]
+        for (input, url) in zip(inputs, inputURLs) {
+            if let id = builder.itemID(for: input) {
+                files[id, default: []].append(url)
+            } else {
+                orphans.append(url)
+            }
+        }
+        itemFiles = files
+        orphanFiles = orphans
+        rows = builder.build(inputs).map { item in
             let saved = knownTextHashes.contains(item.textHash)
             let defaultOn: Bool
             switch item.kind {
@@ -75,14 +99,32 @@ final class ScanResultsViewModel {
             let form = EarningFormViewModel(defaultPlatform: nil, now: item.capturedAt, calendar: calendar)
             form.apply(imported, platforms: platforms, knownTextHashes: knownTextHashes)
             guard form.canSave else {
+                // Secili ama kaydedilemeyen kalemin dosyalari silinmez
                 skippedCount += 1
                 continue
             }
             saved.append(try form.save(in: context))
+            removeFiles(for: item.id)
         }
-        store.removeAll()
-        rows = []
+        // Secilmeyen kalemler ve kalem uretmeyen dosyalar silinir; atlananlar kalir
+        let skippedIDs = rows.filter { row in
+            row.isSelected && !row.isAlreadySaved && itemFiles[row.id] != nil
+        }.map(\.id)
+        let kept = Set(skippedIDs)
+        for id in Array(itemFiles.keys) where !kept.contains(id) { removeFiles(for: id) }
+        orphanFiles.forEach(store.remove)
+        orphanFiles = []
+        if skippedCount > 0 {
+            load()
+        } else {
+            rows = []
+        }
         return saved
+    }
+
+    private func removeFiles(for id: String) {
+        itemFiles[id]?.forEach(store.remove)
+        itemFiles[id] = nil
     }
 
     func discard() {

@@ -22,6 +22,16 @@ struct ScanItem: Identifiable, Equatable {
 struct ScanResultBuilder {
     var calendar: Calendar
 
+    /// Girdinin ait oldugu kalemin kimligi (build ile ayni kural); anahtarsiz girdi icin nil.
+    func itemID(for input: ScanInput) -> String? {
+        guard let key = CaptureKey(parsed: input.parsed, calendar: calendar) else { return nil }
+        if input.parsed.period == .order {
+            let platform = input.parsed.platformCode ?? key.templateID
+            return "orders-\(platform)-\(Int(key.day.timeIntervalSince1970))"
+        }
+        return "\(key.templateID)-\(Int(key.day.timeIntervalSince1970))-\(key.totalCents)-\(key.period.rawValue)"
+    }
+
     func build(_ inputs: [ScanInput]) -> [ScanItem] {
         var seen = Set<CaptureKey>()
         var singles: [ScanItem] = []

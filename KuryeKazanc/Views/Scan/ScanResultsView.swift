@@ -34,7 +34,7 @@ struct ScanResultsView: View {
             .navigationTitle("Taramada bulunanlar")
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) { actionBar }
-            .onAppear { viewModel.load() }
+            .onAppear { viewModel.loadIfNeeded() }
         }
         .interactiveDismissDisabled()
     }
@@ -117,7 +117,12 @@ struct ScanResultsView: View {
         do {
             let saved: [EarningRecord] = try viewModel.save(in: modelContext, platforms: platforms)
             afterSave(saved)
-            dismiss()
+            let skipped: Int = viewModel.skippedCount
+            if skipped > 0 {
+                saveError = "\(skipped) kalem kaydedilemedi: platform bulunamadı. Platformu Profil'den ekleyip tekrar dene ya da Vazgeç."
+            } else {
+                dismiss()
+            }
         } catch {
             saveError = error.localizedDescription
         }

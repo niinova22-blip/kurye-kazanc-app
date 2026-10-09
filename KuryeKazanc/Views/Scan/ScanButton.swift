@@ -7,6 +7,7 @@ struct ScanButton: View {
     @State private var showIntro = false
     @State private var startAfterIntro = false
     @State private var triggerCount = 0
+    @State private var showHint = false
 
     var body: some View {
         Button(action: tapped) {
@@ -14,6 +15,11 @@ struct ScanButton: View {
         }
         .background(pickerView)
         .accessibilityIdentifier("scan.button")
+        .alert("Tarama başlatılamadı", isPresented: $showHint) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text("Denetim Merkezi'nden Ekran Kaydı'na uzun bas → Kurye Kazanç Tarama")
+        }
         .sheet(isPresented: $showIntro, onDismiss: introDismissed) {
             ScanIntroView(onStart: introStarted)
                 .presentationDetents([.medium, .large])
@@ -21,7 +27,7 @@ struct ScanButton: View {
     }
 
     private var pickerView: some View {
-        BroadcastPicker(trigger: triggerCount)
+        BroadcastPicker(trigger: triggerCount, onMissingButton: { showHint = true })
             .frame(width: 1, height: 1)
             .opacity(0.01)
             .allowsHitTesting(false)
@@ -51,6 +57,7 @@ struct ScanButton: View {
 /// Sistem yayın seçicisini görünmez tutar; sayaç artınca iç düğmesine dokunur.
 private struct BroadcastPicker: UIViewRepresentable {
     let trigger: Int
+    let onMissingButton: () -> Void
 
     final class Coordinator { var lastTrigger = 0 }
 
@@ -66,10 +73,18 @@ private struct BroadcastPicker: UIViewRepresentable {
     func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {
         guard trigger != context.coordinator.lastTrigger else { return }
         context.coordinator.lastTrigger = trigger
-        for subview in uiView.subviews {
-            if let button = subview as? UIButton {
-                button.sendActions(for: .touchUpInside)
-            }
+        if let button = Self.findButton(in: uiView) {
+            button.sendActions(for: .touchUpInside)
+        } else {
+            onMissingButton()
         }
+    }
+
+    private static func findButton(in view: UIView) -> UIButton? {
+        if let button = view as? UIButton { return button }
+        for subview in view.subviews {
+            if let found = findButton(in: subview) { return found }
+        }
+        return nil
     }
 }

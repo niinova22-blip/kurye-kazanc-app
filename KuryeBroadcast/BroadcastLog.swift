@@ -4,6 +4,8 @@ import Foundation
 struct BroadcastLog: Codable {
     var startedAt: Date = .now
     var finishedAt: Date?
+    /// Son islenen karenin zamani (canlilik isareti).
+    var lastFrameAt: Date?
     var processed = 0
     var skippedRate = 0
     var unrecognized = 0

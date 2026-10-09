@@ -131,6 +131,9 @@ struct TodayView: View {
                     Task { await importPicked(items) }
                 }
                 // "Vardiya bitti" bildirimine dokunuldu: bekleyen vardiyanin kazanc formu acilir
+                .onReceive(NotificationCenter.default.publisher(for: UIScreen.capturedDidChangeNotification)) { _ in
+                    openScanResultsIfPending()
+                }
                 .onAppear(perform: openRequestedPending)
                 .onChange(of: autoShift.requestedPendingID) { _, _ in
                     openRequestedPending()
@@ -268,10 +271,15 @@ struct TodayView: View {
     private func openScanResultsIfPending() {
         guard activeSheet == nil, !captureStore.pending().isEmpty else { return }
         let log: BroadcastLog? = BroadcastLog.load()
-        let interrupted: Bool = log != nil && log?.finishedAt == nil
+        // Yayin suruyorsa dosyalar yazilmaya devam eder: sonuc sayfasi acilmaz
+        if UIScreen.main.isCaptured { return }
+        let unfinished: Bool = log != nil && log?.finishedAt == nil
+        let lastFrame: Date = log?.lastFrameAt ?? .distantPast
+        if unfinished, Date.now.timeIntervalSince(lastFrame) < 10 { return }
+        let interrupted: Bool = unfinished
         let viewModel = ScanResultsViewModel(
             store: captureStore, templates: sync.mergedTemplates(),
-            knownTextHashes: knownHashes, interrupted: interrupted
+            knownTextHashes: queuedAndKnownHashes, interrupted: interrupted
         )
         activeSheet = .scanResults(viewModel)
     }

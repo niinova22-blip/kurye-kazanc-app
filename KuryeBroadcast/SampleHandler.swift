@@ -37,6 +37,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
 
     private func process(_ pixelBuffer: CVPixelBuffer) {
         log.processed += 1
+        log.lastFrameAt = .now
         let image = CIImage(cvPixelBuffer: pixelBuffer)
         let longSide = max(image.extent.width, image.extent.height)
         let scale = min(1, 1280 / longSide)

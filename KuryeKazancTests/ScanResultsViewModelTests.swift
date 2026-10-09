@@ -111,7 +111,30 @@ final class ScanResultsViewModelTests: XCTestCase {
         let records = try vm.save(in: context, platforms: [])
         XCTAssertTrue(records.isEmpty)
         XCTAssertEqual(vm.skippedCount, 1)
+        // Atlanan kalemin dosyasi kalir, satir yeniden listelenir
+        XCTAssertEqual(store.pending().count, 1)
+        XCTAssertEqual(vm.rows.count, 1)
+    }
+
+    func testSavedAndUnselectedFilesRemovedSkippedKept() throws {
+        try add(getirDaily)
+        try add(uberWeekly, offset: 10)
+        let vm = makeVM()
+        vm.load()
+        let records = try vm.save(in: context, platforms: platforms())
+        XCTAssertEqual(records.count, 1)
+        // haftalik secilmemisti: silinir; gunluk kaydedildi: silinir
         XCTAssertEqual(store.pending(), [])
+    }
+
+    func testLoadIfNeededKeepsSelections() throws {
+        try add(getirDaily)
+        let vm = makeVM()
+        vm.loadIfNeeded()
+        let id = try XCTUnwrap(vm.rows.first).id
+        vm.setSelected(false, for: id)
+        vm.loadIfNeeded()
+        XCTAssertFalse(try XCTUnwrap(vm.rows.first).isSelected)
     }
 
     func testDiscardDeletesFiles() throws {
