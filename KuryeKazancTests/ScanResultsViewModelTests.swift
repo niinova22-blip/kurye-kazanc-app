@@ -301,6 +301,7 @@ final class ScanResultsViewModelTests: XCTestCase {
     func testPhotoDailyDurationSetsStartFromCapturedEnd() throws {
         var result = photoResult(getirDaily, assetID: "d")
         result.input.parsed.workDuration = 3 * 3600
+        result.imported.parsed.workDuration = 3 * 3600
         let vm = ScanResultsViewModel(photoResults: [result], knownTextHashes: [], calendar: calendar, now: now)
         vm.load()
         let record = try XCTUnwrap(try vm.save(in: context, platforms: platforms()).first)
