@@ -308,3 +308,9 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 - 30 günlük test görselleri: masaüstü `Kurye-Test-30-Gun` (112 JPEG, EXIF tarihli).
 - **CI/CD tekrar Codemagic'te**: GitHub Actions kotası %90 (özel repo, macOS ×10). `.github/workflows` yalnızca elle; Codemagic `ios-ci` push/PR, `ios-release` main/release; yayın eklentisi profili `kurye-kazanc-broadcast-appstore`; `submit_to_testflight: false`.
 - Sürüm 1.4.1. Sıradaki: 1.4b Topluluk (sunucu ısı haritası + test kuryeleri, seçenek a), sonra akıllı çalışma planlama modülü.
+
+### 1.4b Topluluk (2026-10-10)
+- Sunucu (canlı): `shifts.is_synthetic`, `community_heatmap` / `community_summary` (k ≥ 5 farklı kurye; 56 gün; dakika ağırlıklı ₺/saat, gece yarısı devri); pgTAP 19/19. Sentetik test verisi: 10 kurye, 338 vardiya, Ankara/Sincan (`seed_synthetic.mjs`; gerçek lansmandan önce `purge_synthetic.mjs`).
+- Uygulama: `SupabaseClient` RPC'leri, Core `CommunityModels`, `CommunityViewModel` (paylaşım kapalıyken ağ yok), Topluluk sekmesi (ilçe seçici, ₺/saat + kendi karşılaştırma, ortak `HeatmapChart`, platformlar, en iyi saatler).
+- Not (lansman öncesi): anonim kayıt sınırsız olduğundan k=5 hücresi sahte hesaplarla çözülebilir — App Attest / hız sınırı lansmandan önce.
+- Sıradaki: 1.4.1 TestFlight (fotoğraf taraması + Topluluk), sonra akıllı çalışma planlama motoru (hafıza: next-planner-module).

@@ -14,6 +14,8 @@ Yeni:
 - Platform şablonları ekrandaki "Çalışma süresi"ni okur: saatler buna göre kurulur ve süre okunan kayıtlar (paylaşım açıksa) topluluğa gider.
 - Kayıt, tarama anındaki ilçenle kaydedilir (yalnızca il/ilçe).
 
+- Topluluk sekmesi: ilçende ₺/saat, senin ₺/saatinle karşılaştırma, gün × saat ısı haritası, platform karşılaştırması ve en iyi saatler. Paylaşım açık olmalı; bir hücre en az 5 farklı kuryeden veri gelmeden gösterilmez. Test için Sincan/Ankara'da sentetik (sahte, işaretli) kurye verisi var.
+
 Test (yalnızca TestFlight): Profil > Test araçları > "Test: son 30 gün ve tüm fotoğraflar".
 
 Lütfen test et:
@@ -22,6 +24,7 @@ Lütfen test et:
 3. Aynı taramayı tekrar yap: kaydedilenler yeniden listelenmemeli.
 4. Test ayarı kapalıyken gerçek bir platform kazanç ekranının görüntüsünü al ve tara (kişisel bilgileri karartıp paylaşabilirsen çok iyi olur).
 5. Fotoğraf iznini reddet: "Ayarlar'ı aç" görünüyor mu?
+6. Topluluk: Profil'de paylaşımı aç, kayıtlarının ilçesi Sincan ise ilçe seçicide Sincan çıkıyor mu, ısı haritası ve platformlar doluyor mu? Senin ₺/saatinle karşılaştırma mantıklı mı?
 
 ## 1.4.0
 
