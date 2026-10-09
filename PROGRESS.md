@@ -222,3 +222,24 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 2. Apple Developer: `com.kuryekazanc.app`'te Sign in with Apple (profil yeniden üretilir → Codemagic referansı); Canlı Etkinlik App ID + profil — kullanıcıya sorarak.
 3. develop push → Codemagic `ios-ci`; derleme/test hatalarını düzelt.
 4. TestFlight'tan önce kullanıcıya sor.
+
+## Oturum 6 — 2026-10-09: Supabase canlı kurulum
+
+### Yapılanlar
+- Supabase projesi `kurye-kazanc` (ref `pgvdefkweclutfwgbxbh`, ücretsiz plan) oluşturuldu.
+- Betikler (kullanıcı çalıştırdı; otomatik mod canlı veritabanına yazmayı engelliyor):
+  - `apply`: 2 göç uygulandı.
+  - `seed_templates`: 4 şablon (Trendyol GO, Getir, Yemeksepeti, Migros Hemen) v1.
+  - `test`: pgTAP 9 grup / 22 kontrol, **hepsi geçti** (Görev 3'ün bekleyen canlı doğrulaması kapandı).
+  - `e2e`: anonim oturum, gönderim/tekrar, shifts 403, şablon okuma, verilerimi sil 204 — **hepsi OK**.
+- `Info.plist`: `SupabaseURL` + `SupabaseAnonKey` dolduruldu → uygulamada sunucu açık (UI testlerinde yine `nil`).
+- Yerel gizli ayarlar `.env.supabase` dosyasında (`.gitignore` → `.env.*`); betikler `node --env-file=.env.supabase scripts/server/<betik>.mjs` ile çalışır. Erişim anahtarı yalnızca bu projeye kapsamlı, 7 gün geçerli.
+
+### Açık konular
+- Authentication: Apple sağlayıcısı (Client ID `com.kuryekazanc.app`) açık ve Email kapalı mı, panelden doğrulanmalı (anonim giriş e2e ile doğrulandı).
+- Oturumda service_role anahtarı yanlışlıkla sohbet kaydına düştü → JWT secret yenilenmesi önerildi; yenilenirse anon anahtar `.env.supabase` + `Info.plist`'te güncellenmeli.
+
+### Sonraki adım
+1. Apple Developer: `com.kuryekazanc.app`'te Sign in with Apple (profil yeniden üretilir → Codemagic); Canlı Etkinlik App ID `com.kuryekazanc.app.liveactivity` + profil — kullanıcıya sorarak.
+2. develop push → Codemagic `ios-ci`; derleme/test hatalarını düzelt.
+3. TestFlight'tan önce kullanıcıya sor.
