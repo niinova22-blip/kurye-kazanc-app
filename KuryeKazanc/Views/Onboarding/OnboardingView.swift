@@ -5,13 +5,17 @@ import SwiftData
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(LocationService.self) private var location
+    @Environment(AutoShiftCoordinator.self) private var autoShift
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
 
     @State private var viewModel = OnboardingViewModel()
     @State private var errorMessage: String?
     @State private var showConsent = false
+    @State private var showAutoShiftIntro = false
     @AppStorage(AppPreferences.dataSharingOptInKey) private var dataSharingOptIn = false
     @AppStorage(AppPreferences.dataSharingConsentDateKey) private var consentTimestamp: Double = 0
+    @AppStorage(AppPreferences.locationSharingOptInKey) private var locationSharingOptIn = false
+    @AppStorage(AppPreferences.locationSharingConsentDateKey) private var locationConsentTimestamp: Double = 0
 
     // Derleyicinin tip denetimi zaman asimina ugramasin diye govde kucuk parcalara bolundu.
     var body: some View {
@@ -32,6 +36,15 @@ struct OnboardingView: View {
             DataSharingConsentView {
                 dataSharingOptIn = true
                 consentTimestamp = Date.now.timeIntervalSince1970
+                // Konum yogunlugu kazanc paylasimiyla birlikte acik gelir (Profil'den ayri kapatilabilir)
+                locationSharingOptIn = true
+                locationConsentTimestamp = Date.now.timeIntervalSince1970
+            }
+        }
+        .sheet(isPresented: $showAutoShiftIntro) {
+            AutoShiftIntroView {
+                let coordinator: AutoShiftCoordinator = autoShift
+                Task { _ = await coordinator.enable() }
             }
         }
         .alert("Kaydedilemedi", isPresented: Binding(
@@ -165,6 +178,25 @@ struct OnboardingView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+            autoShiftOption
+        }
+    }
+
+    /// Istege bagli: otomatik vardiya aciklamasi; onayda izinler istenir.
+    @ViewBuilder
+    private var autoShiftOption: some View {
+        if autoShift.isEnabled {
+            Label("Otomatik vardiya açık", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(Theme.accent)
+        } else {
+            Button {
+                showAutoShiftIntro = true
+            } label: {
+                Label("Otomatik vardiyayı aç (isteğe bağlı)", systemImage: "scooter")
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("onboarding.autoShift")
         }
     }
 
@@ -177,7 +209,7 @@ struct OnboardingView: View {
                 .accessibilityHidden(true)
             Text("Bölgendeki kuryelerle karşılaştır")
                 .font(.title.bold())
-            Text("Anonim paylaşıma katılırsan, topluluk özellikleri açıldığında ilçendeki saat başı ortalama net kazancı ve en yoğun saatleri görürsün. Yalnızca ekran görüntüsüyle doğrulanmış kazançlar kullanılır; adın ve tam konumun asla paylaşılmaz.")
+            Text("Anonim paylaşıma katılırsan, topluluk özellikleri açıldığında ilçendeki saat başı ortalama net kazancı ve en yoğun saatleri görürsün. Yalnızca ekran görüntüsünden okunan kazançların anonim özeti gönderilir; adın, ekran görüntülerin ve tam konumun asla paylaşılmaz.")
                 .foregroundStyle(.secondary)
             if dataSharingOptIn {
                 Label("Katıldın — Profil'den istediğin an kapatabilirsin.", systemImage: "checkmark.circle.fill")

@@ -8,6 +8,12 @@ struct WorkSessionSummary: Equatable {
     var end: Date
     var distanceKm: Double
     var lastLocation: CLLocation?
+    var region: PlaceRegion? = nil
+}
+
+/// Vardiyanin kaynagi. Otomatik vardiya yalnizca kurallarla biter; elle vardiya yalnizca kullanici bitirir.
+enum ShiftOrigin: String {
+    case manual, auto
 }
 
 /// "Calisiyorum" modu. Durum UserDefaults'ta tutulur; uygulama kapanip acilsa da oturum devam eder.
@@ -16,6 +22,7 @@ struct WorkSessionSummary: Equatable {
 final class WorkSessionManager {
     private(set) var isWorking: Bool
     private(set) var sessionStart: Date?
+    private(set) var origin: ShiftOrigin?
 
     let location: LocationService
     @ObservationIgnored private let defaults: UserDefaults
@@ -30,6 +37,10 @@ final class WorkSessionManager {
             isWorking = false
             defaults.set(false, forKey: AppPreferences.isWorkingKey)
         }
+        if isWorking {
+            let raw = defaults.string(forKey: AppPreferences.workSessionOriginKey) ?? ShiftOrigin.manual.rawValue
+            origin = ShiftOrigin(rawValue: raw) ?? .manual
+        }
     }
 
     var sessionDistanceKm: Double { location.sessionDistanceMeters / 1000 }
@@ -37,31 +48,47 @@ final class WorkSessionManager {
     /// Uygulama yeniden acildiginda suren oturumun konum takibini surdurur.
     func resumeIfNeeded() {
         if isWorking, !location.isTracking {
-            location.startTracking(resetDistance: false)
+            location.startTracking(resetDistance: false, keepAliveWhenStationary: origin == .auto)
         }
     }
 
-    func start(now: Date = .now) {
+    /// - Parameter at: Otomatik vardiyada hareketin ilk goruldugu an (geri tarihli baslangic).
+    func start(at date: Date = .now, origin: ShiftOrigin = .manual) {
         guard !isWorking else { return }
         isWorking = true
-        sessionStart = now
+        sessionStart = date
+        self.origin = origin
         persist()
-        location.startTracking(resetDistance: true)
+        location.startTracking(resetDistance: true, keepAliveWhenStationary: origin == .auto)
     }
 
+    /// - Parameter end: Otomatik vardiyada son hareket ani; nil ise `now`.
     @discardableResult
-    func stop(now: Date = .now) -> WorkSessionSummary? {
+    func stop(now: Date = .now, end: Date? = nil) -> WorkSessionSummary? {
         guard isWorking, let start = sessionStart else { return nil }
         let lastLocation = location.lastLocation
         let km = location.stopTracking()
         isWorking = false
         sessionStart = nil
+        origin = nil
         persist()
-        return WorkSessionSummary(start: start, end: max(now, start), distanceKm: km, lastLocation: lastLocation)
+        let finish = max(end ?? now, start)
+        return WorkSessionSummary(start: start, end: finish, distanceKm: km, lastLocation: lastLocation)
+    }
+
+    /// Yanlis baslayan otomatik vardiya: iz birakmadan kapatir.
+    func cancel() {
+        guard isWorking else { return }
+        location.stopTracking()
+        isWorking = false
+        sessionStart = nil
+        origin = nil
+        persist()
     }
 
     private func persist() {
         defaults.set(isWorking, forKey: AppPreferences.isWorkingKey)
         defaults.set(sessionStart, forKey: AppPreferences.workSessionStartKey)
+        defaults.set(origin?.rawValue, forKey: AppPreferences.workSessionOriginKey)
     }
 }

@@ -15,6 +15,8 @@ final class DashboardUITests: XCTestCase {
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
             "-hasCompletedOnboarding", "YES", "-autoEstimateExpenses", "YES",
+            // Paylasim tercihleri testler arasinda tasinmasin
+            "-dataSharingOptIn", "NO", "-locationSharingOptIn", "NO", "-calibrationOptIn", "NO",
         ]
         if sampleData { app.launchArguments.append("-sample-data") }
         app.launch()
@@ -171,6 +173,22 @@ final class DashboardUITests: XCTestCase {
         XCTAssertEqual(toggle.value as? String, "0")
     }
 
+    func testAcceptingEarningsSharingAlsoTurnsOnLocationDensity() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Profil"].tap()
+        let toggle = app.switches["settings.dataSharing"]
+        for _ in 0..<6 where !(toggle.exists && toggle.isHittable) { app.swipeUp() }
+        toggle.switches.firstMatch.tap()
+        XCTAssertTrue(app.buttons["consent.accept"].waitForExistence(timeout: 5))
+        app.buttons["consent.accept"].tap()
+
+        let location = app.switches["profile.locationSharing"]
+        XCTAssertTrue(location.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "1")
+        XCTAssertEqual(location.value as? String, "1", "Konum yogunlugu kazanc paylasimiyla birlikte acik gelir")
+    }
+
     func testLocationSharingRequiresEarningsSharingAndOwnConsent() {
         let app = launch(sampleData: false)
         XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
@@ -191,6 +209,29 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(autoScan.exists)
         // UI testlerinde tarama tercihi bos alandan okunur: kapali baslar (izin istenmez)
         XCTAssertEqual(autoScan.value as? String, "0")
+    }
+
+    func testProfileOffersAutoShift() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Profil"].tap()
+        // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
+        let toggle = app.switches["profile.autoShift"]
+        for _ in 0..<6 where !toggle.exists { app.swipeUp() }
+        XCTAssertTrue(toggle.exists)
+        // UI testlerinde tercih bos alandan okunur: kapali baslar (izin istenmez)
+        XCTAssertEqual(toggle.value as? String, "0", "Varsayilan kapali")
+    }
+
+    func testProfileCalibrationIsOffByDefault() {
+        let app = launch(sampleData: false)
+        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Profil"].tap()
+        // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
+        let toggle = app.switches["profile.calibration"]
+        for _ in 0..<8 where !toggle.exists { app.swipeUp() }
+        XCTAssertTrue(toggle.exists)
+        XCTAssertEqual(toggle.value as? String, "0", "Kalibrasyon varsayilan kapali olmali (opt-in)")
     }
 
     func testDashboardShowsGrossAndExpenseBreakdown() {

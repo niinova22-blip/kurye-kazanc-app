@@ -8,8 +8,12 @@ struct EarningFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(LocationService.self) private var location
+    @Environment(SyncCoordinator.self) private var sync
+    @Environment(AccountService.self) private var account
 
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
+    /// Arac turu paylasilan vardiya ozetine girer.
+    @Query private var couriers: [Courier]
     /// Kayitli kanitlar: ayni ekran goruntusu ikinci kez eklenirse uyarilir.
     @Query private var evidences: [ScreenshotEvidence]
 
@@ -19,21 +23,29 @@ struct EarningFormView: View {
     @State private var saveError: String?
     @State private var showPhotoPicker: Bool
     @State private var appliedInitialImport = false
+    @AppStorage(AppPreferences.calibrationOptInKey) private var calibrationOptIn = false
+    @State private var isSendingCalibration = false
+    /// Bu ekran goruntusu icin son kalibrasyon sonucu; yeni goruntu okununca sifirlanir.
+    @State private var calibrationResult: OutboxResult?
 
     private let session: WorkSessionSummary?
     private let importer: ScreenshotImporter
     private let initialImported: ImportedScreenshot?
+    /// Basarili kayittan sonra (kapanmadan once) cagrilir; or. bekleyen vardiyayi listeden dusurmek icin.
+    private let onSaved: (() -> Void)?
 
     /// - Parameters:
     ///   - imported: Paylas eklentisi / otomatik tarama sonucu; form bununla dolu acilir.
     ///   - opensPhotoPicker: "Ekran goruntusu" ile acildiginda secici hemen gosterilir.
+    ///   - onSaved: Yalnizca kayit basariliysa cagrilir (vazgecilince cagrilmaz).
     init(
         record: EarningRecord? = nil,
         session: WorkSessionSummary? = nil,
         defaultPlatform: Platform? = nil,
         imported: ImportedScreenshot? = nil,
         opensPhotoPicker: Bool = false,
-        importer: ScreenshotImporter = ScreenshotImporter()
+        importer: ScreenshotImporter = ScreenshotImporter(),
+        onSaved: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: EarningFormViewModel(
             record: record, session: session, defaultPlatform: defaultPlatform, imported: imported
@@ -42,6 +54,7 @@ struct EarningFormView: View {
         self.session = session
         self.importer = importer
         self.initialImported = imported
+        self.onSaved = onSaved
     }
 
     var body: some View {
@@ -142,6 +155,7 @@ struct EarningFormView: View {
                     }
                 }
             }
+            .dismissesKeyboard()
             .navigationTitle(vm.isEditing ? "Kazancı düzenle" : "Kazanç ekle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -177,6 +191,10 @@ struct EarningFormView: View {
             .onChange(of: photoItem) { _, item in
                 guard let item else { return }
                 Task { await loadScreenshot(item) }
+            }
+            .onChange(of: viewModel.imported?.textHash) { _, _ in
+                // Yeni ekran goruntusu: kalibrasyon yeniden gonderilebilir
+                calibrationResult = nil
             }
             .task {
                 // Init'te platform listesi yoktu; platformu eslestirmek icin bir kez yeniden uygulanir
@@ -226,6 +244,10 @@ struct EarningFormView: View {
                     .font(.subheadline)
             }
 
+            if calibrationOptIn, viewModel.imported != nil {
+                calibrationRow
+            }
+
             if BuildEnvironment.showsTesterTools, let report = viewModel.ocrDiagnosticReport {
                 ShareLink(item: report, subject: Text("Kurye Kazanç OCR raporu")) {
                     Label("Yanlış okuduysa: okunan metni geliştiriciye gönder", systemImage: "ladybug")
@@ -235,6 +257,42 @@ struct EarningFormView: View {
             }
         } footer: {
             Text("Trendyol GO, Getir, Yemeksepeti ve Migros kazanç ekranları tanınır. Görüntü cihazında işlenir; görselin kendisi saklanmaz.")
+        }
+    }
+
+    /// Kalibrasyon rizasi acik ve form OCR kanitliyken: maskelenmis satirlari gonder.
+    @ViewBuilder
+    private var calibrationRow: some View {
+        Button {
+            sendCalibration()
+        } label: {
+            HStack {
+                Label("Kalibrasyona gönder", systemImage: "paperplane")
+                if isSendingCalibration {
+                    Spacer()
+                    ProgressView()
+                }
+            }
+        }
+        // Basarili / kuyruga alinmis ornek ikinci kez gonderilmez
+        .disabled(isSendingCalibration || (calibrationResult != nil && calibrationResult != .invalid))
+        .accessibilityIdentifier("earningForm.calibrate")
+
+        if let calibrationResult {
+            Text(calibrationResultText(calibrationResult))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("earningForm.calibrateResult")
+        }
+    }
+
+    private func calibrationResultText(_ result: OutboxResult) -> String {
+        switch result {
+        case .ok, .duplicate: "Gönderildi, teşekkürler"
+        case .rateLimited: "Bugünlük sınır doldu"
+        // Gecici hata: ornek kuyruga alindi, baglanti gelince tekrar gonderilir
+        case .transient: "Gönderilemedi, sonra tekrar denenecek"
+        case .invalid: "Gönderilemedi"
         }
     }
 
@@ -266,14 +324,36 @@ struct EarningFormView: View {
         }
         let identifier: String? = item.itemIdentifier
         let capturedAt: Date? = PhotoAssetInfo.creationDate(localIdentifier: identifier)
+        // Sunucudan gelen guncel sablonlar da kullanilir (gomulu + uzak)
+        var configured: ScreenshotImporter = importer
+        configured.parser.templates = sync.mergedTemplates()
         await viewModel.importScreenshot(
             data: data,
             assetIdentifier: identifier,
             capturedAt: capturedAt,
-            importer: importer,
+            importer: configured,
             platforms: platforms,
             knownTextHashes: knownHashes
         )
+    }
+
+    private func sendCalibration() {
+        guard let imported = viewModel.imported else { return }
+        // Veritabanina eklenmeyen gecici kanit: yalnizca gonderim icin (kayitla kaydedilen kanit ayridir)
+        let evidence = ScreenshotEvidence(
+            capturedAt: imported.capturedAt,
+            assetIdentifier: imported.assetIdentifier,
+            parsed: imported.parsed,
+            lines: imported.lines,
+            isGenuineScreenshot: imported.isGenuine
+        )
+        let coordinator: SyncCoordinator = sync
+        isSendingCalibration = true
+        Task {
+            let result: OutboxResult = await coordinator.sendCalibration(evidence)
+            calibrationResult = result
+            isSendingCalibration = false
+        }
     }
 
     /// Kayitli kanitlarin metin ozetleri (bos ozet eslesme sayilmaz).
@@ -292,11 +372,26 @@ struct EarningFormView: View {
 
     private func save() {
         do {
-            try viewModel.save(in: modelContext)
+            let record: EarningRecord = try viewModel.save(in: modelContext)
+            afterSave(record)
+            onSaved?()
             dismiss()
         } catch {
             saveError = error.localizedDescription
         }
+    }
+
+    /// Paylasim rizasi varsa uygun kayit kuyruga girer; Apple ile girisliyse 24 saatte bir yedek.
+    /// Riza yoksa ve giris yapilmadiysa ag kullanilmaz (koordinator ve hesap servisi kontrol eder).
+    private func afterSave(_ record: EarningRecord) {
+        let vehicle: String = (couriers.first?.vehicleType ?? .motorcycle).rawValue
+        sync.recordSaved(record, vehicle: vehicle)
+        let coordinator: SyncCoordinator = sync
+        let service: AccountService = account
+        let context: ModelContext = modelContext
+        // Gonderim yedegi beklemesin: ikisi ayri baslar
+        Task { await coordinator.flush() }
+        Task { await service.backupIfDue(context: context) }
     }
 }
 

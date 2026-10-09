@@ -31,4 +31,15 @@ enum TextHash {
         let padding = String(repeating: "0", count: max(0, 16 - hex.count))
         return padding + hex
     }
+
+    /// Sunucuya giden `text_hash` (spec 4.3): ayni normalize metnin SHA-256 ozeti, 64 karakter hex.
+    static func sha256(_ lines: [String]) -> String {
+        var normalized: [String] = []
+        for line in lines {
+            let text = TextNormalizer.normalize(line)
+            if !text.isEmpty { normalized.append(text) }
+        }
+        guard !normalized.isEmpty else { return "" }
+        return SHA256.hex(normalized.joined(separator: "\n"))
+    }
 }

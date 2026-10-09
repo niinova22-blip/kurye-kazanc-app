@@ -168,3 +168,80 @@ Tasarım: `docs/superpowers/specs/2026-10-07-gridwise-tr-design.md` · Plan: `do
 - Paylaş eklentisi için Apple Developer önkoşulları (README → İmzalama) yapılmadan `ios-release` imzalamada düşer.
 - Şablonlar gerçek ekran örnekleriyle kalibre edilene kadar hiçbir kayıt "Doğrulandı" olmaz (beklenen).
 - Sonraki: 1.2 planı (Live Activity, widget, hareket algılama, PDF/CSV, Siri).
+
+## Oturum 4 — 2026-10-08: Sürüm 1.2 (derlenmedi)
+
+Tasarım: `docs/superpowers/specs/2026-10-08-surum-1-2-otomatik-vardiya-design.md`
+
+### Yapılanlar
+- **Core (`KuryeKazanc/Core/Shift/`, saf):** `AutoShiftPolicy` (başlatma/bitirme/iptal kuralları), `WorkHours` (çalışma saatleri penceresi, gece yarısını aşabilir; varsayılan 09:00–01:00, "Her saatte" seçeneği), `MotionSample` (CoreMotion örneği; yalnızca orta/yüksek güvenli araç veya bisiklet hareket sayılır), `PendingShift` + `PendingShiftList` (en fazla 5, 24 saat), `LiveActivityThrottle` (güncelleme sıklığı).
+- **Servisler:** `CoreMotionActivityProvider` (CMMotionActivityManager geçmiş sorgusu), `ShiftNotifications` ("Vardiya başladı" + "Bu bir vardiya değil" eylemi, "Vardiya bitti" → kazanç formu), `LiveActivityController` (ActivityKit aç/güncelle/bitir/kapat), `AutoShiftCoordinator` (uyanma → hareket geçmişi → politika → başlat/bitir/iptal; bekleyen vardiyalar; tüm başlatma/bitirme buradan geçer). `LocationService`: önemli konum değişikliği izleme, son hareket zamanı (≥ 50 m), konum olayı bildirimi; `WorkSessionManager`: vardiya kaynağı (elle/otomatik), geri tarihli başlangıç, iptal.
+- **Otomatik km:** vardiya boyunca GPS ile biriken mesafe (mevcut "Çalışıyorum" takibi; otomatik vardiyada iOS duraklatmaz). Koordinat saklanmaz, yalnızca il/ilçe/semt metni.
+- **Uygulama:** `AppEnvironment` (tek nesne grafiği: SwiftUI sahnesi, AppDelegate ve Canlı Etkinlik Intent'i aynı örnekleri kullanır) + `AppDelegate` (konum olayıyla arka planda yeniden başlatmada izlemeyi kurar, bildirim eylemlerini işler).
+- **`KuryeLiveActivity` eklentisi:** kilit ekranı + Dynamic Island; süre, km, bugünkü net, ~₺/saat ve "Vardiyayı bitir" düğmesi (`EndShiftIntent`, `Shared/`). Canlı Etkinlikten bitirilen vardiya bekleyen vardiya olur, "Vardiya bitti" bildirimi kazanç formuna götürür.
+- **Arayüz:** Profil "Otomatik vardiya" bölümü (anahtar + çalışma saatleri, izin uyarısı); Bugün'de "Bu bir vardiya değil" satırı ve "Biten vardiyalar" bölümü; onboarding'de isteğe bağlı açma.
+- **Kurallar:** çalışma saatleri içinde son 10 dakikada 3 dakika kesintisiz hareket → başlar (başlangıç hareketin ilk görüldüğü an); "Bu bir vardiya değil" sonrası 30 dk yeniden başlamaz; 20 dk hareketsizlikte biter, bitiş = son hareket anı (süreç ölüyken geçen uzun duraklama da aynı şekilde kesilir); 5 dakikadan kısa ve 1 km'den az otomatik vardiya sessizce atılır; biten vardiya kazancı kaydedilene kadar bekler. Elle vardiya yalnızca kullanıcı bitirince biter.
+- **1.1 arayüz düzeltmeleri (bugün):** formlarda klavye kaydırınca ve "Bitti" ile kapanır; kazanç paylaşımı onayı konum yoğunluğunu da açar.
+- **Son inceleme düzeltmeleri:** Canlı Etkinlik "Vardiyayı bitir" artık süre/km'yi kaybetmez; arka planda başlayan vardiyanın Canlı Etkinliği ön plana dönüşte açılır; her GPS olayında hareket geçmişi sorgulanmaz; elle vardiya başlığı "Vardiya · elle".
+
+### Testler
+- Core (Windows `swift test`): **90 test, 0 hata** (89 + saat geri alınınca Canlı Etkinlik güncellemesi).
+- Uygulama XCTest'leri (`AutoShiftCoordinatorTests` vb.) Windows'ta çalıştırılamadı; elle izlendi.
+
+### Derleme ve TestFlight durumu
+- **Sürüm 1.2 derlenmedi, push edilmedi, TestFlight'a gönderilmedi** — kullanıcı kararı.
+- **1.3 TestFlight öncesi önkoşul:** Apple Developer'da Canlı Etkinlik eklentisi App ID'si `com.kuryekazanc.app.liveactivity` ve App Store profili oluşturulmalı; yoksa `ios-release` imzalamada düşer. Kullanıcıya sorulacak.
+
+### Sonraki adım
+- 1.3 ile birlikte ilk CI derlemesi (uygulama + eklenti) ve uygulama testleri; gerçek cihazda otomatik vardiya ve Canlı Etkinlik denemesi.
+
+## Oturum 5 — 2026-10-09: Sürüm 1.3.0 (sunucu; derlenmedi)
+
+Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan: `docs/superpowers/plans/2026-10-09-surum-1-3-sunucu.md`
+
+### Yapılanlar
+- **Core (saf):** saf Swift SHA-256 ve ekran metni özeti (`TextHash`), vardiya yükü (`ShiftPayload`: il/ilçe, hafta günü, 15 dk dilim, 0,5 km'ye yuvarlı mesafe; yalnızca `verified`/`ocrUnverified`), `OutboxPolicy` (üstel bekleme 1 dk → 6 sa, günlük sınırda ertesi gün), `CalibrationMasker` (IBAN, telefon, TC kimlik, e-posta), `TemplateMerger` (gömülü + uzak şablon).
+- **Sunucu (`supabase/`):** şema, RLS, `submit_shift` / `submit_calibration` / `delete_my_data` fonksiyonları, günlük hız sınırları, pgTAP testleri; `scripts/server/` betikleri (apply, seed_templates, test, e2e). Kurulum: `supabase/README.md`.
+- **Servisler (`Services/Sync/`):** `SupabaseClient` (elle yazılmış REST; anonim oturum, Apple id_token, Keychain'de oturum, yalnızca HTTPS), `OutboxQueue` (Application Support/outbox.json, dosya korumalı), `SyncCoordinator` (rıza + kayıt → kuyruk, boşaltma, kalibrasyon, 12 saatte bir şablon çekimi; rıza yoksa ağ yok), `BackupService` + `AccountService` (Apple ile Giriş, yedekle/geri yükle, 24 saatte bir otomatik yedek, "Verilerimi sil").
+- **Arayüz:** Profil > "Hesap ve yedek", "Kalibrasyon" (ayrı açık rıza), "Gizlilik ve KVKK"; formda "Kalibrasyona gönder". KVKK aydınlatma ve açık rıza **taslakları** `docs/legal/`.
+- **Bağlantılar (Görev 8):** `AppEnvironment` istemciyi yalnızca Info.plist ayarı varsa kurar (UI testlerinde `nil`); `SyncCoordinator` + `AccountService` sahneye `.environment` ile verilir. Açılışta ve ön plana dönüşte şablon yenileme + kuyruk boşaltma. Kayıt sonrası kuyruğa ekleme + girişliyse yedek. Kayıt silinince bekleyen gönderimi düşer (`recordDeleted`, "Tüm kayıtları sil" → `allRecordsDeleted`). Paylaşım kapatılınca kuyruk temizlenir. Tüm ekran görüntüsü okumaları (form, paylaş gelen kutusu, çoklu seçim, otomatik tarama) birleşik şablonları kullanır. 1.2 öncesi "veri gönderilmez / yalnızca bu cihazda" metinleri 1.3'e göre düzeltildi.
+- **Son inceleme düzeltmeleri (2026-10-08):** "Verilerimi sil" artık eski (emekli) anonim/Apple kimliklerindeki veriyi de siler (emekli yenileme belirteçleri Keychain'de, yalnızca bu cihaz); ilk "Şimdi yedekle" öncesi uyarı (sunucudaki yedeği ezmesin); otomatik yedek yalnızca bir yedek tabanı (elle yedek / geri yükleme) varken; boşluksuz/önneksiz cep telefonu maskelenir; haftalık ekranlar vardiya olarak gönderilmez; Profil'de "Son gönderim"; Apple giriş hataları gösterilir; silme sürmekte olan gönderimi bekler; günlük sınır UTC gününe göre.
+- Ertelenen küçükler ve kararlar: `.superpowers/sdd/2026-10-09-surum-1-3-sunucu/progress.md` ("minor (deferred)", "parked", "Ruling:").
+- Sürüm **1.3.0**; `TESTFLIGHT_NOTES.md` 1.3.0 bölümü (1.2 + 1.3 yenilikleri, cihaz test listesi).
+
+### Testler
+- Core (Windows `swift test`): **100 test, 0 hata**.
+- Uygulama XCTest'leri (`SupabaseClientTests`, `SyncCoordinatorTests`, `BackupServiceTests` vb.) Windows'ta çalıştırılamadı; ilk CI derlemesinde çalışacak.
+
+### Derleme ve TestFlight durumu
+- **1.2 + 1.3 henüz derlenmedi**, push edilmedi, TestFlight'a gönderilmedi.
+- Info.plist'te `SupabaseURL` / `SupabaseAnonKey` yok → sunucu kapalı (Profil'de "Sunucu bu sürümde kapalı").
+
+### Sonraki adım (kullanıcı onaylı sıra)
+1. Supabase projesi (eu-central-1), Auth ayarları; betikler: apply → seed_templates → test → e2e; URL + anon anahtarı Info.plist'e.
+2. Apple Developer: `com.kuryekazanc.app`'te Sign in with Apple (profil yeniden üretilir → Codemagic referansı); Canlı Etkinlik App ID + profil — kullanıcıya sorarak.
+3. develop push → Codemagic `ios-ci`; derleme/test hatalarını düzelt.
+4. TestFlight'tan önce kullanıcıya sor.
+
+## Oturum 6 — 2026-10-09: Supabase canlı kurulum
+
+### Yapılanlar
+- Supabase projesi `kurye-kazanc` (ref `pgvdefkweclutfwgbxbh`, ücretsiz plan) oluşturuldu.
+- Betikler (kullanıcı çalıştırdı; otomatik mod canlı veritabanına yazmayı engelliyor):
+  - `apply`: 2 göç uygulandı.
+  - `seed_templates`: 4 şablon (Trendyol GO, Getir, Yemeksepeti, Migros Hemen) v1.
+  - `test`: pgTAP 9 grup / 22 kontrol, **hepsi geçti** (Görev 3'ün bekleyen canlı doğrulaması kapandı).
+  - `e2e`: anonim oturum, gönderim/tekrar, shifts 403, şablon okuma, verilerimi sil 204 — **hepsi OK**.
+- `Info.plist`: `SupabaseURL` + `SupabaseAnonKey` dolduruldu → uygulamada sunucu açık (UI testlerinde yine `nil`).
+- Yerel gizli ayarlar `.env.supabase` dosyasında (`.gitignore` → `.env.*`); betikler `node --env-file=.env.supabase scripts/server/<betik>.mjs` ile çalışır. Erişim anahtarı yalnızca bu projeye kapsamlı, 7 gün geçerli.
+
+### Açık konular
+- Authentication: anonim + Apple (`com.kuryekazanc.app`) açık, Email kapalı (kullanıcı teyit etti).
+- Oturumda eski (legacy) service_role anahtarı yanlışlıkla sohbet kaydına düştü → uygulama ve betikler yeni **publishable** anahtara (`sb_publishable_...`, `apikey` başlığında) geçirildi, e2e yeniden geçti. Eski JWT tabanlı anahtarlar kapatıldı.
+
+- **İlk 1.2 + 1.3 CI derlemesi (#19, `a1f1f6a`) başarılı:** derleme + birim testleri **234/234** (UI testleri yalnızca PR'da).
+
+- **Apple Developer:** `com.kuryekazanc.app`'te Sign in with Apple açıldı; "Kurye Kazanc App Store" yeniden üretildi; App ID `com.kuryekazanc.app.liveactivity` + "Kurye Kazanc Live Activity App Store" profili oluşturuldu. Codemagic'e `kurye-kazanc-appstore-v3` ve `kurye-kazanc-liveactivity-appstore` olarak çekildi; `codemagic.yaml` v3'e geçti.
+
+### Sonraki adım
+1. develop → main PR (UI testleri burada çalışır) → birleştirme → `ios-release` → TestFlight 1.3.0 — kullanıcıya sorarak.

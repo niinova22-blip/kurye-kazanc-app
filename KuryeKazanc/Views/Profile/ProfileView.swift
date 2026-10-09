@@ -2,12 +2,14 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 
-/// Profil sekmesi: profil, hedefler, gider hesabi, konum izni, paylasim rizalari, veri.
+/// Profil sekmesi: profil, hedefler, gider hesabi, konum izni, paylasim rizalari, hesap ve yedek, kalibrasyon, veri.
 struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(LocationService.self) private var location
     @Environment(ScreenshotScanner.self) private var scanner
+    @Environment(SyncCoordinator.self) private var sync
+    @Environment(AccountService.self) private var account
 
     @Query private var couriers: [Courier]
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
@@ -37,21 +39,28 @@ struct ProfileView: View {
                 goalsSection
                 expenseSection
                 locationSection
+                AutoShiftSection()
                 screenshotSection
                 sharingSection
+                AccountSection()
+                CalibrationSection()
                 dataSection
                 aboutSection
             }
+            .dismissesKeyboard()
             .navigationTitle("Profil")
-            .onAppear {
-                costText = TurkishNumberParser.format(costPerKm)
-                weeklyGoalText = weeklyGoal > 0 ? TurkishNumberParser.format(weeklyGoal) : ""
-                dailyGoalText = dailyGoal > 0 ? TurkishNumberParser.format(dailyGoal) : ""
+            .onAppear(perform: loadFieldTexts)
+            // Geri yukleme ayarlari degistirir (taban tarihi de degisir): alanlar yeniden okunur.
+            .onChange(of: account.lastBackupDate) { _, _ in
+                loadFieldTexts()
             }
             .sheet(isPresented: $showConsentSheet) {
                 DataSharingConsentView {
                     dataSharingOptIn = true
                     consentTimestamp = Date.now.timeIntervalSince1970
+                    // Konum yogunlugu, kazanc paylasimiyla birlikte acik gelir (riza ekraninda listelenir); ayri kapatilabilir
+                    locationSharingOptIn = true
+                    locationConsentTimestamp = Date.now.timeIntervalSince1970
                 }
             }
             .sheet(isPresented: $showLocationConsentSheet) {
@@ -184,7 +193,7 @@ struct ProfileView: View {
         } header: {
             Text("Arka plan konumu")
         } footer: {
-            Text("Konum yalnızca “Çalışmaya başla” ile başlattığın oturum boyunca takip edilir (mesafe ve ilçe için), bitirince durur. “Uygulamayı kullanırken” izni de yeterlidir; oturum ön planda başlatıldığında arka planda devam eder. Tam konum saklanmaz.")
+            Text("Konum yalnızca “Vardiyayı başlat” ile başlattığın vardiya boyunca takip edilir (mesafe ve ilçe için), bitirince durur. “Uygulamayı kullanırken” izni de yeterlidir; vardiya ön planda başlatıldığında arka planda devam eder. Tam konum saklanmaz.")
         }
     }
 
@@ -240,10 +249,12 @@ struct ProfileView: View {
                     if newValue {
                         showConsentSheet = true // Acik onay olmadan acilmaz
                     } else {
+                        // Riza anahtari ONCE yazilir; koordinator bekleyen vardiyalari buna gore siler
                         dataSharingOptIn = false
                         consentTimestamp = 0
                         locationSharingOptIn = false
                         locationConsentTimestamp = 0
+                        sync.sharingConsentChanged(enabled: false)
                     }
                 }
             ))
@@ -262,11 +273,21 @@ struct ProfileView: View {
             ))
             .disabled(!dataSharingOptIn)
             .accessibilityIdentifier("profile.locationSharing")
+
+            if dataSharingOptIn {
+                LabeledContent("Son gönderim", value: lastSyncText)
+                    .accessibilityIdentifier("profile.lastSync")
+            }
         } header: {
             Text("Paylaşım")
         } footer: {
-            Text("Varsayılan olarak kapalıdır. Bu sürümde hiçbir veri gönderilmez; tercihlerin kaydedilir. Topluluk özellikleri açıldığında yalnızca ekran görüntüsüyle doğrulanmış kazançlar paylaşılır.")
+            Text("Açıkken, ekran görüntüsünden okunup değiştirilmeyen kazançlarının anonim vardiya özeti gönderilir; görselin kendisi, elle girilen ve düzeltilen kayıtlar gönderilmez. Kapatınca bekleyen gönderimler silinir. Konum yoğunluğu bu sürümde henüz gönderilmiyor; açarsan tercihin kaydedilir.")
         }
+    }
+
+    private var lastSyncText: String {
+        guard let date = sync.lastSyncDate else { return "Henüz yok" }
+        return date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Formatters.locale))
     }
 
     // MARK: - Veri
@@ -276,13 +297,17 @@ struct ProfileView: View {
             Button("Tüm kayıtları sil", role: .destructive) { showDeleteConfirmation = true }
                 .accessibilityIdentifier("settings.deleteAll")
         } footer: {
-            Text("Tüm veriler yalnızca bu cihazda saklanır.")
+            Text("Kayıtların telefonunda saklanır; Apple ile giriş yaparsan sunucuya da yedeklenir. Bu düğme yalnızca telefondaki kayıtları siler; sunucudaki veriler için Hesap ve yedek > “Verilerimi sil”i kullan.")
         }
     }
 
     private var aboutSection: some View {
         Section("Hakkında") {
             LabeledContent("Sürüm", value: appVersion)
+            NavigationLink("Gizlilik ve KVKK") {
+                PrivacyView()
+            }
+            .accessibilityIdentifier("profile.privacy")
         }
     }
 
@@ -299,8 +324,18 @@ struct ProfileView: View {
         }
     }
 
+    private func loadFieldTexts() {
+        costText = TurkishNumberParser.format(costPerKm)
+        weeklyGoalText = weeklyGoal > 0 ? TurkishNumberParser.format(weeklyGoal) : ""
+        dailyGoalText = dailyGoal > 0 ? TurkishNumberParser.format(dailyGoal) : ""
+    }
+
     private func deleteAllRecords() {
         try? modelContext.deleteAllRecords()
+        // Silinen kayitlarin bekleyen gonderimleri de dusulur (sunucudakiler icin "Verilerimi sil")
+        sync.allRecordsDeleted()
+        // Bos veri otomatik yedekle sunucudaki yedegi ezmesin
+        account.localRecordsCleared()
     }
 }
 

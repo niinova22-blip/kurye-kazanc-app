@@ -1,0 +1,93 @@
+# iOS CI (GitHub Actions) - Kurye Kazanc
+#
+# Proje uret, derle, birim testleri; UI testleri yalnizca PR'da (ve elle calistirmada istenirse).
+# Imzalama ve TestFlight burada YOK: main'e birlestirince Codemagic `ios-release` yapar.
+# Ucretsiz planda macOS dakikasi 10 kat sayilir -> belgeler degisince calismaz, eski calisma iptal edilir.
+
+name: iOS CI
+
+on:
+  push:
+    branches-ignore: [main, "release/**"]
+    paths-ignore: ["**.md", "docs/**", "supabase/**", "scripts/server/**", "scripts/design/**"]
+  pull_request:
+    paths-ignore: ["**.md", "docs/**", "supabase/**", "scripts/server/**", "scripts/design/**"]
+  workflow_dispatch:
+    inputs:
+      run_ui_tests:
+        description: "UI testlerini de calistir"
+        type: boolean
+        default: false
+
+# Ayni dal icin push ve PR olaylari ayni grupta: yenisi eskisini iptal eder (dakika tasarrufu).
+concurrency:
+  group: ios-ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  XCODE_PROJECT: KuryeKazanc.xcodeproj
+  XCODE_SCHEME: KuryeKazanc
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: En yeni Xcode'u sec
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: XcodeGen ile Xcode projesini uret
+        run: |
+          brew install xcodegen xcbeautify
+          xcodegen generate
+
+      - name: Test icin derle
+        run: |
+          set -o pipefail
+          SIM_ID=$(bash scripts/ci/pick_simulator.sh)
+          echo "SIM_ID=$SIM_ID" >> "$GITHUB_ENV"
+          xcodebuild build-for-testing \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "id=$SIM_ID" \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+
+      - name: Birim testleri (XCTest)
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "id=$SIM_ID" \
+            -derivedDataPath build/DerivedData \
+            -only-testing:KuryeKazancTests \
+            -resultBundlePath build/results/UnitTests.xcresult \
+            | xcbeautify --renderer github-actions
+
+      - name: UI testleri (XCUITest, simulator)
+        if: github.event_name == 'pull_request' || inputs.run_ui_tests
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "id=$SIM_ID" \
+            -derivedDataPath build/DerivedData \
+            -only-testing:KuryeKazancUITests \
+            -resultBundlePath build/results/UITests.xcresult \
+            | xcbeautify --renderer github-actions
+
+      - name: Test sonuclarini yukle
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: build/results/*.xcresult
+          retention-days: 7

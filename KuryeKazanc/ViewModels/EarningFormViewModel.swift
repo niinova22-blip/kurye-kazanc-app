@@ -274,6 +274,12 @@ final class EarningFormViewModel {
 
     func resolveRegionIfNeeded(using location: LocationService, from session: WorkSessionSummary?) async {
         guard !isEditing, district.isEmpty, location.isEnabled else { return }
+        if let region = session?.region {
+            province = region.province ?? ""
+            district = region.district ?? ""
+            neighborhood = region.neighborhood ?? ""
+            return
+        }
         isResolvingRegion = true
         defer { isResolvingRegion = false }
 

@@ -23,6 +23,25 @@ enum AppPreferences {
     /// Son 48 saatin ekran goruntulerini otomatik tara (kullanici acar; izin o an istenir).
     static let screenshotScanEnabledKey = "screenshotScanEnabled"
     static let dismissedScreenshotIDsKey = "dismissedScreenshotIDs"
+    /// Vardiya elle mi otomatik mi basladi ("manual" / "auto").
+    static let workSessionOriginKey = "workSessionOrigin"
+    /// Hareketle otomatik vardiya (kullanici acar; izinler o an istenir).
+    static let autoShiftEnabledKey = "autoShiftEnabled"
+    static let workHoursKey = "autoShiftWorkHours"
+    static let lastAutoCancelKey = "autoShiftLastCancel"
+    static let pendingShiftsKey = "autoShiftPending"
+    /// Son anlamli hareketin zamani (otomatik vardiyanin bitisi icin).
+    static let lastMovementKey = "lastMovementDate"
+    /// Kalibrasyon ornegi gonderimi (paylasimdan AYRI acik riza). Varsayilan KAPALI.
+    static let calibrationOptInKey = "calibrationOptIn"
+    /// Son basarili sunucu gonderimi (Unix zaman damgasi).
+    static let lastSyncDateKey = "lastSyncDate"
+    /// Uzak sablonlarin son cekildigi an (Unix zaman damgasi).
+    static let templatesFetchedAtKey = "templatesFetchedAt"
+    /// Sunucuya ulasmis (ok/duplicate) kayit id'leri; tekrar kuyruga girmez.
+    static let sentRecordIDsKey = "sentRecordIDs"
+    /// Son basarili yedekleme (Unix zaman damgasi). Cikista silinir.
+    static let lastBackupDateKey = "lastBackupDate"
 
     static let defaultCostPerKm = VehicleType.motorcycle.defaultCostPerKm
 }

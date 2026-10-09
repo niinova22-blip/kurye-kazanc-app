@@ -14,7 +14,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.1.0"
+    MARKETING_VERSION: "1.3.0"
     CURRENT_PROJECT_VERSION: "1"
     VERSIONING_SYSTEM: apple-generic   # CI'da agvtool ile build numarasi arttirilir
     # DEVELOPMENT_TEAM bilerek yok: Codemagic `xcode-project use-profiles` ile imzalama ayarlarini enjekte eder.
@@ -29,8 +29,11 @@ targets:
         excludes:
           - "Supporting/Info.plist"
           - "Supporting/*.entitlements"
+      - path: Shared
     dependencies:
       - target: KuryeShareExtension
+        embed: true
+      - target: KuryeLiveActivity
         embed: true
     settings:
       base:
@@ -44,6 +47,8 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.finance
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Platformunun kazanç ekranının yeni ekran görüntülerini bulup kayda dönüştürmek için. Görüntüler cihazında işlenir, hiçbir yere gönderilmez."
+        INFOPLIST_KEY_NSSupportsLiveActivities: YES
+        INFOPLIST_KEY_NSMotionUsageDescription: "Motorla ya da bisikletle yola çıktığını anlayıp vardiyanı kendiliğinden başlatmak için hareket bilgini kullanıyoruz. Bu bilgi cihazından çıkmaz."
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -67,6 +72,25 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: "Kurye Kazanç"
         CODE_SIGN_ENTITLEMENTS: KuryeShareExtension/KuryeShareExtension.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+
+  # Vardiya Canli Etkinligi (kilit ekrani + Dynamic Island)
+  KuryeLiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: KuryeLiveActivity
+        excludes:
+          - "Info.plist"
+      - path: Shared
+      - path: KuryeKazanc/Core/Formatters.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kuryekazanc.app.liveactivity
+        INFOPLIST_FILE: KuryeLiveActivity/Info.plist
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Kurye Kazanç"
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
 

@@ -9,12 +9,17 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Kazanç kayıtlarına çalıştığın ilçe/semt bilgisini otomatik eklemek için konumunu kullanıyoruz.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Yalnızca "Çalışıyorum" modu açıkken, uygulama arka plandayken de mesafe ve bölge bilgisini kaydetmek için konumunu kullanıyoruz. Mod kapalıyken konum takibi yapılmaz.</string>
+	<string>Vardiya sırasında mesafeni ölçmek ve otomatik vardiya açıksa yola çıktığını anlayıp vardiyanı kendiliğinden başlatmak için konumunu kullanıyoruz. Konumun cihazından çıkmaz.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Supabase (surum 1.3). Bos birakilirsa sunucu kapali sayilir (SupabaseConfig.fromBundle == nil). -->
+	<key>SupabaseURL</key>
+	<string>https://pgvdefkweclutfwgbxbh.supabase.co</string>
+	<key>SupabaseAnonKey</key>
+	<string>sb_publishable_CAu7FNGGNb2axhhp_tmc8g_b45tUOFl</string>
 </dict>
 </plist>

@@ -7,7 +7,7 @@ Kuryeler için net kazanç takip uygulaması. Swift + SwiftUI + SwiftData, MVVM,
 1. Swift kaynaklarını ve `project.yml` dosyasını VS Code'da düzenleyin.
 2. `.xcodeproj` repoda **yoktur**; CI'da [XcodeGen](https://github.com/yonaskolb/XcodeGen) ile `project.yml`'den üretilir.
    Yeni bir `.swift` dosyası eklemek için projeye "eklemeniz" gerekmez — ilgili klasöre koymanız yeterli.
-3. Push → Codemagic `ios-ci` akışı: proje üretimi, derleme, birim testleri, UI testleri (simülatör).
+3. Push / PR → GitHub Actions `iOS CI` (`.github/workflows/ios-ci.yml`): proje üretimi, derleme, birim testleri; UI testleri yalnızca PR'da. Codemagic `ios-ci` yalnızca elle (yedek); `main`'e birleştirince Codemagic `ios-release` → TestFlight.
 4. `main` veya `release/*` dalına push → `ios-release`: testler + imzalı IPA + otomatik TestFlight.
    Öncesinde `TESTFLIGHT_NOTES.md` en üstüne yeni sürüm notunu ekleyin.
 
@@ -60,6 +60,10 @@ scripts/ci/          CI yardımcı scriptleri
 3. Yeni App ID `com.kuryekazanc.app.share` (App Groups açık, aynı grup).
 4. Profiller: "Kurye Kazanc App Store" yeniden kaydedilir; yeni "Kurye Kazanc Share App Store" (`com.kuryekazanc.app.share`).
 5. Codemagic → Code signing identities → iOS provisioning profiles → Fetch: `kurye-kazanc-appstore-v2` (App Group yetenekli yeni profil) ve `kurye-kazanc-share-appstore`.
+6. (1.2+) Canlı Etkinlik eklentisi: App ID `com.kuryekazanc.app.liveactivity` (ek yetenek yok), App Store profili "Kurye Kazanc Live Activity App Store" → Codemagic referansı `kurye-kazanc-liveactivity-appstore`.
+7. (1.3+) `com.kuryekazanc.app`'te Sign in with Apple açık → "Kurye Kazanc App Store" yeniden kaydedildi → Codemagic referansı `kurye-kazanc-appstore-v3` (`-v2` ve ilk `kurye-kazanc-appstore` artık geçersiz profile işaret eder).
+
+Yetenek eklenince profil geçersizleşir: yeniden kaydedip Codemagic'e **yeni bir referans adıyla** çekin ve `codemagic.yaml`'ı güncelleyin.
 
 Gizli bilgiler koda yazılmaz; hepsi Codemagic arayüzünde tutulur:
 
@@ -71,9 +75,19 @@ Gizli bilgiler koda yazılmaz; hepsi Codemagic arayüzünde tutulur:
 
 Bundle ID (`com.kuryekazanc.app`) gizli değildir; `project.yml` ve `codemagic.yaml`'da aynı olmalı ve App Store Connect'te kayıtlı olmalıdır.
 
+## Sunucu (1.3+)
+
+Supabase (eu-central-1): anonim oturum + isteğe bağlı Apple ile Giriş, vardiya gönderimi, kalibrasyon örnekleri,
+OCR şablonları ve yedek. Kurulum, göçler ve test betikleri: [supabase/README.md](supabase/README.md).
+
+Uygulama sunucu adresini ve anon anahtarı Info.plist'teki `SupabaseURL` / `SupabaseAnonKey` değerlerinden okur.
+Bu değerler yoksa (ve UI testlerinde) sunucu kapalıdır: eşitleme ve hesap özellikleri hiç ağ isteği yapmaz.
+
 ## Gizlilik notu
 
 Kazanç/gider kayıtları kişisel bilgi içermez; yalnızca cihazda üretilmiş rastgele bir UUID taşır.
-Ham GPS koordinatı saklanmaz, yalnızca il/ilçe/semt. V1'de hiçbir veri cihaz dışına gönderilmez.
+Ham GPS koordinatı saklanmaz, yalnızca il/ilçe/semt. Cihaz dışına yalnızca kullanıcı açarsa veri çıkar:
+anonim paylaşım açıksa ekran görüntüsünden okunup değiştirilmeyen kayıtların vardiya özeti, kalibrasyon açıksa
+maskelenmiş ekran metni, Apple ile giriş yapıldıysa yedek. Ekran görüntülerinin kendisi asla gönderilmez.
 
 İlerleme kaydı: [PROGRESS.md](PROGRESS.md)

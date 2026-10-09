@@ -7,6 +7,8 @@ struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(WorkSessionManager.self) private var workSession
     @Environment(ScreenshotScanner.self) private var scanner
+    @Environment(AutoShiftCoordinator.self) private var autoShift
+    @Environment(SyncCoordinator.self) private var sync
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
 
@@ -42,6 +44,8 @@ struct TodayView: View {
 
     enum Sheet: Identifiable {
         case addEarning(session: WorkSessionSummary?)
+        /// Biten otomatik vardiya: kazanc kaydedilince bekleyenlerden duser.
+        case pendingShift(id: UUID, summary: WorkSessionSummary)
         case editEarning(EarningRecord)
         case importedScreenshot(ImportedScreenshot)
         case addExpense
@@ -50,6 +54,7 @@ struct TodayView: View {
         var id: String {
             switch self {
             case .addEarning: "addEarning"
+            case .pendingShift(let id, _): "pending-\(id)"
             case .editEarning(let record): "editEarning-\(record.id)"
             case .importedScreenshot: "imported"
             case .addExpense: "addExpense"
@@ -121,6 +126,11 @@ struct TodayView: View {
                     pickedItems = []
                     Task { await importPicked(items) }
                 }
+                // "Vardiya bitti" bildirimine dokunuldu: bekleyen vardiyanin kazanc formu acilir
+                .onAppear(perform: openRequestedPending)
+                .onChange(of: autoShift.requestedPendingID) { _, _ in
+                    openRequestedPending()
+                }
         }
     }
 
@@ -132,6 +142,7 @@ struct TodayView: View {
                 suggestionSection(suggestion)
             }
             noticesSection
+            autoShiftSections
             heroSection(summary)
 
             Section {
@@ -145,6 +156,74 @@ struct TodayView: View {
                 expensesSection
             }
             scanSection
+        }
+    }
+
+    /// Otomatik vardiya: iptal satiri, biten vardiyalar, izin uyarisi.
+    @ViewBuilder
+    private var autoShiftSections: some View {
+        cancelAutoShiftSection
+        pendingShiftsSection
+        autoShiftPermissionSection
+    }
+
+    @ViewBuilder
+    private var cancelAutoShiftSection: some View {
+        if workSession.isWorking, workSession.origin == .auto {
+            Section {
+                Button(role: .destructive) {
+                    autoShift.cancelAutoShift()
+                } label: {
+                    Label("Bu bir vardiya değil", systemImage: "xmark.circle")
+                }
+                .accessibilityIdentifier("today.cancelAutoShift")
+            } footer: {
+                Text("Vardiya hareketle kendiliğinden başladı.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pendingShiftsSection: some View {
+        if !autoShift.pendingShifts.isEmpty {
+            Section("Biten vardiyalar") {
+                ForEach(autoShift.pendingShifts) { (shift: PendingShift) in
+                    pendingShiftButton(shift)
+                }
+            }
+        }
+    }
+
+    private func pendingShiftButton(_ shift: PendingShift) -> some View {
+        Button {
+            openPending(shift.id)
+        } label: {
+            PendingShiftRow(shift: shift)
+        }
+        .buttonStyle(.plain)
+        .swipeActions {
+            Button("Sil", role: .destructive) { autoShift.dismissPending(id: shift.id) }
+        }
+        .accessibilityIdentifier("today.pendingShift")
+    }
+
+    /// Mod aciksa her izin sorunu; kapaliyken yalnizca reddedilen hareket izni gosterilir.
+    @ViewBuilder
+    private var autoShiftPermissionSection: some View {
+        if let problem = autoShift.permissionProblem, autoShift.isEnabled || problem == .motion {
+            Section {
+                Button(action: openSystemSettings) {
+                    Label(autoShiftProblemText(problem), systemImage: "exclamationmark.triangle")
+                }
+                .accessibilityIdentifier("today.autoShiftPermission")
+            }
+        }
+    }
+
+    private func autoShiftProblemText(_ problem: AutoShiftCoordinator.PermissionProblem) -> String {
+        switch problem {
+        case .motion: "Otomatik vardiya için hareket izni gerekli — Ayarlar"
+        case .locationAlways: "Otomatik vardiya için konum izni “Her zaman” olmalı — Ayarlar"
         }
     }
 
@@ -165,6 +244,8 @@ struct TodayView: View {
         switch sheet {
         case .addEarning(let session):
             EarningFormView(session: session, defaultPlatform: defaultPlatform)
+        case .pendingShift(let id, let summary):
+            pendingShiftForm(id: id, summary: summary)
         case .editEarning(let record):
             EarningFormView(record: record)
         case .importedScreenshot(let imported):
@@ -174,6 +255,15 @@ struct TodayView: View {
         case .editExpense(let record):
             ExpenseFormView(record: record)
         }
+    }
+
+    private func pendingShiftForm(id: UUID, summary: WorkSessionSummary) -> some View {
+        let coordinator: AutoShiftCoordinator = autoShift
+        return EarningFormView(
+            session: summary,
+            defaultPlatform: defaultPlatform,
+            onSaved: { coordinator.dismissPending(id: id) }
+        )
     }
 
     private var knownIDs: Set<String> {
@@ -452,7 +542,7 @@ struct TodayView: View {
         guard !isProcessingInbox else { return }
         isProcessingInbox = true
         defer { isProcessingInbox = false }
-        let importer = ScreenshotImporter()
+        let importer = ScreenshotImporter(templates: sync.mergedTemplates())
         // Kayitli bir ekranla ayni metin yine forma gelir (form "daha once kaydedilmis" uyarir);
         // yalnizca ayni anda bekleyen kopyalar elenir.
         var batch = ImportBatch(seenHashes: pendingHashes, seenAssets: knownIDs)
@@ -472,7 +562,7 @@ struct TodayView: View {
     private func importPicked(_ items: [PhotosPickerItem]) async {
         isImportingPicked = true
         defer { isImportingPicked = false }
-        let importer = ScreenshotImporter()
+        let importer = ScreenshotImporter(templates: sync.mergedTemplates())
         var batch = ImportBatch(seenHashes: pendingHashes, seenAssets: knownIDs)
         for item in items {
             let identifier: String? = item.itemIdentifier
@@ -515,7 +605,11 @@ struct TodayView: View {
 
     private func sheetDismissed() {
         presentedHash = nil
-        showNextFromInbox()
+        // Bildirimden gelen bekleyen vardiya istegi once; sonra siradaki ekran goruntusu
+        openRequestedPending()
+        if activeSheet == nil {
+            showNextFromInbox()
+        }
     }
 
     private func shiftStatus(elapsed: TimeInterval, summary: EarningsSummary) -> String {
@@ -539,17 +633,35 @@ struct TodayView: View {
         Haptics.impact()
         if workSession.isWorking {
             // Vardiya bitince kazanc formu sure + mesafe + bolgeyle on doldurulmus acilir
-            if let summary = workSession.stop() {
+            if let summary = autoShift.endShift() {
                 activeSheet = .addEarning(session: summary)
             }
         } else {
-            workSession.start()
+            autoShift.startManualShift()
         }
+    }
+
+    /// Bekleyen vardiya listeden silinmeden acilir; kazanc kaydedilince (onSaved) duser.
+    private func openPending(_ id: UUID) {
+        if let summary = autoShift.pendingSummary(id: id) {
+            activeSheet = .pendingShift(id: id, summary: summary)
+        }
+    }
+
+    /// Bildirimden gelen istek bir kez tuketilir (soguk acilista onAppear, sonra onChange).
+    /// Acik bir form varsa degistirilmez: istek form kapaninca (sheetDismissed) islenir.
+    private func openRequestedPending() {
+        guard activeSheet == nil, let id = autoShift.requestedPendingID else { return }
+        autoShift.requestedPendingID = nil
+        openPending(id)
     }
 
     private func delete(_ model: some PersistentModel) {
         if let record = model as? EarningRecord {
+            let id: UUID = record.id
             try? modelContext.deleteEarning(record)
+            // Silinen kaydin bekleyen gonderimi de dusulur
+            sync.recordDeleted(id: id)
             return
         }
         modelContext.delete(model)
@@ -586,11 +698,37 @@ private struct ImportBatch {
     }
 }
 
+private struct PendingShiftRow: View {
+    let shift: PendingShift
+
+    private var detail: String {
+        let range: String = "\(Formatters.time(shift.start))–\(Formatters.time(shift.end))"
+        var parts: [String] = [range, Formatters.distance(shift.distanceKm)]
+        if let district = shift.district { parts.append(district) }
+        return parts.joined(separator: " · ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Kazancını ekle")
+                .font(.body.weight(.semibold))
+            Text(verbatim: detail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 #Preview("Örnek veri") {
-    let location = LocationService(isEnabled: false)
+    // Koordinator, gorunumle ayni vardiya yoneticisini kullanmali: ortak nesne grafigi
+    let environment = AppEnvironment.shared
     return TodayView()
         .modelContainer(SampleData.previewContainer)
-        .environment(location)
-        .environment(WorkSessionManager(location: location))
-        .environment(ScreenshotScanner())
+        .environment(environment.location)
+        .environment(environment.workSession)
+        .environment(environment.scanner)
+        .environment(environment.autoShift)
+        .environment(environment.sync)
+        .environment(environment.account)
 }

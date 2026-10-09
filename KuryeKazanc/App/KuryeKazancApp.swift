@@ -3,39 +3,49 @@ import SwiftData
 
 @main
 struct KuryeKazancApp: App {
-    private let container: ModelContainer
-    @State private var location: LocationService
-    @State private var workSession: WorkSessionManager
-    @State private var scanner: ScreenshotScanner
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
+    /// Ortak nesne grafigi (bkz. AppEnvironment): sifirlama ve test ayarlari orada uygulanir.
+    private let environment: AppEnvironment
 
     init() {
-        let launch = LaunchOptions.current
-        if launch.resetsDefaults, let bundleID = Bundle.main.bundleIdentifier {
-            UserDefaults.standard.removePersistentDomain(forName: bundleID)
-        }
-        container = ModelContainerFactory.make(inMemory: launch.isUITesting)
-        if launch.loadsSampleData {
-            SampleData.insert(into: container.mainContext)
-        }
-        // UI testlerinde konum kapali: simulatorde izin diyalogu testleri kilitlemesin
-        let location = LocationService(isEnabled: !launch.isUITesting)
-        _location = State(initialValue: location)
-        _workSession = State(initialValue: WorkSessionManager(location: location))
-        // UI testlerinde ayri (bos) tercih alani: tarama kapali, fotograf izni sorulmaz
-        _scanner = State(initialValue: launch.isUITesting
-            ? ScreenshotScanner(defaults: UserDefaults(suiteName: "ui-tests") ?? .standard)
-            : ScreenshotScanner(library: PhotoKitScreenshotLibrary()))
+        environment = AppEnvironment.shared
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environment(location)
-                .environment(workSession)
-                .environment(scanner)
-                .task { workSession.resumeIfNeeded() }
+                .environment(environment.location)
+                .environment(environment.workSession)
+                .environment(environment.scanner)
+                .environment(environment.autoShift)
+                .environment(environment.sync)
+                .environment(environment.account)
+                .task {
+                    // Acilis: sablonlar (12 saatte bir) ve bekleyen gonderimler. Riza yoksa ag yok.
+                    await syncNow()
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    // On plana donus: Ayarlar'da verilen izinler ve suren vardiya yeniden degerlendirilir
+                    guard phase == .active else { return }
+                    let autoShift = environment.autoShift
+                    Task { @MainActor in
+                        await autoShift.handleWake()
+                        // Arka planda baslayan vardiyanin Canli Etkinligi acilamamis olabilir: simdi istenir
+                        autoShift.ensureLiveActivity()
+                    }
+                    Task { await syncNow() }
+                }
         }
-        .modelContainer(container)
+        .modelContainer(environment.container)
+    }
+
+    /// Once sablonlar, sonra kuyruk. Ust uste cagrilar koordinatorde tek calismaya iner.
+    @MainActor
+    private func syncNow() async {
+        let sync: SyncCoordinator = environment.sync
+        await sync.refreshTemplatesIfNeeded()
+        await sync.flush()
     }
 }
 

@@ -253,7 +253,7 @@ final class FormViewModelTests: XCTestCase {
         let manager = WorkSessionManager(location: LocationService(isEnabled: false, defaults: defaults), defaults: defaults)
 
         XCTAssertFalse(manager.isWorking)
-        manager.start(now: at(6, 9))
+        manager.start(at: at(6, 9))
         XCTAssertTrue(manager.isWorking)
 
         // Uygulama yeniden acildi: oturum devam ediyor
@@ -267,6 +267,32 @@ final class FormViewModelTests: XCTestCase {
         XCTAssertFalse(restored.isWorking)
         XCTAssertFalse(defaults.bool(forKey: AppPreferences.isWorkingKey))
         XCTAssertNil(restored.stop())
+    }
+
+    func testAutoShiftStartsBackdatedAndCanBeCancelled() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defaults.removePersistentDomain(forName: #function)
+        let manager = WorkSessionManager(location: LocationService(isEnabled: false, defaults: defaults), defaults: defaults)
+        manager.start(at: at(6, 9, 55), origin: .auto)
+        XCTAssertEqual(manager.origin, .auto)
+        XCTAssertEqual(manager.sessionStart, at(6, 9, 55))
+
+        let restored = WorkSessionManager(location: LocationService(isEnabled: false, defaults: defaults), defaults: defaults)
+        XCTAssertEqual(restored.origin, .auto, "Kaynak kalici")
+
+        manager.cancel()
+        XCTAssertFalse(manager.isWorking)
+        XCTAssertNil(manager.origin)
+        XCTAssertNil(manager.stop(), "Iptal sonrasi ozet yok")
+    }
+
+    func testStopUsesExplicitEnd() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defaults.removePersistentDomain(forName: #function)
+        let manager = WorkSessionManager(location: LocationService(isEnabled: false, defaults: defaults), defaults: defaults)
+        manager.start(at: at(6, 10), origin: .auto)
+        let summary = manager.stop(now: at(6, 12), end: at(6, 11, 40))
+        XCTAssertEqual(summary?.end, at(6, 11, 40), "Bitis son hareket ani")
     }
 
     // MARK: - Dogrulama seviyesi
