@@ -64,6 +64,7 @@ jobs:
           set -o pipefail
           mkdir -p build
           export TEST_RUNNER_SCENARIO_REPORT="$GITHUB_WORKSPACE/build/scenario-report.md"
+          export TEST_RUNNER_SCENARIO_REMEASURE=1
           xcodebuild test-without-building \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \

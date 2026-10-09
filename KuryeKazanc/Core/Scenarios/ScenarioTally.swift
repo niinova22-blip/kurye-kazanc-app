@@ -1,6 +1,6 @@
 import Foundation
 
-/// Platform x alan dogruluk sayimi (spec 1.4a §4.3). Yuzde, bir ondalik.
+/// Grup x alan dogruluk sayimi (spec 1.4a §4.3). Yuzde, bir ondalik.
 struct ScenarioTally {
     private var counts: [String: (ok: Int, total: Int)] = [:]
 
@@ -27,12 +27,12 @@ struct ScenarioTally {
         }
     }
 
-    /// Satirlar platform, sutunlar alan.
+    /// Satirlar grup (sablon kimligi ya da klasor adi), sutunlar alan.
     func markdown(title: String) -> String {
         let acc = accuracy()
         let platforms = Set(acc.keys.map { String($0.split(separator: "/")[0]) }).sorted()
         let fields = ScenarioField.allCases.map(\.rawValue)
-        var lines = ["### \(title)", "", "| platform | " + fields.joined(separator: " | ") + " |",
+        var lines = ["### \(title)", "", "| grup | " + fields.joined(separator: " | ") + " |",
                      "|---|" + fields.map { _ in "---" }.joined(separator: "|") + "|"]
         for platform in platforms {
             let cells = fields.map { field in acc["\(platform)/\(field)"].map { String(format: "%.1f", $0) } ?? "–" }

@@ -22,16 +22,21 @@ final class ScenarioImageTests: XCTestCase {
             let image = MockEarningsScreen.render(scenario)
             let lines = (try? await recognizer.recognize(in: image).map(\.text)) ?? []
             let parsed = parser.parse(lines: lines, referenceDate: reference)
-            tally.add(platform: scenario.platformCode, results: scenario.expected.check(parsed))
+            // Anahtar: sablon kimligi (ayni platformun gunluk/siparis sablonlari ayri sayilir)
+            tally.add(platform: scenario.templateID, results: scenario.expected.check(parsed))
         }
         let report = tally.markdown(title: "Taklit ekranlar (Vision)")
         appendReport(report)
 
         let baselineURL = fixtures.appendingPathComponent("scenario-baseline.json")
+        // Yeniden olcum: CI'da gecici olarak TEST_RUNNER_SCENARIO_REMEASURE=1 verilir (bkz. Fixtures/RealScreens/README.md)
+        if ProcessInfo.processInfo.environment["SCENARIO_REMEASURE"] == "1" {
+            appendReport("\nYeniden olcum. Olculen deger (Fixtures/scenario-baseline.json olarak kaydet):\n```json\n\(tally.baselineJSON())\n```")
+            return
+        }
         guard let data = try? Data(contentsOf: baselineURL),
               let baseline = try? JSONDecoder().decode([String: Double].self, from: data) else {
-            let json = tally.baselineJSON()
-            appendReport("\nTaban dosyasi yok. Olculen deger (Fixtures/scenario-baseline.json olarak kaydet):\n```json\n\(json)\n```")
+            XCTFail("Taban dosyasi yok ya da okunamadi: scenario-baseline.json (yeniden olcmek icin SCENARIO_REMEASURE=1)")
             return
         }
         let drops = tally.drops(from: baseline, tolerance: 5)
@@ -60,7 +65,8 @@ final class ScenarioImageTests: XCTestCase {
             tally.add(platform: file.deletingLastPathComponent().lastPathComponent, results: expected.check(parsed))
         }
         let report = tally.markdown(title: "Gercek ekranlar")
-        appendReport(report)
+        appendReport(report)
+
     }
 
     private func appendReport(_ text: String) {
