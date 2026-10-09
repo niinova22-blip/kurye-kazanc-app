@@ -42,9 +42,14 @@ struct OCRTemplate: Codable, Equatable {
         fingerprint.filter { TextPatterns.containsWord($0, in: normalizedText) }.count
     }
 
+    /// Platform adi yoksa yalnizca bu kadar ya da daha cok parmak izi isteyen sablonlar secilebilir.
+    static let fingerprintOnlyThreshold = 3
+
     /// Haftalik ifade gunluk ifadeden onceliklidir ("Bugun" haftalik ekranda da gorunebilir).
+    /// "4 sub - 10 sub" gibi tarih araligi da haftalik sayilir.
     func period(in normalizedText: String) -> Period {
         if weekLabels.contains(where: { TextPatterns.containsWord($0, in: normalizedText) }) { return .week }
+        if TextPatterns.containsDateRange(normalizedText) { return .week }
         if dayLabels.contains(where: { TextPatterns.containsWord($0, in: normalizedText) }) { return .day }
         return .unknown
     }

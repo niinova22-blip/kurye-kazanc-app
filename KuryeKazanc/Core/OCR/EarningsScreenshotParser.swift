@@ -107,18 +107,32 @@ struct EarningsScreenshotParser {
 
     // MARK: - Platform
 
+    /// 1) Platform adi (esitlikte parmak izi), 2) ad yoksa guclu parmak izi, 3) nil (generic).
     func detectTemplate(in lines: [String]) -> OCRTemplate? {
         let text = lines.joined(separator: " ")
-        var best: (template: OCRTemplate, score: Int)?
+        var best: (template: OCRTemplate, score: Int, fingerprint: Int)?
         for template in templates {
             let score = template.detectionKeywords.reduce(0) { count, keyword in
                 count + (TextPatterns.containsWord(keyword, in: text) ? 1 : 0)
             }
-            if score > 0, score > (best?.score ?? 0) {
-                best = (template, score)
-            }
+            guard score > 0 else { continue }
+            let fingerprint = template.fingerprintMatches(in: text)
+            if let current = best, (score, fingerprint) <= (current.score, current.fingerprint) { continue }
+            best = (template, score, fingerprint)
         }
-        return best?.template
+        if let best { return best.template }
+
+        var byFingerprint: (template: OCRTemplate, matches: Int)?
+        for template in templates where template.minFingerprintMatches >= OCRTemplate.fingerprintOnlyThreshold {
+            let matches = template.fingerprintMatches(in: text)
+            guard matches >= template.minFingerprintMatches else { continue }
+            if let current = byFingerprint {
+                if matches < current.matches { continue }
+                if matches == current.matches, template.fingerprint.count <= current.template.fingerprint.count { continue }
+            }
+            byFingerprint = (template, matches)
+        }
+        return byFingerprint?.template
     }
 
     // MARK: - Tutar
