@@ -223,6 +223,14 @@ struct ProfileView: View {
                 Button("Fotoğraf izni kapalı — Ayarlar'dan aç") { openSystemSettings() }
                     .accessibilityIdentifier("profile.photoPermission")
             }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Kazanç taraması")
+                Text("Bugün sekmesindeki “Kazanç taraması” düğmesiyle platform uygulamalarındaki kazanç panelini okut; bulunanları onaylayıp kaydedersin.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("profile.scanInfo")
         } header: {
             Text("Ekran görüntüleri")
         } footer: {

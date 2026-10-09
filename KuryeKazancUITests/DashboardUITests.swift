@@ -37,6 +37,12 @@ final class DashboardUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["dashboard.netPerHour"].label, "—")
     }
 
+    func testTodayShowsScanButton() {
+        let app = launch(sampleData: false)
+
+        XCTAssertTrue(app.buttons["scan.button"].waitForExistence(timeout: 10))
+    }
+
     func testDashboardSummarizesSampleData() {
         let app = launch(sampleData: true)
 

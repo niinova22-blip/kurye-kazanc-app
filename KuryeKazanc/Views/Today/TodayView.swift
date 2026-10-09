@@ -40,6 +40,8 @@ struct TodayView: View {
 
     private let inbox = LaunchOptions.current.isUITesting ? ScreenshotInbox(directory: nil) : .shared
 
+    private let captureStore = LaunchOptions.current.isUITesting ? BroadcastCaptureStore(directory: nil) : .shared
+
     private let day: Date
 
     enum Sheet: Identifiable {
@@ -50,9 +52,11 @@ struct TodayView: View {
         case importedScreenshot(ImportedScreenshot)
         case addExpense
         case editExpense(ExpenseRecord)
+        case scanResults(ScanResultsViewModel)
 
         var id: String {
             switch self {
+            case .scanResults: "scanResults"
             case .addEarning: "addEarning"
             case .pendingShift(let id, _): "pending-\(id)"
             case .editEarning(let record): "editEarning-\(record.id)"
@@ -151,6 +155,7 @@ struct TodayView: View {
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
 
+            Section { ScanButton() }
             earningsSection
             if !todaysExpenses.isEmpty {
                 expensesSection
@@ -254,7 +259,21 @@ struct TodayView: View {
             ExpenseFormView()
         case .editExpense(let record):
             ExpenseFormView(record: record)
+        case .scanResults(let viewModel):
+            ScanResultsView(viewModel: viewModel)
         }
+    }
+
+    /// Yayin eklentisinin biraktigi yakalama varsa "Taramada bulunanlar" sayfasini acar.
+    private func openScanResultsIfPending() {
+        guard activeSheet == nil, !captureStore.pending().isEmpty else { return }
+        let log: BroadcastLog? = BroadcastLog.load()
+        let interrupted: Bool = log != nil && log?.finishedAt == nil
+        let viewModel = ScanResultsViewModel(
+            store: captureStore, templates: sync.mergedTemplates(),
+            knownTextHashes: knownHashes, interrupted: interrupted
+        )
+        activeSheet = .scanResults(viewModel)
     }
 
     private func pendingShiftForm(id: UUID, summary: WorkSessionSummary) -> some View {
@@ -519,6 +538,7 @@ struct TodayView: View {
     /// Gelen kutusunu isler, sonra otomatik taramayi calistirir.
     private func refreshImports() async {
         await processInbox()
+        openScanResultsIfPending()
         await scanner.scan(knownIdentifiers: knownIDs, knownTextHashes: queuedAndKnownHashes)
     }
 
@@ -610,6 +630,7 @@ struct TodayView: View {
         if activeSheet == nil {
             showNextFromInbox()
         }
+        openScanResultsIfPending()
     }
 
     private func shiftStatus(elapsed: TimeInterval, summary: EarningsSummary) -> String {
