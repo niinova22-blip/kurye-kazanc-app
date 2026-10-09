@@ -241,6 +241,7 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 
 - **İlk 1.2 + 1.3 CI derlemesi (#19, `a1f1f6a`) başarılı:** derleme + birim testleri **234/234** (UI testleri yalnızca PR'da).
 
+- **Apple Developer:** `com.kuryekazanc.app`'te Sign in with Apple açıldı; "Kurye Kazanc App Store" yeniden üretildi; App ID `com.kuryekazanc.app.liveactivity` + "Kurye Kazanc Live Activity App Store" profili oluşturuldu. Codemagic'e `kurye-kazanc-appstore-v3` ve `kurye-kazanc-liveactivity-appstore` olarak çekildi; `codemagic.yaml` v3'e geçti.
+
 ### Sonraki adım
-1. Apple Developer: `com.kuryekazanc.app`'te Sign in with Apple (profil yeniden üretilir → Codemagic); Canlı Etkinlik App ID `com.kuryekazanc.app.liveactivity` + profil — kullanıcıya sorarak.
-2. develop → main PR (UI testleri burada çalışır) → TestFlight 1.3.0 — kullanıcıya sorarak.
+1. develop → main PR (UI testleri burada çalışır) → birleştirme → `ios-release` → TestFlight 1.3.0 — kullanıcıya sorarak.
