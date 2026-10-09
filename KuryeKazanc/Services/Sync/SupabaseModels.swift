@@ -173,3 +173,23 @@ struct TemplateRow: Decodable {
 struct BackupDownloadRow: Decodable {
     let payload: JSONValue
 }
+
+/// community_heatmap / community_summary govdesi.
+struct CommunityBody: Encodable {
+    let province: String
+    let district: String
+
+    enum CodingKeys: String, CodingKey {
+        case province = "p_province"
+        case district = "p_district"
+    }
+}
+
+/// Tek satiri cozulemeyen kural tum listeyi bozmasin.
+struct LossyRule: Decodable {
+    let rule: PlatformRule?
+
+    init(from decoder: Decoder) throws {
+        rule = try? PlatformRule(from: decoder)
+    }
+}

@@ -38,6 +38,11 @@ enum AppPreferences {
     static let lastSyncDateKey = "lastSyncDate"
     /// Uzak sablonlarin son cekildigi an (Unix zaman damgasi).
     static let templatesFetchedAtKey = "templatesFetchedAt"
+    static let rulesFetchedAtKey = "platformRulesFetchedAt"
+    /// Planlama motoru calisma profili (JSON).
+    static let workProfileKey = "workProfile"
+    /// Kullanicinin sectigi plan (yeniden dogrulama icin kural surumuyle).
+    static let savedPlanKey = "savedWorkPlan"
     /// Sunucuya ulasmis (ok/duplicate) kayit id'leri; tekrar kuyruga girmez.
     static let sentRecordIDsKey = "sentRecordIDs"
     /// Son basarili yedekleme (Unix zaman damgasi). Cikista silinir.

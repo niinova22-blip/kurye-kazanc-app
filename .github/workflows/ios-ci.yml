@@ -6,12 +6,8 @@
 
 name: iOS CI
 
+# 2026-10-10: Actions kotasi doldu -> CI Codemagic'te (codemagic.yaml ios-ci); bu akis yalnizca elle.
 on:
-  push:
-    branches-ignore: [main, "release/**"]
-    paths-ignore: ["**.md", "docs/**", "supabase/**", "scripts/server/**", "scripts/design/**"]
-  pull_request:
-    paths-ignore: ["**.md", "docs/**", "supabase/**", "scripts/server/**", "scripts/design/**"]
   workflow_dispatch:
     inputs:
       run_ui_tests:

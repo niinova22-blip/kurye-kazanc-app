@@ -17,6 +17,7 @@ final class ScreenshotScannerTests: XCTestCase {
         var items: [LibraryScreenshot]
         func requestAccess() async -> Bool { isAuthorized }
         func recentScreenshots(since: Date, limit: Int) async -> [LibraryScreenshot] { Array(items.prefix(limit)) }
+        func recentImages(since: Date, limit: Int) async -> [LibraryScreenshot] { Array(items.prefix(limit)) }
     }
 
     /// Kac kez OCR yapildigini sayar (reddedilen goruntu tekrar okunmasin testi).

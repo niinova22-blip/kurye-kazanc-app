@@ -38,7 +38,16 @@ final class ScanResultsViewModel {
     @ObservationIgnored private var hasLoaded = false
     @ObservationIgnored private var itemFiles: [String: [URL]] = [:]
     @ObservationIgnored private var orphanFiles: [URL] = []
-    @ObservationIgnored private let store: BroadcastCaptureStore
+    /// Kalemlerin geldigi yer: yayin yakalamalari (dosyali) veya fotograf taramasi (dosyasiz).
+    @ObservationIgnored private let store: BroadcastCaptureStore?
+    @ObservationIgnored private let photoResults: [PhotoScanResult]?
+    @ObservationIgnored private let region: PlaceRegion?
+    /// Fotograf kaynaginda bu oturumda kaydedilen kalemler: yeniden yuklemede geri gelmez.
+    @ObservationIgnored private var savedItemIDs: Set<String> = []
+    /// Kaydedilen kalemlerin ardindaki TUM fotograflarin PhotoKit kimlikleri (siparis grubunun her uyesi dahil);
+    /// sonraki taramada "bilinen" olarak verilir.
+    private(set) var savedAssetIdentifiers: Set<String> = []
+    @ObservationIgnored private var itemPhotos: [String: [PhotoScanResult]] = [:]
     @ObservationIgnored private let importer: ScreenshotImporter
     @ObservationIgnored private let knownTextHashes: Set<String>
     @ObservationIgnored private let existingDaily: [ExistingDaily]
@@ -48,10 +57,27 @@ final class ScanResultsViewModel {
     init(store: BroadcastCaptureStore, templates: [OCRTemplate]?, knownTextHashes: Set<String>,
          existingDaily: [ExistingDaily] = [], interrupted: Bool, calendar: Calendar = .current, now: Date = .now) {
         self.store = store
+        self.photoResults = nil
+        self.region = nil
         self.importer = ScreenshotImporter(verifier: ScreenshotVerifier(calendar: calendar), templates: templates)
         self.knownTextHashes = knownTextHashes
         self.existingDaily = existingDaily
         self.interrupted = interrupted
+        self.calendar = calendar
+        self.now = now
+    }
+
+    /// Fotograf taramasi kaynagi: dosya yok; kanita PhotoKit kimligi yazilir, bolge bos formlara doldurulur.
+    init(photoResults: [PhotoScanResult], templates: [OCRTemplate]? = nil, knownTextHashes: Set<String>,
+         existingDaily: [ExistingDaily] = [], region: PlaceRegion? = nil, calendar: Calendar = .current,
+         now: Date = .now) {
+        self.store = nil
+        self.photoResults = photoResults
+        self.region = region
+        self.importer = ScreenshotImporter(verifier: ScreenshotVerifier(calendar: calendar), templates: templates)
+        self.knownTextHashes = knownTextHashes
+        self.existingDaily = existingDaily
+        self.interrupted = false
         self.calendar = calendar
         self.now = now
     }
@@ -80,6 +106,11 @@ final class ScanResultsViewModel {
 
     func load() {
         hasLoaded = true
+        if let photoResults {
+            loadPhotos(photoResults)
+            return
+        }
+        guard let store else { return }
         var inputs: [ScanInput] = []
         var inputURLs: [URL] = []
         var orphans: [URL] = []
@@ -101,7 +132,25 @@ final class ScanResultsViewModel {
         }
         itemFiles = files
         orphanFiles = orphans
-        rows = builder.build(inputs).map { item in
+        rows = makeRows(builder.build(inputs))
+    }
+
+    private func loadPhotos(_ results: [PhotoScanResult]) {
+        let builder = ScanResultBuilder(calendar: calendar)
+        var grouped: [String: [PhotoScanResult]] = [:]
+        let results = results.filter { result in
+            guard let id = builder.itemID(for: result.input) else { return true }
+            return !savedItemIDs.contains(id)
+        }
+        for result in results {
+            if let id = builder.itemID(for: result.input) { grouped[id, default: []].append(result) }
+        }
+        itemPhotos = grouped
+        rows = makeRows(builder.build(results.map(\.input)))
+    }
+
+    private func makeRows(_ items: [ScanItem]) -> [Row] {
+        items.map { item in
             let sameDay = sameDayGross(for: item)
             let sameTotal = sameDay.contains { abs($0 - item.parsed.totalEarning) < 0.01 }
             let saved = knownTextHashes.contains(item.textHash) || sameTotal
@@ -111,13 +160,16 @@ final class ScanResultsViewModel {
             case .daily, .orderGroup: defaultOn = true
             case .weekly, .unknown: defaultOn = false
             }
-            return Row(item: item, isSelected: defaultOn && !saved && !hasSameDay, isAlreadySaved: saved,
+            // Haftalik ozet vardiya degildir: asla secilemez, kaydedilmez
+            return Row(item: item, isSelected: defaultOn && !saved && !hasSameDay && item.kind != .weekly,
+                       isAlreadySaved: saved,
                        hasSameDayRecord: hasSameDay)
         }
     }
 
     func setSelected(_ selected: Bool, for id: String) {
-        guard let index = rows.firstIndex(where: { $0.id == id }), !rows[index].isAlreadySaved else { return }
+        guard let index = rows.firstIndex(where: { $0.id == id }), !rows[index].isAlreadySaved,
+              rows[index].item.kind != .weekly else { return }
         rows[index].isSelected = selected
     }
 
@@ -132,10 +184,14 @@ final class ScanResultsViewModel {
         var saved: [EarningRecord] = []
         for row in rows where row.isSelected && !row.isAlreadySaved {
             let item = row.item
-            let imported = importer.makeImported(parsed: item.parsed, lines: item.lines,
-                                                 capturedAt: item.capturedAt, referenceDate: now)
+            let imported = importedEvidence(for: item)
             let form = EarningFormViewModel(defaultPlatform: nil, now: item.capturedAt, calendar: calendar)
             form.apply(imported, platforms: platforms, knownTextHashes: knownTextHashes)
+            if photoResults != nil, let region {
+                if form.province.isEmpty { form.province = region.province ?? "" }
+                if form.district.isEmpty { form.district = region.district ?? "" }
+                if form.neighborhood.isEmpty { form.neighborhood = region.neighborhood ?? "" }
+            }
             guard form.canSave else {
                 // Secili ama kaydedilemeyen kalemin dosyalari silinmez
                 skippedCount += 1
@@ -147,6 +203,12 @@ final class ScanResultsViewModel {
                 let record = try form.save(in: context)
                 saved.append(record)
                 if Self.isSendable(item) { sendableRecordIDs.insert(record.id) }
+                if photoResults != nil {
+                    savedItemIDs.insert(item.id)
+                    for photo in itemPhotos[item.id] ?? [] {
+                        if let id = photo.imported.assetIdentifier { savedAssetIdentifiers.insert(id) }
+                    }
+                }
                 removeFiles(for: item.id)
             } catch {
                 failedCount += 1
@@ -158,7 +220,7 @@ final class ScanResultsViewModel {
         }.map(\.id)
         let kept = Set(skippedIDs)
         for id in Array(itemFiles.keys) where !kept.contains(id) { removeFiles(for: id) }
-        orphanFiles.forEach(store.remove)
+        if let store { orphanFiles.forEach(store.remove) }
         orphanFiles = []
         if skippedCount > 0 || failedCount > 0 {
             load()
@@ -168,13 +230,30 @@ final class ScanResultsViewModel {
         return saved
     }
 
+    /// Fotograf kaynaginda tek kalem orijinal kanitini (kimlik, gercek ekran) korur; siparis grubu birlestirilir.
+    private func importedEvidence(for item: ScanItem) -> ImportedScreenshot {
+        if let photos = itemPhotos[item.id], !photos.isEmpty {
+            if case .orderGroup = item.kind {
+                var merged = importer.makeImported(parsed: item.parsed, lines: item.lines,
+                                                   capturedAt: item.capturedAt, referenceDate: now)
+                merged.assetIdentifier = photos.first?.imported.assetIdentifier
+                merged.isGenuine = photos.allSatisfy(\.imported.isGenuine)
+                return merged
+            }
+            return photos[0].imported
+        }
+        return importer.makeImported(parsed: item.parsed, lines: item.lines,
+                                     capturedAt: item.capturedAt, referenceDate: now)
+    }
+
     private func removeFiles(for id: String) {
+        guard let store else { return }
         itemFiles[id]?.forEach(store.remove)
         itemFiles[id] = nil
     }
 
     func discard() {
-        store.removeAll()
+        store?.removeAll()
         rows = []
     }
 }

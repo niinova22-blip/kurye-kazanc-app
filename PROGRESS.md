@@ -297,3 +297,41 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 - Bilinen sınır: aynı tutarlı iki farklı sipariş kartı tek sayılır (gerçek ekranla sipariş no eklenecek).
 - Sürüm 1.4.0.
 - Sonraki adım: develop→main PR → TestFlight 1.4.0 → cihaz testi.
+
+## Oturum 7 — 2026-10-10: 1.4.1 fotoğraflardan kazanç taraması
+
+- Cihaz testi (1.4.0) sonrası kullanıcı kararı: ekran kaydı yerine rehber + son 24 saatin ekran görüntülerini okuma (spec §6, plan `docs/superpowers/plans/2026-10-09-surum-1-4b-fotograf-taramasi.md`).
+- Test hataları: Uber/TheKurye/Banabikurye platform listesinde; haftalık özet kaydedilmez; platform adları; mesaj.
+- Core: `ScanWindow` (24 sa / test 30 gün); 4 platform şablonuna çalışma süresi etiketleri (sürümler +1).
+- `PhotoScanService` (300 getir → bilinenleri ele → en fazla 60 oku, `didTruncate`, oturumluk red listesi); `ScanResultsViewModel` fotoğraf kaynağı (ilçe, tüm görüntü kimlikleri, kaydedilenler yeniden gelmez).
+- `ScanGuideView`: her basışta rehber, dönüşte otomatik tarama, izin/Ayarlar, test anahtarı (Profil > Test araçları). Yayın düğmesi Bugün'den kaldırıldı (eklenti kodu duruyor).
+- 30 günlük test görselleri: masaüstü `Kurye-Test-30-Gun` (112 JPEG, EXIF tarihli).
+- **CI/CD tekrar Codemagic'te**: GitHub Actions kotası %90 (özel repo, macOS ×10). `.github/workflows` yalnızca elle; Codemagic `ios-ci` push/PR, `ios-release` main/release; yayın eklentisi profili `kurye-kazanc-broadcast-appstore`; `submit_to_testflight: false`.
+- Sürüm 1.4.1. Sıradaki: 1.4b Topluluk (sunucu ısı haritası + test kuryeleri, seçenek a), sonra akıllı çalışma planlama modülü.
+
+### 1.4b Topluluk (2026-10-10)
+- Sunucu (canlı): `shifts.is_synthetic`, `community_heatmap` / `community_summary` (k ≥ 5 farklı kurye; 56 gün; dakika ağırlıklı ₺/saat, gece yarısı devri); pgTAP 19/19. Sentetik test verisi: 10 kurye, 338 vardiya, Ankara/Sincan (`seed_synthetic.mjs`; gerçek lansmandan önce `purge_synthetic.mjs`).
+- Uygulama: `SupabaseClient` RPC'leri, Core `CommunityModels`, `CommunityViewModel` (paylaşım kapalıyken ağ yok), Topluluk sekmesi (ilçe seçici, ₺/saat + kendi karşılaştırma, ortak `HeatmapChart`, platformlar, en iyi saatler).
+- Not (lansman öncesi): anonim kayıt sınırsız olduğundan k=5 hücresi sahte hesaplarla çözülebilir — App Attest / hız sınırı lansmandan önce.
+- Sıradaki: 1.4.1 TestFlight (fotoğraf taraması + Topluluk), sonra akıllı çalışma planlama motoru (hafıza: next-planner-module).
+
+## Oturum 7 (devam) — 2026-10-10: 1.5.0 akıllı çalışma planlama motoru
+
+### Yapılanlar
+- Araştırma `docs/research/2026-10-10-platform-kurallari.md` (kullanıcının 8 başlıklı belge listesi dahil), tasarım `docs/superpowers/specs/2026-10-10-planlama-motoru-design.md`, plan `docs/superpowers/plans/2026-10-10-planlama-motoru.md`.
+- Core `KuryeKazanc/Core/Planner/`: `PlatformRule`/`RuleSet` (kaynaklı, sürümlü, 90 gün stale, kullanıcı onayı), `BundledRules` (44 kural, bulunamayanlar `unknownTerm`), `WorkProfile`, `EarningsForecaster` (p25/p50/p75, ≥3 örnek, 8 hafta), `PlanValidator`, `PlanEngine` (30 dk dilimli DP; en kârlı / düşük riskli / az saat; brüt-gider-vergi; kayıtlı plan yeniden doğrulama). 208 Core testi geçiyor.
+- Sunucu: göç `20261010000004_platform_rules.sql`, pgTAP `003_platform_rules.sql`, `seed_platform_rules.mjs`, `check_sources.mjs`, `approve_rule.mjs`. **Canlıya uygulanmadı.**
+- Uygulama: `SyncCoordinator.refreshRulesIfNeeded/ruleSet`, `SupabaseClient.fetchPlatformRules`, `PlannerViewModel`, `PlannerView`, `WorkProfileView`, `PlatformRulesView`; Bugün > Plan öner, Profil > Çalışma profili ve plan. Sürüm 1.5.0.
+
+### Kullanıcının çalıştıracakları (canlı veritabanı)
+```
+node scripts/server/apply.mjs
+node scripts/server/test.mjs
+node scripts/server/seed_platform_rules.mjs
+node scripts/server/check_sources.mjs --dry-run
+```
+
+### Açık konular
+- Uygulama kodu (fotoğraf taraması + Topluluk + planlayıcı) henüz derlenmedi: tek push → Codemagic.
+- Sözleşme/slot/hakediş/askı/itiraz/çoklu platform belgelerinin çoğu kamuya açık değil; kurye belgeleri gelince kurallar güncellenmeli.
+- Kural kaynakları ayda bir `check_sources.mjs` ile kontrol edilmeli (90 günü geçen kural "güncelliği bilinmiyor" olur).

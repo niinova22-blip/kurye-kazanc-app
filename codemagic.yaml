@@ -1,8 +1,9 @@
 # Codemagic CI/CD - Kurye Kazanc (iOS)
 #
 # Akislar:
-#   ios-ci       : yalnizca elle (yedek). Asil CI GitHub Actions'ta: .github/workflows/ios-ci.yml
-#   ios-release  : yalnizca elle (yedek). Asil TestFlight GitHub Actions'ta: .github/workflows/ios-release.yml
+#   ios-ci       : main/release disindaki her dal + PR -> proje uret, build, unit test (UI test yalnizca PR'da)
+#   ios-release  : main ve release/* dallarina push -> testler + imzali IPA + TestFlight
+# (2026-10-10: GitHub Actions kotasi doldugu icin CI/CD tekrar Codemagic'te; .github/workflows yalnizca elle.)
 #
 # GIZLI BILGILER KODA YAZILMAZ. Codemagic arayuzunde tanimlanmasi gerekenler:
 #   1) Teams > Integrations > Developer Portal: App Store Connect API anahtari
@@ -85,8 +86,31 @@ workflows:
       <<: *env_versions
       vars:
         <<: *common_vars
-    # Otomatik tetikleme yok: CI GitHub Actions'ta (.github/workflows/ios-ci.yml).
-    # Bu akis yalnizca Codemagic arayuzunden elle baslatilir (yedek).
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: "*"
+          include: true
+          source: true
+        # Kararli dallar ios-release akisinda test ediliyor; cift calismasin
+        - pattern: "main"
+          include: false
+          source: true
+        - pattern: "release/*"
+          include: false
+          source: true
+      cancel_previous_builds: true
+    # Yalnizca belge / sunucu / betik degisikliginde iOS derlemesi baslamaz (kuyruk bosuna sifirlanmasin)
+    when:
+      changeset:
+        excludes:
+          - '**/*.md'
+          - 'docs/**'
+          - 'supabase/**'
+          - 'scripts/server/**'
+          - 'scripts/design/**'
     scripts:
       - *generate_project
       - *build_for_testing
@@ -113,10 +137,20 @@ workflows:
           - kurye-kazanc-appstore-v3
           - kurye-kazanc-share-appstore
           - kurye-kazanc-liveactivity-appstore
+          - kurye-kazanc-broadcast-appstore
         certificates:
           - selfwake-distribution
-    # Otomatik tetikleme yok: TestFlight GitHub Actions'ta (.github/workflows/ios-release.yml).
-    # Bu akis yalnizca Codemagic arayuzunden elle baslatilir (yedek).
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: "main"
+          include: true
+          source: true
+        - pattern: "release/*"
+          include: true
+          source: true
+      cancel_previous_builds: false
     scripts:
       - *generate_project
       - *build_for_testing
@@ -153,7 +187,8 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        # Harici Beta App Review icin App Store Connect'te test bilgileri gerekir; dahili testciler build'i yine gorur
+        submit_to_testflight: false
         # Dahili testciler (App Store Connect kullanicilari) build'i otomatik gorur.
         # Gonullu kuryeler gibi harici testciler icin grup acilinca asagidaki satiri acin
         # (harici grup ilk build'de Apple Beta App Review gerektirir):

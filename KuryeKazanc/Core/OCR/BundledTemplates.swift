@@ -32,46 +32,50 @@ enum BundledTemplates {
     static let json = #"""
     [
       {
-        "id": "trendyol_go.earnings", "version": 1, "status": "calibrating", "platformCode": "trendyol_go",
+        "id": "trendyol_go.earnings", "version": 2, "status": "calibrating", "platformCode": "trendyol_go",
         "detectionKeywords": ["trendyol go", "trendyol", "tgo"],
         "fingerprint": ["kazanclarim", "kazanc raporu", "toplam kazanc", "teslimat sayisi", "hakedis"],
         "minFingerprintMatches": 2,
         "totalLabels": ["toplam kazanc", "toplam hakedis", "net kazanc", "gunluk kazanc", "haftalik kazanc", "toplam tutar", "hakedis", "toplam"],
         "bonusLabels": ["bonus", "prim", "tesvik", "ek odeme", "ekstra kazanc"],
         "packageLabels": ["teslimat sayisi", "teslim edilen paket", "teslim edilen", "paket sayisi", "tamamlanan teslimat", "teslimat", "paket"],
+        "durationLabels": ["calisma suresi", "cevrimici sure", "cevrimici", "online sure", "aktif sure"],
         "totalIncludesBonus": true, "minPackageFee": 40, "maxPackageFee": 250,
         "dayLabels": ["bugun", "gunluk", "dun"], "weekLabels": ["haftalik", "bu hafta", "gecen hafta"]
       },
       {
-        "id": "getir.earnings", "version": 1, "status": "calibrating", "platformCode": "getir",
+        "id": "getir.earnings", "version": 2, "status": "calibrating", "platformCode": "getir",
         "detectionKeywords": ["getir", "getirkurye", "getir kurye", "getiryemek", "getirbuyuk"],
         "fingerprint": ["kazanclarim", "toplam kazanc", "siparis sayisi", "hakedis", "kazancin"],
         "minFingerprintMatches": 2,
         "totalLabels": ["toplam kazanc", "toplam kazancin", "toplam hakedis", "toplam tutar", "net kazanc", "gunluk kazanc", "hakedis", "kazancin", "toplam"],
         "bonusLabels": ["bonus", "ek kazanc", "prim", "kampanya", "tesvik", "ek odeme"],
         "packageLabels": ["siparis sayisi", "teslim edilen siparis", "tamamlanan siparis", "teslimat sayisi", "siparis", "teslimat", "paket"],
+        "durationLabels": ["calisma suresi", "cevrimici sure", "cevrimici", "online sure", "aktif sure"],
         "totalIncludesBonus": true, "minPackageFee": 40, "maxPackageFee": 250,
         "dayLabels": ["bugun", "gunluk", "dun"], "weekLabels": ["haftalik", "bu hafta", "gecen hafta"]
       },
       {
-        "id": "yemeksepeti.earnings", "version": 2, "status": "calibrating", "platformCode": "yemeksepeti",
+        "id": "yemeksepeti.earnings", "version": 3, "status": "calibrating", "platformCode": "yemeksepeti",
         "detectionKeywords": ["yemeksepeti", "yemeksepeti express", "ys express", "banabi"],
         "fingerprint": ["odemeler", "siparis tutari", "toplam kazanc", "bahsis", "mesafe"],
         "minFingerprintMatches": 2,
         "totalLabels": ["toplam kazanc", "toplam odeme", "toplam tutar", "net kazanc", "kazanc", "toplam"],
         "bonusLabels": ["bonus", "ek kazanc", "bahsis", "prim", "tesvik"],
         "packageLabels": ["siparis sayisi", "teslim edilen siparis", "tamamlanan siparis", "siparis", "teslimat"],
+        "durationLabels": ["calisma suresi", "cevrimici sure", "cevrimici", "online sure", "aktif sure"],
         "totalIncludesBonus": true, "minPackageFee": 40, "maxPackageFee": 300,
         "dayLabels": ["bugun", "gunluk", "dun"], "weekLabels": ["haftalik", "bu hafta", "gecen hafta"], "amountsExcludeVAT": true
       },
       {
-        "id": "migros_hemen.earnings", "version": 1, "status": "calibrating", "platformCode": "migros_hemen",
+        "id": "migros_hemen.earnings", "version": 2, "status": "calibrating", "platformCode": "migros_hemen",
         "detectionKeywords": ["migros hemen", "migros yemek", "migros"],
         "fingerprint": ["kazanclarim", "toplam kazanc", "teslimat sayisi", "hakedis"],
         "minFingerprintMatches": 2,
         "totalLabels": ["toplam kazanc", "toplam hakedis", "toplam tutar", "net kazanc", "hakedis", "toplam"],
         "bonusLabels": ["bonus", "prim", "tesvik", "ek odeme"],
         "packageLabels": ["teslimat sayisi", "siparis sayisi", "paket sayisi", "teslimat", "siparis", "paket"],
+        "durationLabels": ["calisma suresi", "cevrimici sure", "cevrimici", "online sure", "aktif sure"],
         "totalIncludesBonus": true, "minPackageFee": 40, "maxPackageFee": 250,
         "dayLabels": ["bugun", "gunluk", "dun"], "weekLabels": ["haftalik", "bu hafta", "gecen hafta"]
       },

@@ -55,6 +55,21 @@ final class ScanResultsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.selectedCount, 1)
     }
 
+    func testWeeklyRowCannotBeSelectedNorSaved() throws {
+        try add(uberWeekly)
+        let vm = makeVM()
+        vm.load()
+        let row = try XCTUnwrap(vm.rows.first)
+        XCTAssertEqual(row.item.kind, .weekly)
+        XCTAssertFalse(row.isSelected)
+        vm.setSelected(true, for: row.id)
+        XCTAssertFalse(try XCTUnwrap(vm.rows.first).isSelected)
+        XCTAssertEqual(vm.selectedCount, 0)
+        let records = try vm.save(in: context, platforms: platforms())
+        XCTAssertTrue(records.isEmpty)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<EarningRecord>()).count, 0)
+    }
+
     func testAlreadySavedRowIsNotSelectableNorSaved() throws {
         try add(getirDaily)
         let probe = makeVM()
@@ -226,5 +241,71 @@ final class ScanResultsViewModelTests: XCTestCase {
         XCTAssertEqual(imported.capturedAt, now)
         XCTAssertEqual(imported.textHash, TextHash.of(getirDaily))
         XCTAssertEqual(imported.parsed.platformCode, "getir")
+    }
+
+    // MARK: Fotograf kaynagi
+
+    private func photoResult(_ texts: [String], assetID: String) -> PhotoScanResult {
+        let lines = texts.enumerated().map { RecognizedLine(text: $1, x: 0, y: Double($0) * 0.05, width: 1, height: 0.04) }
+        let importer = ScreenshotImporter(parser: EarningsScreenshotParser(calendar: calendar),
+                                          verifier: ScreenshotVerifier(calendar: calendar))
+        let parsed = EarningsScreenshotParser(calendar: calendar).parse(lines: texts, referenceDate: now)
+        var imported = importer.makeImported(parsed: parsed, lines: lines, capturedAt: now, referenceDate: now)
+        imported.assetIdentifier = assetID
+        return PhotoScanResult(imported: imported, input: ScanInput(parsed: parsed, lines: lines, capturedAt: now))
+    }
+
+    func testPhotoSourceSavesDistrictAndAssetIdentifier() throws {
+        let vm = ScanResultsViewModel(
+            photoResults: [photoResult(getirDaily, assetID: "asset-1")], knownTextHashes: [],
+            region: PlaceRegion(province: "İstanbul", district: "Kadıköy", neighborhood: nil),
+            calendar: calendar, now: now
+        )
+        vm.load()
+        XCTAssertEqual(vm.rows.count, 1)
+        let saved = try vm.save(in: context, platforms: platforms())
+        let record = try XCTUnwrap(saved.first)
+        XCTAssertEqual(record.district, "Kadıköy")
+        XCTAssertEqual(record.province, "İstanbul")
+        XCTAssertEqual(record.evidence?.assetIdentifier, "asset-1")
+        XCTAssertTrue(vm.rows.isEmpty)
+    }
+
+    func testPhotoOrderGroupExposesAllAssetIdentifiersAndNoDuplicatesOnReload() throws {
+        let vm = ScanResultsViewModel(
+            photoResults: [photoResult(orderCardA, assetID: "card-1"), photoResult(orderCardB, assetID: "card-2")],
+            knownTextHashes: [], calendar: calendar, now: now
+        )
+        vm.load()
+        XCTAssertEqual(vm.rows.count, 1)
+        let saved = try vm.save(in: context, platforms: platforms())
+        XCTAssertEqual(saved.count, 1)
+        XCTAssertEqual(vm.savedAssetIdentifiers, ["card-1", "card-2"])
+        XCTAssertEqual(saved.first?.evidence?.assetIdentifier, "card-1")
+    }
+
+    func testPartialSaveDoesNotResurrectSavedPhotoRows() throws {
+        // Ikinci kalem (haftalik) secilemez; ilk kalem kaydedilir. Yeniden yukleme kaydedileni geri getirmez.
+        let vm = ScanResultsViewModel(
+            photoResults: [photoResult(getirDaily, assetID: "a"), photoResult(uberWeekly, assetID: "w")],
+            knownTextHashes: [], calendar: calendar, now: now
+        )
+        vm.load()
+        XCTAssertEqual(vm.selectedCount, 1)
+        _ = try vm.save(in: context, platforms: platforms())
+        vm.load()
+        XCTAssertFalse(vm.rows.contains { $0.item.kind == .daily })
+        XCTAssertEqual(vm.savedAssetIdentifiers, ["a"])
+    }
+
+    func testPhotoDailyDurationSetsStartFromCapturedEnd() throws {
+        var result = photoResult(getirDaily, assetID: "d")
+        result.input.parsed.workDuration = 3 * 3600
+        result.imported.parsed.workDuration = 3 * 3600
+        let vm = ScanResultsViewModel(photoResults: [result], knownTextHashes: [], calendar: calendar, now: now)
+        vm.load()
+        let record = try XCTUnwrap(try vm.save(in: context, platforms: platforms()).first)
+        XCTAssertEqual(record.endTime, now)
+        XCTAssertEqual(record.startTime, now.addingTimeInterval(-3 * 3600))
     }
 }

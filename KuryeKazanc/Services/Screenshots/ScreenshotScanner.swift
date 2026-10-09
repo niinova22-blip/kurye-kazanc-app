@@ -13,6 +13,8 @@ protocol ScreenshotLibrary {
     var isAuthorized: Bool { get }
     func requestAccess() async -> Bool
     func recentScreenshots(since: Date, limit: Int) async -> [LibraryScreenshot]
+    /// Tum fotograflar (yalnizca "tum fotograflari tara" test modu icin), en yeni once.
+    func recentImages(since: Date, limit: Int) async -> [LibraryScreenshot]
 }
 
 /// PhotoKit: yalnizca ekran goruntusu alt turundeki fotograflar. Sinirli erisimde yalnizca secilenler gorunur.
@@ -33,11 +35,23 @@ struct PhotoKitScreenshotLibrary: ScreenshotLibrary {
         guard let album = PHAssetCollection.fetchAssetCollections(
             with: .smartAlbum, subtype: .smartAlbumScreenshots, options: nil
         ).firstObject else { return [] }
+        return Self.collect(PHAsset.fetchAssets(in: album, options: Self.options(since: since, limit: limit)))
+    }
+
+    func recentImages(since: Date, limit: Int) async -> [LibraryScreenshot] {
+        guard isAuthorized else { return [] }
+        return Self.collect(PHAsset.fetchAssets(with: .image, options: Self.options(since: since, limit: limit)))
+    }
+
+    private static func options(since: Date, limit: Int) -> PHFetchOptions {
         let options = PHFetchOptions()
         options.predicate = NSPredicate(format: "creationDate >= %@", since as NSDate)
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.fetchLimit = limit
-        let assets = PHAsset.fetchAssets(in: album, options: options)
+        return options
+    }
+
+    private static func collect(_ assets: PHFetchResult<PHAsset>) -> [LibraryScreenshot] {
         var result: [LibraryScreenshot] = []
         assets.enumerateObjects { asset, _, _ in
             result.append(LibraryScreenshot(identifier: asset.localIdentifier, createdAt: asset.creationDate) {

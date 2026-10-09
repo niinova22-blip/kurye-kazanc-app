@@ -237,6 +237,37 @@ final class SupabaseClientTests: XCTestCase {
         XCTAssertEqual(client.session, store.stored)
     }
 
+    // Topluluk: oturumla RPC, govde p_province/p_district, JSON cozulur.
+    @MainActor
+    func testCommunitySummaryAndHeatmap() async {
+        StubProtocol.reset([
+            "/rest/v1/rpc/community_summary": [.init(status: 200, body: #"{"per_hour":350.5,"couriers":7,"platforms":[],"best":[]}"#)],
+            "/rest/v1/rpc/community_heatmap": [.init(status: 200, body: #"[{"weekday":5,"hour":20,"per_hour":410,"couriers":6,"shifts":8}]"#)],
+        ])
+        let client = makeClient(store: MemorySessionStore(session(expiresIn: 3600)))
+
+        let summary = await client.communitySummary(province: "Ankara", district: "Sincan")
+        let cells = await client.communityHeatmap(province: "Ankara", district: "Sincan")
+
+        XCTAssertEqual(summary?.perHour, 350.5)
+        XCTAssertEqual(summary?.couriers, 7)
+        XCTAssertEqual(cells?.first?.hour, 20)
+        let first = StubProtocol.requests[0]
+        XCTAssertTrue(first.body.contains(#""p_province":"Ankara""#))
+        XCTAssertTrue(first.body.contains(#""p_district":"Sincan""#))
+        XCTAssertEqual(first.headers["authorization"], "Bearer acc-old")
+    }
+
+    @MainActor
+    func testCommunityFailureReturnsNil() async {
+        StubProtocol.reset([
+            "/rest/v1/rpc/community_summary": [.init(status: 500, body: "{}")],
+        ])
+        let client = makeClient(store: MemorySessionStore(session(expiresIn: 3600)))
+        let summary = await client.communitySummary(province: "Ankara", district: "Sincan")
+        XCTAssertNil(summary)
+    }
+
     // (b)
     @MainActor
     func testDuplicateResult() async {

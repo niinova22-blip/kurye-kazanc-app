@@ -29,6 +29,7 @@ struct ProfileView: View {
     @State private var showConsentSheet = false
     @State private var showLocationConsentSheet = false
     @State private var showDeleteConfirmation = false
+    @AppStorage("scanTestWindow") private var scanTestWindow = false
 
     private var courier: Courier? { couriers.first }
 
@@ -47,6 +48,8 @@ struct ProfileView: View {
                 if BuildEnvironment.showsTesterTools {
                     Section("Test araçları") {
                         NavigationLink("Tarama günlüğü") { ScanLogView() }
+                        Toggle("Test: son 30 gün ve tüm fotoğraflar", isOn: $scanTestWindow)
+                            .accessibilityIdentifier("profile.scanTestWindow")
                     }
                 }
                 dataSection
@@ -106,6 +109,11 @@ struct ProfileView: View {
                     LabeledContent("Platformlarım", value: courier.defaultPlatforms
                         .sorted { $0.sortOrder < $1.sortOrder }
                         .map(\.name).joined(separator: ", "))
+                }
+                NavigationLink {
+                    PlannerView()
+                } label: {
+                    Label("Çalışma profili ve plan", systemImage: "calendar.badge.clock")
                 }
             } else {
                 Text("Profil bulunamadı").foregroundStyle(.secondary)
@@ -225,7 +233,7 @@ struct ProfileView: View {
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text("Kazanç taraması")
-                Text("Bugün sekmesindeki “Kazanç taraması” düğmesiyle platform uygulamalarındaki kazanç panelini okut; bulunanları onaylayıp kaydedersin.")
+                Text("Platform uygulamalarında günlük kazanç ekranının görüntüsünü al, sonra Bugün sekmesindeki “Kazanç taraması” düğmesine bas; son 24 saatin ekran görüntüleri okunur, bulunanları onaylayıp kaydedersin.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

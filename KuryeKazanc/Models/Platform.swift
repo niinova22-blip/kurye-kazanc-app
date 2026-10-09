@@ -31,6 +31,9 @@ extension Platform {
         ("getir", "Getir"),
         ("yemeksepeti", "Yemeksepeti"),
         ("migros_hemen", "Migros Hemen"),
+        ("uber", "Uber"),
+        ("thekurye", "TheKurye"),
+        ("banabikurye", "Banabikurye"),
         ("other", "Diğer"),
     ]
 }

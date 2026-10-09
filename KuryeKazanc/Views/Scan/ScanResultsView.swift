@@ -74,17 +74,22 @@ struct ScanResultsView: View {
         .background(.bar)
     }
 
-    private func rowView(_ row: ScanResultsViewModel.Row) -> some View {
+    private func rowView(_ row: ScanResultsViewModel.Row) -> AnyView {
         let id: String = row.id
+        if row.item.kind == .weekly {
+            return AnyView(rowLabel(row).opacity(0.5))
+        }
         let binding = Binding<Bool>(
             get: { row.isSelected },
             set: { viewModel.setSelected($0, for: id) }
         )
-        return Toggle(isOn: binding) {
-            rowLabel(row)
-        }
-        .disabled(row.isAlreadySaved)
-        .opacity(row.isAlreadySaved ? 0.5 : 1)
+        return AnyView(
+            Toggle(isOn: binding) {
+                rowLabel(row)
+            }
+            .disabled(row.isAlreadySaved)
+            .opacity(row.isAlreadySaved ? 0.5 : 1)
+        )
     }
 
     private func rowLabel(_ row: ScanResultsViewModel.Row) -> some View {
@@ -111,17 +116,20 @@ struct ScanResultsView: View {
     }
 
     private func platformName(_ item: ScanItem) -> String {
-        let code: String? = item.parsed.platformCode
-        if let name = Platform.defaults.first(where: { $0.code == code })?.name {
-            return name
+        // Sablon kimligi "uber.earnings" bicimindedir; ilk parca platform kodudur
+        let templatePrefix: String? = item.parsed.templateID?.split(separator: ".").first.map(String.init)
+        for candidate in [item.parsed.platformCode, templatePrefix] {
+            guard let code = candidate else { continue }
+            if let name = platforms.first(where: { $0.code == code })?.name { return name }
+            if let name = Platform.defaults.first(where: { $0.code == code })?.name { return name }
         }
-        return item.parsed.templateID ?? "Platform"
+        return "Platform"
     }
 
     private func kindText(_ kind: ScanItem.Kind) -> String {
         switch kind {
         case .daily: "Günlük"
-        case .weekly: "Haftalık özet — vardiya değil"
+        case .weekly: "Haftalık özet — kaydedilmez (vardiya değil)"
         case .orderGroup(let count): "\(count) sipariş"
         case .unknown: "Belirsiz"
         }
@@ -145,7 +153,8 @@ struct ScanResultsView: View {
         let skipped: Int = viewModel.skippedCount
         let failed: Int = viewModel.failedCount
         guard skipped + failed > 0 else { return nil }
-        let reason: String = viewModel.firstSkipReason ?? "kayıt sırasında hata oluştu"
+        var reason: String = viewModel.firstSkipReason ?? "kayıt sırasında hata oluştu"
+        while reason.hasSuffix(".") { reason.removeLast() }
         return "\(skipped + failed) kalem kaydedilemedi: \(reason). Eksiği giderip tekrar dene ya da Vazgeç."
     }
 
