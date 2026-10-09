@@ -33,7 +33,7 @@ final class OCRTemplateTests: XCTestCase {
             referenceDate: reference
         )
         XCTAssertEqual(parsed.templateID, "getir.earnings")
-        XCTAssertEqual(parsed.templateVersion, 1)
+        XCTAssertEqual(parsed.templateVersion, 2)
         XCTAssertEqual(parsed.templateStatus, .calibrating)
         XCTAssertEqual(parsed.period, .day)
         XCTAssertGreaterThanOrEqual(parsed.fingerprintMatches, 1)

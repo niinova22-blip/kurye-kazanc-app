@@ -105,7 +105,7 @@ final class SyncRulesTests: XCTestCase {
 
     func testTemplateMerger() {
         var newer = BundledTemplates.template(id: "getir.earnings")!
-        newer.version = 2
+        newer.version = 99
         newer.status = .active
         var older = BundledTemplates.template(id: "trendyol_go.earnings")!
         older.version = 0
@@ -114,8 +114,8 @@ final class SyncRulesTests: XCTestCase {
         extra.platformCode = "bolt"
         let merged = TemplateMerger.merge(bundled: BundledTemplates.all, remote: [newer, older, extra])
         XCTAssertEqual(merged.count, BundledTemplates.all.count + 1)
-        XCTAssertEqual(merged.first { $0.id == "getir.earnings" }?.version, 2)
-        XCTAssertEqual(merged.first { $0.id == "trendyol_go.earnings" }?.version, 1, "Eski uzak surum gomuluyu ezmez")
+        XCTAssertEqual(merged.first { $0.id == "getir.earnings" }?.version, 99)
+        XCTAssertEqual(merged.first { $0.id == "trendyol_go.earnings" }?.version, BundledTemplates.template(id: "trendyol_go.earnings")!.version, "Eski uzak surum gomuluyu ezmez")
         XCTAssertEqual(merged.last?.id, "bolt.earnings")
     }
 }

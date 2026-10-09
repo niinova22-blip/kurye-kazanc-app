@@ -83,7 +83,7 @@ final class NewTemplatesTests: XCTestCase {
 
     func testYemeksepetiSummary_isVATExclusiveV2() {
         let t = BundledTemplates.template(id: "yemeksepeti.earnings")!
-        XCTAssertEqual(t.version, 2)
+        XCTAssertEqual(t.version, 3)
         XCTAssertTrue(t.amountsExcludeVAT)
     }
 
@@ -92,5 +92,21 @@ final class NewTemplatesTests: XCTestCase {
         let r = parse(["Getir", "Kazançlarım", "Bugün", "Toplam Kazanç", "₺980,00", "Sipariş Sayısı", "11"])
         XCTAssertEqual(r.templateID, "getir.earnings")
         XCTAssertEqual(r.period, .day)
+    }
+
+    /// Tarama v2: ozet ekranlarindaki calisma suresi satiri okunur, gunluk ekran gun kalir.
+    func testPlatformSummaries_readWorkDuration() {
+        let cases: [(String, [String])] = [
+            ("trendyol_go.earnings", ["Trendyol Go", "Kazançlarım", "Bugün", "Toplam Kazanç", "₺980,00", "Teslimat Sayısı", "11", "Çalışma süresi 6 sa 20 dk"]),
+            ("getir.earnings", ["Getir", "Kazançlarım", "Bugün", "Toplam Kazanç", "₺980,00", "Sipariş Sayısı", "11", "Çalışma süresi 6 sa 20 dk"]),
+            ("yemeksepeti.earnings", ["Yemeksepeti", "Ödemeler", "Bugün", "Toplam Kazanç", "₺980,00", "Sipariş Sayısı", "11", "Çalışma süresi 6 sa 20 dk"]),
+            ("migros_hemen.earnings", ["Migros Hemen", "Kazançlarım", "Bugün", "Toplam Kazanç", "₺980,00", "Teslimat Sayısı", "11", "Çalışma süresi 6 sa 20 dk"]),
+        ]
+        for (id, lines) in cases {
+            let r = parse(lines)
+            XCTAssertEqual(r.templateID, id)
+            XCTAssertEqual(r.workDuration, 6 * 3600 + 20 * 60, id)
+            XCTAssertEqual(r.period, .day, id)
+        }
     }
 }
