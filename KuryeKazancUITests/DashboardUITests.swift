@@ -15,8 +15,10 @@ final class DashboardUITests: XCTestCase {
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
             "-hasCompletedOnboarding", "YES", "-autoEstimateExpenses", "YES",
-            // Paylasim tercihleri testler arasinda tasinmasin
-            "-dataSharingOptIn", "NO", "-locationSharingOptIn", "NO", "-calibrationOptIn", "NO",
+            // Paylasim tercihleri testler arasinda tasinmasin. "-anahtar NO" argumani KULLANILMAZ: argumanla
+            // verilen deger UserDefaults'ta en ust katmandir; uygulamanin yazdigi "acik" degeri okunamaz olur
+            // (paylasim onayindan sonra anahtar ara sira kapali kaliyordu). Bunun yerine kayitli tercihler silinir.
+            "-reset-defaults",
         ]
         if sampleData { app.launchArguments.append("-sample-data") }
         app.launch()
