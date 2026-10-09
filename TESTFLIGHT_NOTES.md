@@ -24,6 +24,7 @@ Lütfen test et:
 5. Kısayollar'da "Kurye Kazanç'a ekran görüntüsü gönder" eylemi görünüyor mu, otomasyonla çalışıyor mu?
 6. Pil: 5 dk taramada yüzde kaç düştü?
 7. Gerçek bir platform kazanç ekranın varsa kişisel bilgileri karartıp paylaş.
+8. Paneli açıp dokunmadan 5 sn bekle: Tarama günlüğü'nde "Kabul edilen" artıyor mu?
 
 ## 1.3.0
 
