@@ -114,6 +114,11 @@ begin
     perform tests._login(a, true);
     return next is(public.community_heatmap('TestIl', 'Eski'), '[]'::jsonb, '56 gunden eski vardiyalar sayilmaz');
     perform tests._logout();
+    -- 5 taze kurye eklenince yalnizca onlar sayilir (eski satirlar disarida)
+    perform tests._seed_couriers(5, 'TestIl', 'Eski', 'getir', 2, 72, 60, 300);
+    perform tests._login(a, true);
+    return next is((public.community_heatmap('TestIl', 'Eski') -> 0 ->> 'couriers')::int, 5, 'eski kuryeler sayilmaz');
+    perform tests._logout();
 end;
 $$;
 

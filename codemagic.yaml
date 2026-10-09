@@ -102,6 +102,15 @@ workflows:
           include: false
           source: true
       cancel_previous_builds: true
+    # Yalnizca belge / sunucu / betik degisikliginde iOS derlemesi baslamaz (kuyruk bosuna sifirlanmasin)
+    when:
+      changeset:
+        excludes:
+          - '**/*.md'
+          - 'docs/**'
+          - 'supabase/**'
+          - 'scripts/server/**'
+          - 'scripts/design/**'
     scripts:
       - *generate_project
       - *build_for_testing

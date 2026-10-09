@@ -8,7 +8,7 @@ alter table public.shifts add column if not exists is_synthetic boolean not null
 -- Ic yardimci: (hafta gunu, saat) hucreleri. Yalnizca diger SECURITY DEFINER fonksiyonlar cagirir.
 -- weekday: 1 = Pazartesi ... 7 = Pazar. Vardiya, kapsadigi saatlere dakika agirlikli dagitilir;
 -- gece yarisini asan kisim ertesi gune (7 -> 1) gecer. Saat sinirlari uzerinden hesaplanir (dakika uretilmez).
-create or replace function public.community_cells(p_province text, p_district text, p_platform text default null)
+create or replace function public.community_cells(p_province text, p_district text)
 returns table (weekday smallint, hour smallint, per_hour numeric, couriers integer, shifts integer)
 language sql
 stable
@@ -24,7 +24,6 @@ as $$
         where s.created_at >= now() - interval '56 days'
           and (s.province = p_province or lower(s.province) = lower(p_province))
           and (s.district = p_district or lower(s.district) = lower(p_district))
-          and (p_platform is null or s.platform_code = p_platform)
     ),
     pieces as (
         select sc.id, sc.user_id, sc.dur, sc.earn,
@@ -74,7 +73,7 @@ declare
     result jsonb;
 begin
     select count(distinct s.user_id),
-           round(sum(s.gross + s.bonus) / nullif(sum(s.duration_min / 60.0), 0), 2)
+           round(sum(s.gross + s.bonus) / nullif(sum(s.duration_min) / 60.0, 0), 2)
       into total_couriers, total_per_hour
       from public.shifts s
      where s.created_at >= now() - interval '56 days'
@@ -89,9 +88,9 @@ begin
                        order by t.per_hour desc, t.platform_code)
             from (
                 select s.platform_code,
-                       round(sum(s.gross + s.bonus) / nullif(sum(s.duration_min / 60.0), 0), 2) as per_hour,
-                       round(sum(s.gross + s.bonus) filter (where s.packages is not null)
-                             / nullif(sum(s.packages), 0), 2) as per_package,
+                       round(sum(s.gross + s.bonus) / nullif(sum(s.duration_min) / 60.0, 0), 2) as per_hour,
+                       round(sum(s.gross + s.bonus) filter (where s.packages > 0)
+                             / nullif(sum(s.packages) filter (where s.packages > 0), 0), 2) as per_package,
                        count(distinct s.user_id)::integer as couriers
                 from public.shifts s
                 where s.created_at >= now() - interval '56 days'
@@ -119,7 +118,7 @@ begin
 end;
 $$;
 
-revoke all on function public.community_cells(text, text, text) from public, anon, authenticated;
+revoke all on function public.community_cells(text, text) from public, anon, authenticated;
 revoke all on function public.community_heatmap(text, text) from public, anon;
 revoke all on function public.community_summary(text, text) from public, anon;
 grant execute on function public.community_heatmap(text, text) to authenticated;

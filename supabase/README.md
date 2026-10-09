@@ -20,11 +20,11 @@ node scripts/server/apply.mjs           # gocleri sirayla, bir kez uygular
 node scripts/server/seed_templates.mjs  # gomulu sablonlari ocr_templates'e yazar
 node scripts/server/test.mjs            # pgTAP testleri (basarisizlikta cikis kodu 1)
 node scripts/server/e2e.mjs             # anon anahtarla uctan uca kontrol
-node scripts/server/seed_synthetic.mjs  # 1.4b: Sincan/Ankara sentetik test kuryeleri (8 kurye, 30 gun)
+node scripts/server/seed_synthetic.mjs  # 1.4b: Sincan/Ankara sentetik test kuryeleri (10 kurye, 30 gun)
 node scripts/server/purge_synthetic.mjs # sentetik vardiyalari ve kullanicilari siler
 ```
 
-Sira: `apply` -> `test` -> `seed_synthetic`. `seed_synthetic.mjs` sentetik satir varsa durur (`--force` ile zorlanir).
+Sira: `apply` -> `test` -> `seed_synthetic`. `seed_synthetic.mjs` sentetik satir varsa durur.
 `purge_synthetic.mjs` gercek yayindan (topluluk ozelligi herkese acilmadan) once calistirilmalidir.
 
 ## Notlar
