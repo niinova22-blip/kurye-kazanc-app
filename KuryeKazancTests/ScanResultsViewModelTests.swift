@@ -242,4 +242,32 @@ final class ScanResultsViewModelTests: XCTestCase {
         XCTAssertEqual(imported.textHash, TextHash.of(getirDaily))
         XCTAssertEqual(imported.parsed.platformCode, "getir")
     }
+
+    // MARK: Fotograf kaynagi
+
+    private func photoResult(_ texts: [String], assetID: String) -> PhotoScanResult {
+        let lines = texts.enumerated().map { RecognizedLine(text: $1, x: 0, y: Double($0) * 0.05, width: 1, height: 0.04) }
+        let importer = ScreenshotImporter(parser: EarningsScreenshotParser(calendar: calendar),
+                                          verifier: ScreenshotVerifier(calendar: calendar))
+        let parsed = EarningsScreenshotParser(calendar: calendar).parse(lines: texts, referenceDate: now)
+        var imported = importer.makeImported(parsed: parsed, lines: lines, capturedAt: now, referenceDate: now)
+        imported.assetIdentifier = assetID
+        return PhotoScanResult(imported: imported, input: ScanInput(parsed: parsed, lines: lines, capturedAt: now))
+    }
+
+    func testPhotoSourceSavesDistrictAndAssetIdentifier() throws {
+        let vm = ScanResultsViewModel(
+            photoResults: [photoResult(getirDaily, assetID: "asset-1")], knownTextHashes: [],
+            region: PlaceRegion(province: "İstanbul", district: "Kadıköy", neighborhood: nil),
+            calendar: calendar, now: now
+        )
+        vm.load()
+        XCTAssertEqual(vm.rows.count, 1)
+        let saved = try vm.save(in: context, platforms: platforms())
+        let record = try XCTUnwrap(saved.first)
+        XCTAssertEqual(record.district, "Kadıköy")
+        XCTAssertEqual(record.province, "İstanbul")
+        XCTAssertEqual(record.evidence?.assetIdentifier, "asset-1")
+        XCTAssertTrue(vm.rows.isEmpty)
+    }
 }
