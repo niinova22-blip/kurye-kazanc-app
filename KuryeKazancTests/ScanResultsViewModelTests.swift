@@ -33,8 +33,10 @@ final class ScanResultsViewModelTests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.01)
     }
 
-    private func makeVM(known: Set<String> = []) -> ScanResultsViewModel {
-        ScanResultsViewModel(store: store, templates: nil, knownTextHashes: known, interrupted: false,
+    private func makeVM(known: Set<String> = [],
+                        existing: [ScanResultsViewModel.ExistingDaily] = []) -> ScanResultsViewModel {
+        ScanResultsViewModel(store: store, templates: nil, knownTextHashes: known, existingDaily: existing,
+                             interrupted: false,
                              calendar: calendar, now: now)
     }
 
@@ -154,6 +156,66 @@ final class ScanResultsViewModelTests: XCTestCase {
         let vm = makeVM()
         vm.load()
         XCTAssertEqual(vm.rows.count, 1)
+    }
+
+    private func existing(_ code: String, dayOffset: Int = 0, gross: Double) -> ScanResultsViewModel.ExistingDaily {
+        let day = calendar.date(byAdding: .day, value: dayOffset, to: calendar.startOfDay(for: now))!
+        return .init(platformCode: code, day: day.addingTimeInterval(9 * 3600), gross: gross)
+    }
+
+    func testSameDayPlatformAndTotalIsAlreadySaved() throws {
+        try add(getirDaily)
+        let vm = makeVM(existing: [existing("getir", gross: 980)])
+        vm.load()
+        let row = try XCTUnwrap(vm.rows.first)
+        XCTAssertTrue(row.isAlreadySaved)
+        XCTAssertFalse(row.isSelected)
+    }
+
+    func testSameDayDifferentTotalIsUnselectedWithFlag() throws {
+        try add(getirDaily)
+        let vm = makeVM(existing: [existing("getir", gross: 600)])
+        vm.load()
+        let row = try XCTUnwrap(vm.rows.first)
+        XCTAssertFalse(row.isAlreadySaved)
+        XCTAssertTrue(row.hasSameDayRecord)
+        XCTAssertFalse(row.isSelected)
+        vm.setSelected(true, for: row.id)
+        XCTAssertEqual(vm.selectedCount, 1)
+    }
+
+    func testOtherDayOrPlatformIsUnaffected() throws {
+        try add(getirDaily)
+        let vm = makeVM(existing: [existing("getir", dayOffset: -1, gross: 980), existing("uber", gross: 980)])
+        vm.load()
+        let row = try XCTUnwrap(vm.rows.first)
+        XCTAssertFalse(row.isAlreadySaved)
+        XCTAssertFalse(row.hasSameDayRecord)
+        XCTAssertTrue(row.isSelected)
+    }
+
+    func testSendableOnlyWhenDailyWorkDurationRead() throws {
+        try add(getirDaily)
+        let vm = makeVM()
+        vm.load()
+        let item = try XCTUnwrap(vm.rows.first).item
+        XCTAssertFalse(ScanResultsViewModel.isSendable(item))
+        var withDuration = item
+        withDuration.parsed.period = .day
+        withDuration.parsed.workDuration = 4 * 3600
+        XCTAssertTrue(ScanResultsViewModel.isSendable(withDuration))
+        var weekly = withDuration
+        weekly.parsed.period = .week
+        XCTAssertFalse(ScanResultsViewModel.isSendable(weekly))
+    }
+
+    func testSkipReasonIsReported() throws {
+        try add(getirDaily)
+        let vm = makeVM()
+        vm.load()
+        _ = try vm.save(in: context, platforms: [])
+        XCTAssertNotNil(vm.firstSkipReason)
+        XCTAssertTrue(vm.sendableRecordIDs.isEmpty)
     }
 
     func testImportCaptureUsesCapturedAtAndMarksGenuine() {

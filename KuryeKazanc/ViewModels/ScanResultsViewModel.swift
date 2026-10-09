@@ -11,6 +11,8 @@ final class ScanResultsViewModel {
         let item: ScanItem
         var isSelected: Bool
         let isAlreadySaved: Bool
+        /// Ayni platform ve gun icin farkli tutarli bir kayit var: varsayilan secili degil.
+        var hasSameDayRecord = false
         var id: String { item.id }
     }
 
@@ -19,6 +21,19 @@ final class ScanResultsViewModel {
     var interrupted: Bool
     /// Son kaydetmede dogrulamadan gecemeyip atlanan kalem sayisi.
     private(set) var skippedCount = 0
+    /// Kaydederken hata alan (veritabani) kalem sayisi.
+    private(set) var failedCount = 0
+    /// Atlanan kalemlerden ilkinin nedeni (dogrulama hatasi).
+    private(set) var firstSkipReason: String?
+    /// Son kaydetmede olusan kayitlardan topluluga gonderilebilecekler (ekranda calisma suresi olanlar).
+    private(set) var sendableRecordIDs: Set<UUID> = []
+
+    /// Var olan bir kaydin ozeti (tekrar tarama kontrolu icin).
+    struct ExistingDaily: Equatable {
+        var platformCode: String?
+        var day: Date
+        var gross: Double
+    }
 
     @ObservationIgnored private var hasLoaded = false
     @ObservationIgnored private var itemFiles: [String: [URL]] = [:]
@@ -26,17 +41,33 @@ final class ScanResultsViewModel {
     @ObservationIgnored private let store: BroadcastCaptureStore
     @ObservationIgnored private let importer: ScreenshotImporter
     @ObservationIgnored private let knownTextHashes: Set<String>
+    @ObservationIgnored private let existingDaily: [ExistingDaily]
     @ObservationIgnored private let calendar: Calendar
     @ObservationIgnored private let now: Date
 
     init(store: BroadcastCaptureStore, templates: [OCRTemplate]?, knownTextHashes: Set<String>,
-         interrupted: Bool, calendar: Calendar = .current, now: Date = .now) {
+         existingDaily: [ExistingDaily] = [], interrupted: Bool, calendar: Calendar = .current, now: Date = .now) {
         self.store = store
         self.importer = ScreenshotImporter(verifier: ScreenshotVerifier(calendar: calendar), templates: templates)
         self.knownTextHashes = knownTextHashes
+        self.existingDaily = existingDaily
         self.interrupted = interrupted
         self.calendar = calendar
         self.now = now
+    }
+
+    /// Yalnizca ekranda gunluk calisma suresi okunan kalemler topluluga gonderilir; digerlerinde saat tahminidir.
+    static func isSendable(_ item: ScanItem) -> Bool {
+        item.parsed.period == .day && item.parsed.workDuration != nil
+    }
+
+    /// Ayni platform + gun icin mevcut kayitlarin tutarlari.
+    private func sameDayGross(for item: ScanItem) -> [Double] {
+        guard item.kind == .daily else { return [] }
+        let day = calendar.startOfDay(for: item.parsed.date)
+        return existingDaily
+            .filter { $0.platformCode == item.parsed.platformCode && calendar.startOfDay(for: $0.day) == day }
+            .map(\.gross)
     }
 
     var selectedCount: Int { rows.filter { $0.isSelected && !$0.isAlreadySaved }.count }
@@ -71,13 +102,17 @@ final class ScanResultsViewModel {
         itemFiles = files
         orphanFiles = orphans
         rows = builder.build(inputs).map { item in
-            let saved = knownTextHashes.contains(item.textHash)
+            let sameDay = sameDayGross(for: item)
+            let sameTotal = sameDay.contains { abs($0 - item.parsed.totalEarning) < 0.01 }
+            let saved = knownTextHashes.contains(item.textHash) || sameTotal
+            let hasSameDay = !saved && !sameDay.isEmpty
             let defaultOn: Bool
             switch item.kind {
             case .daily, .orderGroup: defaultOn = true
             case .weekly, .unknown: defaultOn = false
             }
-            return Row(item: item, isSelected: defaultOn && !saved, isAlreadySaved: saved)
+            return Row(item: item, isSelected: defaultOn && !saved && !hasSameDay, isAlreadySaved: saved,
+                       hasSameDayRecord: hasSameDay)
         }
     }
 
@@ -91,6 +126,9 @@ final class ScanResultsViewModel {
     @discardableResult
     func save(in context: ModelContext, platforms: [Platform]) throws -> [EarningRecord] {
         skippedCount = 0
+        failedCount = 0
+        firstSkipReason = nil
+        sendableRecordIDs = []
         var saved: [EarningRecord] = []
         for row in rows where row.isSelected && !row.isAlreadySaved {
             let item = row.item
@@ -101,10 +139,18 @@ final class ScanResultsViewModel {
             guard form.canSave else {
                 // Secili ama kaydedilemeyen kalemin dosyalari silinmez
                 skippedCount += 1
+                if firstSkipReason == nil { firstSkipReason = form.validationErrors.first }
                 continue
             }
-            saved.append(try form.save(in: context))
-            removeFiles(for: item.id)
+            // Tek kalemin kayit hatasi oncekilerin kuyruga alinmasini engellemez
+            do {
+                let record = try form.save(in: context)
+                saved.append(record)
+                if Self.isSendable(item) { sendableRecordIDs.insert(record.id) }
+                removeFiles(for: item.id)
+            } catch {
+                failedCount += 1
+            }
         }
         // Secilmeyen kalemler ve kalem uretmeyen dosyalar silinir; atlananlar kalir
         let skippedIDs = rows.filter { row in
@@ -114,7 +160,7 @@ final class ScanResultsViewModel {
         for id in Array(itemFiles.keys) where !kept.contains(id) { removeFiles(for: id) }
         orphanFiles.forEach(store.remove)
         orphanFiles = []
-        if skippedCount > 0 {
+        if skippedCount > 0 || failedCount > 0 {
             load()
         } else {
             rows = []

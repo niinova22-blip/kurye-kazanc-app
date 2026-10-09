@@ -27,6 +27,7 @@ struct ScanResultsView: View {
                         .foregroundStyle(.orange)
                 }
                 rowsContent
+                estimateFootnote
                 if let saveError {
                     Text(saveError).foregroundStyle(.red)
                 }
@@ -48,6 +49,15 @@ struct ScanResultsView: View {
             ForEach(viewModel.rows) { row in
                 rowView(row)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var estimateFootnote: some View {
+        if !viewModel.rows.isEmpty {
+            Text("Ekranda çalışma süresi yoksa saatler tahminidir (4 sa); kaydı açıp düzenleyebilirsin. Bu kayıtlar topluluğa gönderilmez.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -92,6 +102,10 @@ struct ScanResultsView: View {
             if row.isAlreadySaved {
                 Text("Zaten kayıtlı")
                     .font(.caption.weight(.semibold))
+            } else if row.hasSameDayRecord {
+                Text("Bu gün için kayıt var")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
             }
         }
     }
@@ -117,15 +131,22 @@ struct ScanResultsView: View {
         do {
             let saved: [EarningRecord] = try viewModel.save(in: modelContext, platforms: platforms)
             afterSave(saved)
-            let skipped: Int = viewModel.skippedCount
-            if skipped > 0 {
-                saveError = "\(skipped) kalem kaydedilemedi: platform bulunamadı. Platformu Profil'den ekleyip tekrar dene ya da Vazgeç."
+            if let message = failureMessage() {
+                saveError = message
             } else {
                 dismiss()
             }
         } catch {
             saveError = error.localizedDescription
         }
+    }
+
+    private func failureMessage() -> String? {
+        let skipped: Int = viewModel.skippedCount
+        let failed: Int = viewModel.failedCount
+        guard skipped + failed > 0 else { return nil }
+        let reason: String = viewModel.firstSkipReason ?? "kayıt sırasında hata oluştu"
+        return "\(skipped + failed) kalem kaydedilemedi: \(reason). Eksiği giderip tekrar dene ya da Vazgeç."
     }
 
     private func discard() {
@@ -136,7 +157,8 @@ struct ScanResultsView: View {
     /// Form kaydı sonrasıyla aynı: eşitleme kuyruğu, gönderim ve 24 saatlik yedek.
     private func afterSave(_ records: [EarningRecord]) {
         let vehicle: String = (couriers.first?.vehicleType ?? .motorcycle).rawValue
-        for record in records {
+        let sendable: Set<UUID> = viewModel.sendableRecordIDs
+        for record in records where sendable.contains(record.id) {
             sync.recordSaved(record, vehicle: vehicle)
         }
         let coordinator: SyncCoordinator = sync
