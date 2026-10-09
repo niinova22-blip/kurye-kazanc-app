@@ -10,29 +10,77 @@ final class SampleHandler: RPBroadcastSampleHandler {
     private let parser = EarningsScreenshotParser()
     private let ciContext = CIContext(options: [.cacheIntermediates: false])
 
+    /// Durum (log, son isleme, bekleyen kare) tek kilit altinda; ayni anda en fazla bir OCR calisir.
+    private let lock = NSLock()
+    private let trailingQueue = DispatchQueue(label: "kurye.broadcast.trailing")
+    /// Hiz sinirina takilan en yeni kare: statik ekran icin pencere sonunda islenir.
+    private var pendingBuffer: CVPixelBuffer?
+    private var trailingScheduled = false
+
     override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
+        lock.lock()
+        defer { lock.unlock() }
         log = BroadcastLog()
         filter = StableCaptureFilter()
+        pendingBuffer = nil
         log.save()
     }
 
     override func broadcastFinished() {
+        lock.lock()
+        defer { lock.unlock() }
+        pendingBuffer = nil
         log.finishedAt = .now
         log.save()
     }
 
     override func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, with sampleBufferType: RPSampleBufferType) {
         guard sampleBufferType == .video else { return }
-        let now = Date()
-        guard now.timeIntervalSince(lastProcessed) >= 1,
-              let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             log.skippedRate += 1
             return
         }
-        lastProcessed = now
+        if Date().timeIntervalSince(lastProcessed) >= 1 {
+            pendingBuffer = nil
+            run(pixelBuffer)
+        } else {
+            log.skippedRate += 1
+            pendingBuffer = pixelBuffer
+            scheduleTrailing(after: 1 - Date().timeIntervalSince(lastProcessed))
+        }
+    }
+
+    /// Kilit altinda cagrilir.
+    private func run(_ pixelBuffer: CVPixelBuffer) {
+        lastProcessed = Date()
         autoreleasepool { process(pixelBuffer) }
         log.peakMemoryMB = max(log.peakMemoryMB, BroadcastLog.currentMemoryMB())
         log.save()
+    }
+
+    /// Kilit altinda cagrilir. Pencere sonunda bekleyen kare islenmediyse islenir.
+    private func scheduleTrailing(after delay: TimeInterval) {
+        guard !trailingScheduled else { return }
+        trailingScheduled = true
+        trailingQueue.asyncAfter(deadline: .now() + max(0.05, delay)) { [weak self] in
+            self?.runTrailing()
+        }
+    }
+
+    private func runTrailing() {
+        lock.lock()
+        defer { lock.unlock() }
+        trailingScheduled = false
+        guard let pixelBuffer = pendingBuffer else { return }
+        let remaining = 1 - Date().timeIntervalSince(lastProcessed)
+        if remaining > 0.01 {
+            scheduleTrailing(after: remaining)
+            return
+        }
+        pendingBuffer = nil
+        run(pixelBuffer)
     }
 
     private func process(_ pixelBuffer: CVPixelBuffer) {
