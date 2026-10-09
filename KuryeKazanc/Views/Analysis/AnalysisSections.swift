@@ -1,8 +1,8 @@
 import SwiftUI
 import Charts
 
-private let weekdayNames = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
-private let weekdayLongNames = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+let weekdayNames = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
+let weekdayLongNames = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
 
 struct BestSlotsSection: View {
     let slots: [RankedSlot]
@@ -62,16 +62,13 @@ private struct BestSlotRow: View {
 struct HeatmapSection: View {
     let map: [HourSlot: SlotStat]
 
-    /// Eksen isaretleri; alan -0.5...23.5 oldugundan ilk ve son hucre tam gorunur.
-    private static let hourMarks: [Double] = [0, 6, 12, 18, 23]
-
-    private var cells: [RankedSlot] {
-        map.filter { $0.value.netPerHour != nil }.map { RankedSlot(slot: $0.key, stat: $0.value) }
+    private var values: [HourSlot: Double] {
+        map.compactMapValues { $0.netPerHour }
     }
 
     var body: some View {
         Section {
-            heatmapChart
+            HeatmapChart(values: values)
                 .frame(height: 220)
                 .padding(.vertical, 8)
                 .accessibilityLabel("Gün ve saate göre net kazanç ısı haritası")
@@ -81,16 +78,34 @@ struct HeatmapSection: View {
             Text("Koyu hücre = saat başı daha yüksek net. Son 8 hafta.")
         }
     }
+}
 
-    private var heatmapChart: some View {
-        Chart(cells, id: \.slot) { cell in
+/// Gun x saat isi haritasi (kisisel ve topluluk ortak kullanir). Deger = saat basi TL.
+struct HeatmapChart: View {
+    let values: [HourSlot: Double]
+
+    private struct Cell: Identifiable {
+        let slot: HourSlot
+        let value: Double
+        var id: HourSlot { slot }
+    }
+
+    /// Eksen isaretleri; alan -0.5...23.5 oldugundan ilk ve son hucre tam gorunur.
+    private static let hourMarks: [Double] = [0, 6, 12, 18, 23]
+
+    private var cells: [Cell] {
+        values.map { Cell(slot: $0.key, value: $0.value) }.sorted { $0.slot < $1.slot }
+    }
+
+    var body: some View {
+        Chart(cells) { cell in
             RectangleMark(
                 xStart: .value("Saat başı", Double(cell.slot.hour) - 0.45),
                 xEnd: .value("Saat sonu", Double(cell.slot.hour) + 0.45),
                 y: .value("Gün", weekdayNames[cell.slot.weekday - 1]),
                 height: .ratio(0.9)
             )
-            .foregroundStyle(by: .value("Net ₺/sa", cell.stat.netPerHour ?? 0))
+            .foregroundStyle(by: .value("₺/sa", cell.value))
         }
         .chartForegroundStyleScale(range: Gradient(colors: [Theme.accent.opacity(0.15), Theme.accent]))
         .chartYScale(domain: weekdayNames)

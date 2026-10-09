@@ -51,6 +51,9 @@ final class SyncCoordinator {
     /// Sunucu ayari var mi (istemci olusturuldu mu).
     var isServerAvailable: Bool { client != nil }
 
+    /// Topluluk sekmesi ayni istemciyi kullanir (nil: sunucu yok).
+    var communityClient: (any SupabaseServing)? { client }
+
     // MARK: - Riza
 
     var isSharingEnabled: Bool {

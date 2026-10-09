@@ -39,6 +39,16 @@ final class FakeSupabase: SupabaseServing {
         return templates
     }
 
+    func communityHeatmap(province: String, district: String) async -> [CommunityCell]? {
+        otherCalls += 1
+        return nil
+    }
+
+    func communitySummary(province: String, district: String) async -> CommunitySummary? {
+        otherCalls += 1
+        return nil
+    }
+
     func signInWithApple(idToken: String, nonce: String) async throws -> AuthSession {
         otherCalls += 1
         throw SupabaseError.notSignedIn

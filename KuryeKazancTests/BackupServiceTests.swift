@@ -32,6 +32,10 @@ final class FakeAccountClient: SupabaseServing {
 
     func fetchTemplates() async -> [OCRTemplate]? { [] }
 
+    func communityHeatmap(province: String, district: String) async -> [CommunityCell]? { nil }
+
+    func communitySummary(province: String, district: String) async -> CommunitySummary? { nil }
+
     func signInWithApple(idToken: String, nonce: String) async throws -> AuthSession {
         appleNonces.append(nonce)
         let fresh: AuthSession = FakeAccountClient.makeSession(anonymous: false)
