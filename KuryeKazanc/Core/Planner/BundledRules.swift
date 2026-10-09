@@ -893,7 +893,7 @@ enum BundledRules {
   "kind": "info",
   "params": {},
   "description": "Hesabın kapatılmasında kullanılan kişisel verilerin ve işlenme amacının bildirilmesini KVKK md. 11 kapsamında yazılı isteyebilirsin.",
-  "source_url": "https://www.mevzuat.gov.tr/mevzuatmetin/1.5.6698.pdf",
+  "source_url": "https://www.kvkk.gov.tr/Icerik/6649/Personal-Data-Protection-Law",
   "source_kind": "official",
   "published_on": null,
   "last_checked_on": "2026-10-10",
@@ -903,7 +903,7 @@ enum BundledRules {
   "confidence": 0.8,
   "courier_model": "any",
   "region": null,
-  "version": 1,
+  "version": 2,
   "previous_id": null
  }
 ]
