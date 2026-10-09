@@ -26,7 +26,9 @@ final class ScenarioImageTests: XCTestCase {
         }
         let report = tally.markdown(title: "Taklit ekranlar (Vision)")
         appendReport(report)
-        print(report)
+        print("SCENARIO_REPORT_BEGIN
+\(report)
+SCENARIO_REPORT_END")
 
         let baselineURL = fixtures.appendingPathComponent("scenario-baseline.json")
         guard let data = try? Data(contentsOf: baselineURL),
