@@ -38,7 +38,12 @@ for (const [url, ids] of bySource) {
   let hash = null;
   let note = null;
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'KuryeKazanc-RuleCheck/1.0' }, redirect: 'follow' });
+    const res = await fetch(url, { headers: {
+      'User-Agent': 'KuryeKazanc-RuleCheck/1.0',
+      // Accept basligi olmadan bazi siteler 403/406 donuyor
+      Accept: 'text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'tr-TR,tr;q=0.9,en;q=0.8',
+    }, redirect: 'follow', signal: AbortSignal.timeout(30000) });
     status = res.status;
     if (res.ok) {
       const text = normalize(await res.text());
