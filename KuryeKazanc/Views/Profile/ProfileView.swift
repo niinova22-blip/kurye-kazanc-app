@@ -44,6 +44,11 @@ struct ProfileView: View {
                 sharingSection
                 AccountSection()
                 CalibrationSection()
+                if BuildEnvironment.showsTesterTools {
+                    Section("Test araçları") {
+                        NavigationLink("Tarama günlüğü") { ScanLogView() }
+                    }
+                }
                 dataSection
                 aboutSection
             }
