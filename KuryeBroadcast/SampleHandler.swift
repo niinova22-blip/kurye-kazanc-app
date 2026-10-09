@@ -31,7 +31,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
         lastProcessed = now
         autoreleasepool { process(pixelBuffer) }
         log.peakMemoryMB = max(log.peakMemoryMB, BroadcastLog.currentMemoryMB())
-        if log.processed % 10 == 0 { log.save() }
+        log.save()
     }
 
     private func process(_ pixelBuffer: CVPixelBuffer) {
@@ -41,6 +41,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
         let scale = min(1, 1280 / longSide)
         let scaled = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         guard let cgImage = ciContext.createCGImage(scaled, from: scaled.extent) else { return }
+        log.peakMemoryMB = max(log.peakMemoryMB, BroadcastLog.currentMemoryMB())
 
         let started = Date()
         let request = VNRecognizeTextRequest()
@@ -48,6 +49,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
         request.usesLanguageCorrection = false
         request.recognitionLanguages = ["tr-TR", "en-US"]
         try? VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+        log.peakMemoryMB = max(log.peakMemoryMB, BroadcastLog.currentMemoryMB())
         let seconds = Date().timeIntervalSince(started)
         log.totalOCRSeconds += seconds
         log.maxOCRSeconds = max(log.maxOCRSeconds, seconds)

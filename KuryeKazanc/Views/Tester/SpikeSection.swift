@@ -5,8 +5,11 @@ import ReplayKit
 struct SpikeSection: View {
     var body: some View {
         Section("Deneme: kazanç taraması") {
-            BroadcastPickerButton()
-                .frame(height: 44)
+            HStack {
+                BroadcastPickerButton()
+                    .frame(width: 44, height: 44)
+                Text("Kazanç taramasını başlat")
+            }
             NavigationLink("Deneme ekranları") { MockScreensPager() }
             NavigationLink("Tarama günlüğü") { BroadcastLogView() }
         }
