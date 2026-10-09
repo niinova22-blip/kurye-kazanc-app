@@ -7,7 +7,7 @@ struct SendScreenshotIntent: AppIntent {
     static var description = IntentDescription("Ekran görüntüsünü Kurye Kazanç'a bırakır; uygulamayı açınca okunur.")
     static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "Görüntü", supportedContentTypes: [.image])
+    @Parameter(title: "Görüntü", supportedTypeIdentifiers: ["public.image"])
     var image: IntentFile
 
     /// Test icin gelen kutusu disaridan verilir.
