@@ -184,3 +184,12 @@ struct CommunityBody: Encodable {
         case district = "p_district"
     }
 }
+
+/// Tek satiri cozulemeyen kural tum listeyi bozmasin.
+struct LossyRule: Decodable {
+    let rule: PlatformRule?
+
+    init(from decoder: Decoder) throws {
+        rule = try? PlatformRule(from: decoder)
+    }
+}

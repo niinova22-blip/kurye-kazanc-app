@@ -110,6 +110,11 @@ struct ProfileView: View {
                         .sorted { $0.sortOrder < $1.sortOrder }
                         .map(\.name).joined(separator: ", "))
                 }
+                NavigationLink {
+                    PlannerView()
+                } label: {
+                    Label("Çalışma profili ve plan", systemImage: "calendar.badge.clock")
+                }
             } else {
                 Text("Profil bulunamadı").foregroundStyle(.secondary)
             }

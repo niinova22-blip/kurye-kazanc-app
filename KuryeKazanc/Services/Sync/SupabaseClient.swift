@@ -6,6 +6,7 @@ protocol SupabaseServing {
     func submitShift(_ p: ShiftPayload) async -> OutboxResult
     func submitCalibration(platformCode: String?, templateID: String?, lines: [RecognizedLine]) async -> OutboxResult
     func fetchTemplates() async -> [OCRTemplate]?
+    func fetchPlatformRules() async -> [PlatformRule]?
     func communityHeatmap(province: String, district: String) async -> [CommunityCell]?
     func communitySummary(province: String, district: String) async -> CommunitySummary?
     func signInWithApple(idToken: String, nonce: String) async throws -> AuthSession
@@ -14,6 +15,11 @@ protocol SupabaseServing {
     func deleteMyData() async throws
     func signOut()
     var session: AuthSession? { get }
+}
+
+extension SupabaseServing {
+    /// Varsayilan: kural yok (test istemcileri icin). Gercek istemci sunucudan ceker.
+    func fetchPlatformRules() async -> [PlatformRule]? { nil }
 }
 
 /// Elle yazilmis kucuk Supabase REST istemcisi (GoTrue + PostgREST). Ucuncu taraf bagimlilik yok.
@@ -89,6 +95,15 @@ final class SupabaseClient: SupabaseServing {
         guard let result = try? await perform(request), result.isSuccess else { return nil }
         guard let rows = try? decoder.decode([TemplateRow].self, from: result.body) else { return nil }
         return rows.compactMap { $0.body }
+    }
+
+    /// Planlama kurallari herkese acik: oturum gerekmez. Bozuk satir atlanir; istek basarisizsa nil.
+    func fetchPlatformRules() async -> [PlatformRule]? {
+        let query: [URLQueryItem] = [URLQueryItem(name: "select", value: "*")]
+        let request: URLRequest = makeRequest(method: "GET", path: "rest/v1/platform_rules", query: query)
+        guard let result = try? await perform(request), result.isSuccess else { return nil }
+        guard let rows = try? decoder.decode([LossyRule].self, from: result.body) else { return nil }
+        return rows.compactMap(\.rule)
     }
 
     // MARK: - Topluluk

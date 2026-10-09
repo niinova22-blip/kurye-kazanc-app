@@ -40,11 +40,12 @@ struct KuryeKazancApp: App {
         .modelContainer(environment.container)
     }
 
-    /// Once sablonlar, sonra kuyruk. Ust uste cagrilar koordinatorde tek calismaya iner.
+    /// Once sablonlar ve planlama kurallari, sonra kuyruk. Ust uste cagrilar koordinatorde tek calismaya iner.
     @MainActor
     private func syncNow() async {
         let sync: SyncCoordinator = environment.sync
         await sync.refreshTemplatesIfNeeded()
+        await sync.refreshRulesIfNeeded()
         await sync.flush()
     }
 }

@@ -39,6 +39,14 @@ final class FakeSupabase: SupabaseServing {
         return templates
     }
 
+    var rules: [PlatformRule]? = []
+    private(set) var ruleFetchCount: Int = 0
+
+    func fetchPlatformRules() async -> [PlatformRule]? {
+        ruleFetchCount += 1
+        return rules
+    }
+
     func communityHeatmap(province: String, district: String) async -> [CommunityCell]? {
         otherCalls += 1
         return nil
@@ -129,7 +137,8 @@ final class SyncCoordinatorTests: XCTestCase {
         SyncCoordinator(
             client: client, queue: queue, defaults: defaults, calendar: calendar,
             clock: { [unowned self] in self.now },
-            templatesFileURL: directory.appendingPathComponent("remote_templates.json")
+            templatesFileURL: directory.appendingPathComponent("remote_templates.json"),
+            rulesFileURL: directory.appendingPathComponent("platform_rules.json")
         )
     }
 
@@ -582,6 +591,47 @@ final class SyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(fake.fetchCount, 2)
         XCTAssertTrue(sync.remoteTemplates.isEmpty)
         XCTAssertEqual(sync.mergedTemplates(), BundledTemplates.all)
+    }
+
+    // MARK: - Planlama kurallari
+
+    func testRefreshRules_newVersionOverridesBundledAndPersists() async {
+        setConsents(sharing: true, calibration: false)
+        var updated: PlatformRule = BundledRules.all.first { $0.id == "tgo-peak" }!
+        updated.version = 2
+        updated.status = .verified
+        updated.params.hours = 18
+        fake.rules = [updated]
+        let sync = makeCoordinator(client: fake)
+
+        await sync.refreshRulesIfNeeded()
+        XCTAssertEqual(fake.ruleFetchCount, 1)
+        let rule: PlatformRule? = sync.ruleSet().latest.first { $0.id == "tgo-peak" }
+        XCTAssertEqual(rule?.version, 2)
+        XCTAssertEqual(rule?.params.hours, 18)
+        XCTAssertEqual(sync.ruleSet().latest.count, BundledRules.all.count)
+
+        now = now.addingTimeInterval(3600)
+        await sync.refreshRulesIfNeeded()
+        XCTAssertEqual(fake.ruleFetchCount, 1)
+
+        let reloaded = makeCoordinator(client: nil)
+        XCTAssertEqual(reloaded.ruleSet().latest.first { $0.id == "tgo-peak" }?.version, 2)
+        XCTAssertNotNil(reloaded.rulesFetchedAt)
+    }
+
+    func testRefreshRules_noConsentOrFailureKeepsBundled() async {
+        setConsents(sharing: false, calibration: false)
+        let sync = makeCoordinator(client: fake)
+        await sync.refreshRulesIfNeeded()
+        XCTAssertEqual(fake.ruleFetchCount, 0)
+
+        setConsents(sharing: true, calibration: false)
+        fake.rules = nil
+        await sync.refreshRulesIfNeeded()
+        XCTAssertEqual(fake.ruleFetchCount, 1)
+        XCTAssertNil(sync.rulesFetchedAt)
+        XCTAssertEqual(sync.ruleSet().latest.count, BundledRules.all.count)
     }
 
     // MARK: - OutboxQueue

@@ -14,6 +14,10 @@ final class SyncCoordinator {
 
     private(set) var lastSyncDate: Date?
     private(set) var remoteTemplates: [OCRTemplate]
+    /// Sunucudan cekilen planlama kurallari (tum surumler); bos ise gomulu kurallar kullanilir.
+    private(set) var remoteRules: [PlatformRule]
+    /// Kurallarin sunucudan en son basariyla cekildigi an.
+    private(set) var rulesFetchedAt: Date?
 
     private let client: (any SupabaseServing)?
     private let queue: OutboxQueue
@@ -21,9 +25,11 @@ final class SyncCoordinator {
     private let calendar: Calendar
     private let clock: () -> Date
     private let templatesFileURL: URL
+    private let rulesFileURL: URL
 
     @ObservationIgnored private var isFlushing: Bool = false
     @ObservationIgnored private var isRefreshingTemplates: Bool = false
+    @ObservationIgnored private var isRefreshingRules: Bool = false
     /// Suren gonderim (flush / sendCalibration) sayisi; `waitUntilIdle` bunlarin bitmesini bekler.
     @ObservationIgnored private var activeSends: Int = 0
     @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
@@ -35,7 +41,8 @@ final class SyncCoordinator {
         defaults: UserDefaults = .standard,
         calendar: Calendar = .current,
         clock: @escaping () -> Date = { Date() },
-        templatesFileURL: URL? = nil
+        templatesFileURL: URL? = nil,
+        rulesFileURL: URL? = nil
     ) {
         self.client = client
         self.queue = queue
@@ -45,6 +52,10 @@ final class SyncCoordinator {
         let fileURL: URL = templatesFileURL ?? SyncCoordinator.defaultTemplatesFileURL()
         self.templatesFileURL = fileURL
         self.remoteTemplates = SyncCoordinator.loadTemplates(from: fileURL)
+        let rulesURL: URL = rulesFileURL ?? SyncCoordinator.defaultRulesFileURL()
+        self.rulesFileURL = rulesURL
+        self.remoteRules = SyncCoordinator.loadRules(from: rulesURL)
+        self.rulesFetchedAt = SyncCoordinator.date(forKey: AppPreferences.rulesFetchedAtKey, in: defaults)
         self.lastSyncDate = SyncCoordinator.date(forKey: AppPreferences.lastSyncDateKey, in: defaults)
     }
 
@@ -361,6 +372,50 @@ final class SyncCoordinator {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         guard let data = try? JSONEncoder().encode(templates) else { return }
         try? data.write(to: templatesFileURL, options: OutboxQueue.writeOptions)
+    }
+
+    // MARK: - Planlama kurallari
+
+    /// Sablonlarla ayni kural: riza yoksa ya da son cekimden 12 saat gecmediyse istek yok.
+    /// Cekilemeyen kurallar zamanla "guncelligi bilinmiyor" olur ve plan kesin gosterilmez.
+    func refreshRulesIfNeeded() async {
+        guard let client, isNetworkAllowed, !isRefreshingRules else { return }
+        let now: Date = clock()
+        if let last = rulesFetchedAt {
+            let elapsed: TimeInterval = now.timeIntervalSince(last)
+            if elapsed >= 0, elapsed < SyncCoordinator.templateRefreshInterval { return }
+        }
+        isRefreshingRules = true
+        defer { isRefreshingRules = false }
+
+        guard let fetched = await client.fetchPlatformRules(), !fetched.isEmpty else { return }
+        remoteRules = fetched
+        saveRules(fetched)
+        rulesFetchedAt = now
+        defaults.set(now.timeIntervalSince1970, forKey: AppPreferences.rulesFetchedAtKey)
+    }
+
+    /// Gomulu + sunucu kurallari; ayni id icin en yuksek surum (RuleSet.latest).
+    func ruleSet() -> RuleSet {
+        RuleSet(rules: BundledRules.all + remoteRules)
+    }
+
+    private static func defaultRulesFileURL() -> URL {
+        let base: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("platform_rules.json")
+    }
+
+    private static func loadRules(from url: URL) -> [PlatformRule] {
+        guard let data = try? Data(contentsOf: url) else { return [] }
+        return (try? JSONDecoder().decode([PlatformRule].self, from: data)) ?? []
+    }
+
+    private func saveRules(_ rules: [PlatformRule]) {
+        let directory: URL = rulesFileURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        guard let data = try? JSONEncoder().encode(rules) else { return }
+        try? data.write(to: rulesFileURL, options: OutboxQueue.writeOptions)
     }
 
     // MARK: - Kalici durum

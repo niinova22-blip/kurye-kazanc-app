@@ -155,6 +155,14 @@ struct TodayView: View {
             .listRowBackground(Color.clear)
 
             Section { ScanButton() }
+            Section {
+                NavigationLink {
+                    PlannerView()
+                } label: {
+                    Label("Plan öner", systemImage: "calendar.badge.clock")
+                }
+                .accessibilityIdentifier("planner.open")
+            }
             earningsSection
             if !todaysExpenses.isEmpty {
                 expensesSection
