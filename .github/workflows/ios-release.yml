@@ -12,10 +12,8 @@
 
 name: iOS Release (TestFlight)
 
+# 2026-10-10: Actions kotasi doldu -> TestFlight Codemagic'te (codemagic.yaml ios-release); bu akis yalnizca elle.
 on:
-  push:
-    branches: [main, "release/**"]
-    paths-ignore: ["**.md", "docs/**", "supabase/**", "scripts/server/**", "scripts/design/**"]
   workflow_dispatch:
 
 # Ayni dalda iki yukleme ayni build numarasini almasin: sirayla calisir, iptal edilmez.
