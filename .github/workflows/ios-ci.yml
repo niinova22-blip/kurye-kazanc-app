@@ -1,7 +1,7 @@
 # iOS CI (GitHub Actions) - Kurye Kazanc
 #
 # Proje uret, derle, birim testleri; UI testleri yalnizca PR'da (ve elle calistirmada istenirse).
-# Imzalama ve TestFlight burada YOK: main'e birlestirince Codemagic `ios-release` yapar.
+# Imzalama ve TestFlight burada YOK: main'e push'ta `ios-release.yml` bu is akisini (UI dahil) cagirir, sonra imzalar ve yukler.
 # Ucretsiz planda macOS dakikasi 10 kat sayilir -> belgeler degisince calismaz, eski calisma iptal edilir.
 
 name: iOS CI
@@ -18,10 +18,16 @@ on:
         description: "UI testlerini de calistir"
         type: boolean
         default: false
+  # ios-release.yml testleri buradan cagirir (UI testleri dahil)
+  workflow_call:
+    inputs:
+      run_ui_tests:
+        type: boolean
+        default: true
 
 # Ayni dal icin push ve PR olaylari ayni grupta: yenisi eskisini iptal eder (dakika tasarrufu).
 concurrency:
-  group: ios-ci-${{ github.head_ref || github.ref_name }}
+  group: ios-ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 env:
