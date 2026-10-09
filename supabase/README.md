@@ -22,7 +22,14 @@ node scripts/server/test.mjs            # pgTAP testleri (basarisizlikta cikis k
 node scripts/server/e2e.mjs             # anon anahtarla uctan uca kontrol
 node scripts/server/seed_synthetic.mjs  # 1.4b: Sincan/Ankara sentetik test kuryeleri (10 kurye, 30 gun)
 node scripts/server/purge_synthetic.mjs # sentetik vardiyalari ve kullanicilari siler
+node scripts/server/seed_platform_rules.mjs # 1.5: gomulu planlama kurallarini platform_rules'a yazar (var olani ezmez)
+node scripts/server/check_sources.mjs   # kural kaynaklarini indirir, degisenleri incelemeye alir (kurali DEGISTIRMEZ)
+node scripts/server/approve_rule.mjs --list   # yonetici: bekleyen kontroller; --rule/--recheck/--ignore ile onay
 ```
+
+Planlama kurallari: kaynak degisikligi otomatik kabul edilmez. `check_sources.mjs` (ayda bir onerilir) degisen
+kaynagi `pending` yazar; yonetici kaynagi okuyup `approve_rule.mjs --rule <id> --set ...` ile yeni surum ekler.
+90 gunden uzun suredir kontrol edilmeyen kural uygulamada "guncelligi bilinmiyor" sayilir ve plan kesin gosterilmez.
 
 Sira: `apply` -> `test` -> `seed_synthetic`. `seed_synthetic.mjs` sentetik satir varsa durur.
 `purge_synthetic.mjs` gercek yayindan (topluluk ozelligi herkese acilmadan) once calistirilmalidir.
