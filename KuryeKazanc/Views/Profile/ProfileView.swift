@@ -44,6 +44,9 @@ struct ProfileView: View {
                 sharingSection
                 AccountSection()
                 CalibrationSection()
+                if BuildEnvironment.showsTesterTools {
+                    SpikeSection()
+                }
                 dataSection
                 aboutSection
             }
