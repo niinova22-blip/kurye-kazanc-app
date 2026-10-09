@@ -236,8 +236,8 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 - Yerel gizli ayarlar `.env.supabase` dosyasında (`.gitignore` → `.env.*`); betikler `node --env-file=.env.supabase scripts/server/<betik>.mjs` ile çalışır. Erişim anahtarı yalnızca bu projeye kapsamlı, 7 gün geçerli.
 
 ### Açık konular
-- Authentication: Apple sağlayıcısı (Client ID `com.kuryekazanc.app`) açık ve Email kapalı mı, panelden doğrulanmalı (anonim giriş e2e ile doğrulandı).
-- Oturumda service_role anahtarı yanlışlıkla sohbet kaydına düştü → JWT secret yenilenmesi önerildi; yenilenirse anon anahtar `.env.supabase` + `Info.plist`'te güncellenmeli.
+- Authentication: anonim + Apple (`com.kuryekazanc.app`) açık, Email kapalı (kullanıcı teyit etti).
+- Oturumda eski (legacy) service_role anahtarı yanlışlıkla sohbet kaydına düştü → uygulama ve betikler yeni **publishable** anahtara (`sb_publishable_...`, `apikey` başlığında) geçirildi, e2e yeniden geçti. Eski JWT tabanlı anahtarlar (anon + service_role) API Keys → Legacy → "Disable JWT-based API keys" ile kapatılmalı (kullanıcı).
 
 ### Sonraki adım
 1. Apple Developer: `com.kuryekazanc.app`'te Sign in with Apple (profil yeniden üretilir → Codemagic); Canlı Etkinlik App ID `com.kuryekazanc.app.liveactivity` + profil — kullanıcıya sorarak.
