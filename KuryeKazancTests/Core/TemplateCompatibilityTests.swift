@@ -23,6 +23,12 @@ final class TemplateCompatibilityTests: XCTestCase {
         XCTAssertNil(template.minPackageFee)
     }
 
+    func testWrongTypedLayout_fallsBackToSummary() throws {
+        let json = oldJSON.replacingOccurrences(of: #""version":1,"#, with: #""version":1,"layout":5,"#)
+        let template = try JSONDecoder().decode(OCRTemplate.self, from: Data(json.utf8))
+        XCTAssertEqual(template.layout, .summary)
+    }
+
     func testUnknownLayout_fallsBackToSummary() throws {
         let json = oldJSON.replacingOccurrences(of: #""version":1,"#, with: #""version":1,"layout":"grid","#)
         let template = try JSONDecoder().decode(OCRTemplate.self, from: Data(json.utf8))

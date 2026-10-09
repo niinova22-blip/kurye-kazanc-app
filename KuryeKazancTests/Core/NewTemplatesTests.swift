@@ -34,6 +34,27 @@ final class NewTemplatesTests: XCTestCase {
         XCTAssertEqual(r.templateID, "uber.earnings")
         XCTAssertEqual(r.packageCount, 54)
         XCTAssertEqual(r.workDuration, 23 * 3600 + 32 * 60)
+        XCTAssertEqual(r.period, .week)
+    }
+
+    /// Hafta etiketi / tarih araligi okunamasa bile 16 saati asan sure gunluk olamaz.
+    func testUberEarnings_longDurationWithoutWeekLabel_isWeek() {
+        let r = parse(["Kazançlar", "₺3.645,99", "Çevrimiçi 23 sa 32 dk", "54 Sefer", "Ayrıntıları gör"])
+        XCTAssertEqual(r.templateID, "uber.earnings")
+        XCTAssertEqual(r.workDuration, 23 * 3600 + 32 * 60)
+        XCTAssertEqual(r.period, .week)
+    }
+
+    func testTheKuryeInvoices_withoutDayLabel_isWeek() {
+        let r = parse(["The Kurye", "Faturalar 3", "Taşıma Ücreti 303.3₺", "#1420", "Taşıma Ücreti 900₺", "#903",
+                       "Taşıma Ücreti 56₺", "#314", "Tümünü Seç", "Fatura Oluştur"])
+        XCTAssertEqual(r.period, .week)
+    }
+
+    func testTheKuryeInvoices_withToday_isDay() {
+        let r = parse(["The Kurye", "Bugün", "Faturalar 3", "Taşıma Ücreti 303.3₺", "#1420", "Taşıma Ücreti 900₺", "#903",
+                       "Taşıma Ücreti 56₺", "#314", "Tümünü Seç", "Fatura Oluştur"])
+        XCTAssertEqual(r.period, .day)
     }
 
     func testTheKuryeInvoices() {

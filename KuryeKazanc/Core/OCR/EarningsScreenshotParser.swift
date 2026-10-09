@@ -28,6 +28,9 @@ struct ParsedEarning: Equatable {
     /// Sablona gore ekrandaki tutarlar KDV haric (bilgi).
     var amountsExcludeVAT: Bool = false
 
+    /// Tek vardiya icin makul ust sinir; ekran suresi bunu asarsa gunluk sayilmaz.
+    static let maxShiftDuration: TimeInterval = 16 * 3600
+
     /// Bizim modelimizdeki brut (bonus haric) kazanc.
     var grossEarning: Double {
         totalIncludesBonus ? max(0, totalEarning - bonus) : totalEarning
@@ -120,6 +123,17 @@ struct EarningsScreenshotParser {
             review.insert(.totalEarning)
         }
 
+        var period: OCRTemplate.Period = template.layout == .orderCard ? .order : template.period(in: fullText)
+        let workDuration = findDuration(labels: template.durationLabels, in: normalized)
+        // 16 saatten uzun sure tek gun olamaz -> haftalik ozet
+        if let workDuration, workDuration > ParsedEarning.maxShiftDuration, period == .day || period == .unknown {
+            period = .week
+        }
+        // Liste ekrani tek gun oldugu dogrulanmadikca haftalik/coklu gun sayilir (gunluk vardiya gibi gonderilmesin)
+        if template.layout == .list, period == .unknown {
+            period = .week
+        }
+
         return ParsedEarning(
             platformCode: template.platformCode.isEmpty ? nil : template.platformCode,
             date: date!,
@@ -132,8 +146,8 @@ struct EarningsScreenshotParser {
             templateVersion: detected?.version,
             templateStatus: detected?.status,
             fingerprintMatches: detected?.fingerprintMatches(in: fullText) ?? 0,
-            period: template.layout == .orderCard ? .order : template.period(in: fullText),
-            workDuration: findDuration(labels: template.durationLabels, in: normalized),
+            period: period,
+            workDuration: workDuration,
             layout: template.layout,
             amountsExcludeVAT: template.amountsExcludeVAT
         )

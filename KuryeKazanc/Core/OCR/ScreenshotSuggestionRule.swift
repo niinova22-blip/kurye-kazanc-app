@@ -7,6 +7,8 @@ import Foundation
 /// - okunan toplam pozitif olmali.
 enum ScreenshotSuggestionRule {
     static func qualifies(_ parsed: ParsedEarning) -> Bool {
+        // Siparis karti ekranlari kazanc ekrani olarak onerilmez
+        guard parsed.period != .order else { return false }
         guard parsed.platformCode != nil else { return false }
         guard parsed.totalEarning > 0 else { return false }
         guard let templateID = parsed.templateID else { return false }

@@ -117,7 +117,7 @@ struct ScenarioGenerator {
                 }
                 return (["The Kurye", "Faturalar \(count)"], rows, ["Tümünü Seç", "Fatura Oluştur"],
                         ScenarioExpectation(templateID: "thekurye.invoices", total: (sum * 100).rounded() / 100,
-                                            bonus: nil, packages: count, duration: nil, period: nil))
+                                            bonus: nil, packages: count, duration: nil, period: .week))
             },
             Base(templateID: "yemeksepeti.order", platformCode: "yemeksepeti") { rng, f in
                 let extra = Double(rng.int(0...6_000)) / 100

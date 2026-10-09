@@ -176,13 +176,23 @@ enum TextPatterns {
 
     // MARK: - Tarih araligi (haftalik ozet)
 
-    private static let dateRangeRegex = try! NSRegularExpression(
-        pattern: #"(?<!\d)\d{1,2}\s*(?:oca|sub|mar|nis|may|haz|tem|agu|eyl|eki|kas|ara)\p{L}*\s*[-–]\s*\d{1,2}\s*(?:oca|sub|mar|nis|may|haz|tem|agu|eyl|eki|kas|ara)\p{L}*"#
-    )
+    // Ay adi: bilinen tam ad ya da 3 harfli kisaltma (+ istege bagli nokta); ardindan harf gelmez
+    // ("5 market - 3 kasa" aralik sayilmaz). Normalize metinde Turkce harfler sadelesmis olur.
+    private static let trMonth = #"(?:ocak|oca|subat|sub|mart|mar|nisan|nis|mayis|may|haziran|haz|temmuz|tem|agustos|agu|eylul|eyl|ekim|eki|kasim|kas|aralik|ara)(?!\p{L})"#
+    private static let enMonth = #"(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)(?!\p{L})"#
+    private static let anyMonth = "(?:\(trMonth)|\(enMonth))"
 
-    /// "4 sub - 10 sub" gibi gun-ay araligi (normalize metin).
+    private static let dateRangeRegexes: [NSRegularExpression] = [
+        // "4 sub - 10 sub", "4 - 10 sub" (gun-ay, gun-ay / gun-gun ay)
+        #"(?<!\d)\d{1,2}\s*(?:\#(anyMonth)\.?)?\s*[-–—]\s*\d{1,2}\s*\#(anyMonth)"#,
+        // "feb 4 - feb 10", "feb 4 - 10" (ay-gun)
+        #"(?<!\p{L})\#(enMonth)\.?\s*\d{1,2}\s*[-–—]\s*(?:\#(enMonth)\.?\s*)?\d{1,2}(?!\d)"#,
+    ].map { try! NSRegularExpression(pattern: $0) }
+
+    /// "4 sub - 10 sub", "4-10 sub", "feb 4 - feb 10" gibi tarih araligi (normalize metin).
     static func containsDateRange(_ text: String) -> Bool {
-        dateRangeRegex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+        let range = NSRange(text.startIndex..., in: text)
+        return dateRangeRegexes.contains { $0.firstMatch(in: text, range: range) != nil }
     }
 
     // MARK: - Referans numaralari

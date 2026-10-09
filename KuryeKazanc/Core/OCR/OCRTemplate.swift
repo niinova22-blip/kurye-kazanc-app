@@ -80,8 +80,9 @@ extension OCRTemplate {
         maxPackageFee = try c.decodeIfPresent(Double.self, forKey: .maxPackageFee)
         dayLabels = try c.decode([String].self, forKey: .dayLabels)
         weekLabels = try c.decode([String].self, forKey: .weekLabels)
-        let layoutRaw = try c.decodeIfPresent(String.self, forKey: .layout)
-        layout = layoutRaw.flatMap(Layout.init(rawValue:)) ?? .summary
+        // Yanlis tipli layout (or. sayi) decode hatasi vermez, summary olur
+        let layoutRaw = try? c.decodeIfPresent(String.self, forKey: .layout)
+        layout = (layoutRaw ?? nil).flatMap(Layout.init(rawValue:)) ?? .summary
         durationLabels = try c.decodeIfPresent([String].self, forKey: .durationLabels) ?? []
         rowLabels = try c.decodeIfPresent([String].self, forKey: .rowLabels) ?? []
         amountsExcludeVAT = try c.decodeIfPresent(Bool.self, forKey: .amountsExcludeVAT) ?? false

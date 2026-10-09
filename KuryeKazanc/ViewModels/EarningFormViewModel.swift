@@ -56,6 +56,8 @@ final class EarningFormViewModel {
     var isResolvingRegion = false
 
     private(set) var editingRecord: EarningRecord?
+    /// Form bir calisma oturumundan acildi: gercek saatler ekran suresiyle ezilmez.
+    @ObservationIgnored private var openedFromSession = false
     @ObservationIgnored private let calendar: Calendar
 
     var isEditing: Bool { editingRecord != nil }
@@ -70,7 +72,7 @@ final class EarningFormViewModel {
     }
 
     /// Tek vardiya icin en uzun sure; uzunu haftalik/hatali okuma sayilir.
-    static let maxShiftDuration: TimeInterval = 16 * 3600
+    static let maxShiftDuration: TimeInterval = ParsedEarning.maxShiftDuration
 
     /// Sablon tutarlarin KDV haric oldugunu soyluyorsa bilgi notu.
     var amountNote: String? {
@@ -149,6 +151,7 @@ final class EarningFormViewModel {
             neighborhood = record.neighborhood ?? ""
             source = record.source
         } else if let session {
+            openedFromSession = true
             platform = defaultPlatform
             date = calendar.startOfDay(for: session.start)
             startTime = session.start
@@ -251,12 +254,16 @@ final class EarningFormViewModel {
             case .bonus: review.insert(.bonus)
             }
         }
-        // Ekranda gunluk calisma suresi varsa vardiya saatini ondan kur; yoksa varsayilan saatler kontrol edilmeli.
-        if let duration = parsed.workDuration, parsed.period != .week, duration <= Self.maxShiftDuration {
-            startTime = endTime.addingTimeInterval(-duration)
-        } else {
-            review.insert(.hours)
+        // Saatler her zaman kullanici onayina birakilir. Ekranda GUNLUK sure varsa, form oturumdan/kayittan
+        // acilmadiysa ve sonuc ayni gune sigiyorsa baslangic bitisten geriye kurulur.
+        if let duration = parsed.workDuration, parsed.period == .day,
+           !openedFromSession, !isEditing, duration <= Self.maxShiftDuration {
+            let start = endTime.addingTimeInterval(-duration)
+            if calendar.isDate(start, inSameDayAs: endTime) {
+                startTime = start
+            }
         }
+        review.insert(.hours)
         fieldsToReview = review
     }
 

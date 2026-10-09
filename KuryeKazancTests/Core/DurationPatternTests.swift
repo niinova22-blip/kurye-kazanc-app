@@ -39,6 +39,22 @@ final class DurationPatternTests: XCTestCase {
         XCTAssertFalse(TextPatterns.containsDateRange("10 - 20 paket"))
     }
 
+    func testDateRange_englishMonthFirst() {
+        XCTAssertTrue(TextPatterns.containsDateRange(TextNormalizer.normalize("Feb 4 - Feb 10")))
+        XCTAssertTrue(TextPatterns.containsDateRange(TextNormalizer.normalize("Oct 28 – Nov 3")))
+        XCTAssertFalse(TextPatterns.containsDateRange(TextNormalizer.normalize("Feb 4")))
+    }
+
+    func testDateRange_compactDayDashDayMonth() {
+        XCTAssertTrue(TextPatterns.containsDateRange(TextNormalizer.normalize("4-10 Şub")))
+        XCTAssertTrue(TextPatterns.containsDateRange(TextNormalizer.normalize("4 – 10 Şubat")))
+        XCTAssertTrue(TextPatterns.containsDateRange(TextNormalizer.normalize("4-10 Feb")))
+    }
+
+    func testDateRange_marketNotAMonth() {
+        XCTAssertFalse(TextPatterns.containsDateRange(TextNormalizer.normalize("5 market - 3 kasa")))
+    }
+
     func testStrippingReferenceNumbers() {
         XCTAssertEqual(TextPatterns.strippingReferenceNumbers("tasima ucreti #1420").trimmingCharacters(in: .whitespaces), "tasima ucreti")
         XCTAssertEqual(TextPatterns.strippingReferenceNumbers("siparis №78347 bugun"), "siparis   bugun")

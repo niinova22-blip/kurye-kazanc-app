@@ -32,7 +32,7 @@ final class FormViewModelTests: XCTestCase {
 
     // MARK: - Kazanc formu
 
-    func testApplyOCR_dailyDurationSetsHoursWithoutReview() {
+    func testApplyOCR_dailyDurationSetsStartButKeepsHoursReview() {
         let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
         vm.endTime = at(6, 17)
         var parsed = ParsedEarning(
@@ -45,7 +45,39 @@ final class FormViewModelTests: XCTestCase {
 
         XCTAssertEqual(vm.resolvedInterval().start, at(6, 10, 30))
         XCTAssertEqual(vm.resolvedInterval().end, at(6, 17))
-        XCTAssertFalse(vm.fieldsToReview.contains(.hours))
+        XCTAssertTrue(vm.fieldsToReview.contains(.hours))
+    }
+
+    func testApplyOCR_dailyDurationKeepsSessionTimes() {
+        let session = WorkSessionSummary(start: at(6, 8), end: at(6, 14, 15), distanceKm: 10)
+        let vm = EarningFormViewModel(session: session, defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        var parsed = ParsedEarning(
+            platformCode: "getir", date: calendar.startOfDay(for: at(6, 0)), packageCount: 12,
+            totalEarning: 1000, bonus: 0, totalIncludesBonus: true, fieldsToReview: []
+        )
+        parsed.period = .day
+        parsed.workDuration = 3 * 3600
+        vm.apply(parsed, platforms: platforms)
+
+        XCTAssertEqual(vm.resolvedInterval().start, at(6, 8))
+        XCTAssertEqual(vm.resolvedInterval().end, at(6, 14, 15))
+        XCTAssertTrue(vm.fieldsToReview.contains(.hours))
+    }
+
+    func testApplyOCR_dailyDurationCrossingMidnightNotApplied() {
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 9), calendar: calendar)
+        vm.startTime = at(6, 6)
+        vm.endTime = at(6, 9)
+        var parsed = ParsedEarning(
+            platformCode: "getir", date: calendar.startOfDay(for: at(6, 0)), packageCount: 12,
+            totalEarning: 1000, bonus: 0, totalIncludesBonus: true, fieldsToReview: []
+        )
+        parsed.period = .day
+        parsed.workDuration = 10 * 3600
+        vm.apply(parsed, platforms: platforms)
+
+        XCTAssertEqual(vm.resolvedInterval().start, at(6, 6))
+        XCTAssertTrue(vm.fieldsToReview.contains(.hours))
     }
 
     /// Review Focus 4: haftalik sure tek vardiya saatine yazilmaz.
