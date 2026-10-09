@@ -20,7 +20,12 @@ node scripts/server/apply.mjs           # gocleri sirayla, bir kez uygular
 node scripts/server/seed_templates.mjs  # gomulu sablonlari ocr_templates'e yazar
 node scripts/server/test.mjs            # pgTAP testleri (basarisizlikta cikis kodu 1)
 node scripts/server/e2e.mjs             # anon anahtarla uctan uca kontrol
+node scripts/server/seed_synthetic.mjs  # 1.4b: Sincan/Ankara sentetik test kuryeleri (8 kurye, 30 gun)
+node scripts/server/purge_synthetic.mjs # sentetik vardiyalari ve kullanicilari siler
 ```
+
+Sira: `apply` -> `test` -> `seed_synthetic`. `seed_synthetic.mjs` sentetik satir varsa durur (`--force` ile zorlanir).
+`purge_synthetic.mjs` gercek yayindan (topluluk ozelligi herkese acilmadan) once calistirilmalidir.
 
 ## Notlar
 
@@ -33,3 +38,14 @@ node scripts/server/e2e.mjs             # anon anahtarla uctan uca kontrol
 - Ekran tipli sablonlar (`layout: list/orderCard`, 1.4a) 1.3 istemcisini bozar (`layout`'u tanimaz, ozet ekran gibi okur):
   `seed_templates.mjs` bunlari atlar ("atlandi: ..." yazar); 1.3 emekli olana kadar yalnizca uygulamaya gomulu kalirlar.
   `layout`'u olmayan / `summary` olan sablonlar (or. yemeksepeti.earnings v2) sunucuya yazilabilir.
+
+## Topluluk (1.4b)
+
+- `20261010000003_community.sql`: `shifts.is_synthetic` (varsayilan false; `submit_shift` yazmaz), `community_heatmap(province, district)`
+  ve `community_summary(province, district)`. Ikisi de `jsonb` doner, yalnizca `authenticated` (anonim oturum dahil) calistirabilir.
+- k-anonimlik: hucre / toplam / platform satiri, en az 5 FARKLI kurye yoksa donmez. Pencere: `created_at` son 56 gun.
+- `community_heatmap`: `[{weekday (1=Pzt..7=Paz), hour (0-23), per_hour, couriers, shifts}]`, bos ise `[]`.
+- `community_summary`: `{per_hour?, couriers?, platforms:[{code, per_hour, per_package, couriers}], best:[3 hucre]}`;
+  `per_hour`/`couriers` yalnizca ilcede >= 5 kurye varsa bulunur.
+- Il/ilce eslesmesi buyuk/kucuk harf duyarsizdir (`Ankara` / `Sincan` yazilir).
+- Sentetik kuryeler gercek verilerle karisir (k-anonimlige katkida bulunurlar); gercek yayindan once `purge_synthetic.mjs`.
