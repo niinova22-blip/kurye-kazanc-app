@@ -270,3 +270,12 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 
 ### Sonraki adım
 - Kazanç taraması denemesi (plan Görev 10–12), her adımda kullanıcıya sorarak.
+
+### 1.4a son inceleme düzeltmeleri (2026-10-09)
+- Ekrandaki çalışma süresi yalnızca günlük ekranda, yeni formda (oturumdan açılmamış / düzenleme değil) ve gece yarısını aşmıyorsa başlangıç saatini doldurur; "Çalışma saatleri" yine kontrol ister.
+- İngilizce ("feb 4 - feb 10") ve kısa ("4-10 şub") tarih aralıkları ile 16 saati aşan süre haftalık sayılır (gönderilmez).
+- Sipariş kartları ekran görüntüsü önerilerinde çıkmaz.
+- `seed_templates.mjs` liste / sipariş kartı şablonlarını sunucuya yazmaz (1.3 bunları özet ekran gibi okurdu).
+- "Bugün" yazmayan liste ekranı (TheKurye faturaları) haftalık sayılır: birden çok günün toplamı vardiya olarak gönderilmez.
+- Görüntü senaryoları artık şablon bazında raporlanır; taban yoksa test başarısız olur. Ölçüm: tüm hücreler %100, `yemeksepeti.order/total` %88,9 (9 örnekte 1). Core: 143 test.
+- Ertelenen küçükler ve kararlar: `.superpowers/sdd/2026-10-09-surum-1-4a-ekran-okuma/progress.md`.
