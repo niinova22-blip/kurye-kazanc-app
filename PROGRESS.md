@@ -279,3 +279,10 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 - "Bugün" yazmayan liste ekranı (TheKurye faturaları) haftalık sayılır: birden çok günün toplamı vardiya olarak gönderilmez.
 - Görüntü senaryoları artık şablon bazında raporlanır; taban yoksa test başarısız olur. Ölçüm: tüm hücreler %100, `yemeksepeti.order/total` %88,9 (9 örnekte 1). Core: 143 test.
 - Ertelenen küçükler ve kararlar: `.superpowers/sdd/2026-10-09-surum-1-4a-ekran-okuma/progress.md`.
+
+### Kazanç taraması denemesi — sonuç (2026-10-09, TestFlight 1.3.0 (4), iPhone)
+- Yayın eklentisi (`spike/broadcast-capture`, birleştirilmedi) ~1,5 dk: 86 kare işlendi, **en yüksek bellek 20,6 MB** (hedef < 40, iOS sınırı ~50), okuma ort. 0,46 sn / en uzun 1,18 sn, çökme yok, pil %75 → %74.
+- 38 yakalama / 24 tanınmayan / 24 tekrar. 24 farklı deneme ekranına karşı 38 yakalama: metin özetiyle tekrar kontrolü yetmiyor (durum çubuğundaki saat, kaydırma sırasındaki yarım kareler metni değiştiriyor).
+- Kısayollar otomasyonu testi kullanıcı tarafından yapılamadı.
+- **Karar:** kazanç taraması uygulanabilir → üretim tasarımına geçilir (spec §5.4). Üretimde: tekrar kontrolü okunan değerlerle (şablon + tutar + tarih), durum çubuğu okumadan hariç, bir ekran ancak art arda 2 karede aynı okunursa kaydedilir; sipariş kartları gün bazında birleştirilir; onay ekranı. Kısayollar ikinci yol (basit hazır kısayol).
+- Açık: 8 şablonun hepsinin yakalandığı henüz doğrulanmadı (günlüğün kalanı bekleniyor).
