@@ -245,3 +245,55 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 
 ### Sonraki adım
 1. develop → main PR (UI testleri burada çalışır) → birleştirme → `ios-release` → TestFlight 1.3.0 — kullanıcıya sorarak.
+
+## Oturum 6 (devam) — 2026-10-09: 1.4a okuma motoru ve senaryo testleri
+
+### Yapılanlar
+- **Okuma motoru:** şablona `layout` (summary/list/orderCard), `durationLabels`, `rowLabels`, `amountsExcludeVAT` alanları eklendi (geriye uyumlu; bilinmeyen layout = summary).
+  - Şablon seçimi: platform adı; yoksa en az 3 parmak izi.
+  - Tarih aralığı = haftalık ekran.
+  - Liste ekranı: satır toplamı (iş numaraları atlanır).
+  - Sipariş kartı: period `.order`, vardiya sayılmaz, sunucuya gönderilmez.
+  - Çalışma süresi okuma: formda vardiya saatini doldurur; haftalık ve >16 sa yok sayılır.
+  - KDV notu.
+- **Yeni şablonlar (hepsi calibrating):** uber.earnings, thekurye.invoices, yemeksepeti.order, banabikurye.order; yemeksepeti.earnings v2 (KDV hariç). Kaynak: App Store mağaza görselleri (gerçek ekran yok).
+- **Senaryo testleri:** 144 satır senaryosu (Windows `swift test`, hepsi geçiyor). Görüntü katmanı CI'da 72 örneklenmiş taklit ekran (SwiftUI + Vision); GitHub Actions özetinde platform × alan tablosu; taban `KuryeKazancTests/Fixtures/scenario-baseline.json` (5 puandan fazla düşüş CI'ı kırmızı yapar).
+  - Ölçülen: tüm hücreler %100, yalnızca yemeksepeti/total %94,4.
+  - Birim test adımı ~81 sn → ~163 sn.
+- Core testleri: 135. CI yeşil.
+- **Yan iş:** TestFlight 1.3.0 Codemagic #3 bir UI testinde düştü. Kök neden: UI testlerinin `-dataSharingOptIn NO` başlatma argümanı (UserDefaults argüman katmanı uygulamanın yazdığı değeri gölgeliyordu). PR #4 ile `-reset-defaults`'a geçildi ve main'e birleşti; Codemagic #4 yeniden denendi.
+
+### Açık konular
+- Gerçek kurye ekran görüntüleri (`Fixtures/RealScreens`) yok.
+- Sunucu şablon tohumlama 1.4a TestFlight'ında yapılacak (`supabase/README.md` notu).
+- yemeksepeti/total %94,4.
+
+### Sonraki adım
+- Kazanç taraması denemesi (plan Görev 10–12), her adımda kullanıcıya sorarak.
+
+### 1.4a son inceleme düzeltmeleri (2026-10-09)
+- Ekrandaki çalışma süresi yalnızca günlük ekranda, yeni formda (oturumdan açılmamış / düzenleme değil) ve gece yarısını aşmıyorsa başlangıç saatini doldurur; "Çalışma saatleri" yine kontrol ister.
+- İngilizce ("feb 4 - feb 10") ve kısa ("4-10 şub") tarih aralıkları ile 16 saati aşan süre haftalık sayılır (gönderilmez).
+- Sipariş kartları ekran görüntüsü önerilerinde çıkmaz.
+- `seed_templates.mjs` liste / sipariş kartı şablonlarını sunucuya yazmaz (1.3 bunları özet ekran gibi okurdu).
+- "Bugün" yazmayan liste ekranı (TheKurye faturaları) haftalık sayılır: birden çok günün toplamı vardiya olarak gönderilmez.
+- Görüntü senaryoları artık şablon bazında raporlanır; taban yoksa test başarısız olur. Ölçüm: tüm hücreler %100, `yemeksepeti.order/total` %88,9 (9 örnekte 1). Core: 143 test.
+- Ertelenen küçükler ve kararlar: `.superpowers/sdd/2026-10-09-surum-1-4a-ekran-okuma/progress.md`.
+
+### Kazanç taraması denemesi — sonuç (2026-10-09, TestFlight 1.3.0 (4), iPhone)
+- Yayın eklentisi (`spike/broadcast-capture`, birleştirilmedi) ~1,5 dk: 86 kare işlendi, **en yüksek bellek 20,6 MB** (hedef < 40, iOS sınırı ~50), okuma ort. 0,46 sn / en uzun 1,18 sn, çökme yok, pil %75 → %74.
+- 38 yakalama / 24 tanınmayan / 24 tekrar. 24 farklı deneme ekranına karşı 38 yakalama: metin özetiyle tekrar kontrolü yetmiyor (durum çubuğundaki saat, kaydırma sırasındaki yarım kareler metni değiştiriyor).
+- Kısayollar otomasyonu testi kullanıcı tarafından yapılamadı.
+- **Karar:** kazanç taraması uygulanabilir → üretim tasarımına geçilir (spec §5.4). Üretimde: tekrar kontrolü okunan değerlerle (şablon + tutar + tarih), durum çubuğu okumadan hariç, bir ekran ancak art arda 2 karede aynı okunursa kaydedilir; sipariş kartları gün bazında birleştirilir; onay ekranı. Kısayollar ikinci yol (basit hazır kısayol).
+- 8 şablonun hepsi yakalandı (getir, migros_hemen, thekurye, trendyol_go, uber, yemeksepeti.earnings, yemeksepeti.order, banabikurye). Her platformun 3 deneme ekranına karşı Uber/TheKurye/Banabikurye 2'şer yakalandı: bir ekran kaçmış olabilir (liste sonunda hızlı geçiş) — üretimde kısa kalan / onaylanmayan kareler ayrıca sayılacak.
+
+## Oturum 6 (devam 2) — 2026-10-09: Kazanç taraması (üretim) ve Kısayollar
+- Core: CaptureKey, StableCaptureFilter, ScanResultBuilder + sipariş kartı birleştirme (gün + platform).
+- Yayın eklentisi (üretim): ekranın üst %6'sı (durum çubuğu) okumadan hariç, iki kare doğrulama, değer tabanlı tekrar kontrolü, BroadcastCaptureStore, lastFrameAt.
+- ScanResultsViewModel / ScanResultsView: atlanan kalemler silinmez, canlı yayında sonuç ekranı açılmaz.
+- Bugün'de ScanButton + tanıtım.
+- SendScreenshotIntent + KuryeShortcuts (Kısayollar eylemi).
+- TestFlight artık GitHub Actions ile (ios-release.yml, sertifika GT35S8T4WB, profiller --create).
+- Bilinen sınır: aynı tutarlı iki farklı sipariş kartı tek sayılır (gerçek ekranla sipariş no eklenecek).
+- Sürüm 1.4.0.
+- Sonraki adım: develop→main PR → TestFlight 1.4.0 → cihaz testi.

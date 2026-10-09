@@ -17,6 +17,8 @@ struct TodayView: View {
     @Query private var weekEarnings: [EarningRecord]
     @Query private var weekExpenses: [ExpenseRecord]
     @Query private var couriers: [Courier]
+    /// Tekrar tarama kontrolu icin tum kazanc kayitlari.
+    @Query private var allEarnings: [EarningRecord]
     /// Kaydedilmis ekran goruntuleri (kimlik + metin ozeti) tekrar onerilmez / siraya alinmaz.
     @Query private var evidences: [ScreenshotEvidence]
 
@@ -37,8 +39,11 @@ struct TodayView: View {
     @State private var presentedHash: String?
     /// Okunamayan / zaten kayitli gorseller icin engellemeyen bildirimler.
     @State private var notices: [String] = []
+    @State private var recheckScheduled = false
 
     private let inbox = LaunchOptions.current.isUITesting ? ScreenshotInbox(directory: nil) : .shared
+
+    private let captureStore = LaunchOptions.current.isUITesting ? BroadcastCaptureStore(directory: nil) : .shared
 
     private let day: Date
 
@@ -50,9 +55,11 @@ struct TodayView: View {
         case importedScreenshot(ImportedScreenshot)
         case addExpense
         case editExpense(ExpenseRecord)
+        case scanResults(ScanResultsViewModel)
 
         var id: String {
             switch self {
+            case .scanResults: "scanResults"
             case .addEarning: "addEarning"
             case .pendingShift(let id, _): "pending-\(id)"
             case .editEarning(let record): "editEarning-\(record.id)"
@@ -127,6 +134,9 @@ struct TodayView: View {
                     Task { await importPicked(items) }
                 }
                 // "Vardiya bitti" bildirimine dokunuldu: bekleyen vardiyanin kazanc formu acilir
+                .onReceive(NotificationCenter.default.publisher(for: UIScreen.capturedDidChangeNotification)) { _ in
+                    openScanResultsIfPending()
+                }
                 .onAppear(perform: openRequestedPending)
                 .onChange(of: autoShift.requestedPendingID) { _, _ in
                     openRequestedPending()
@@ -151,6 +161,7 @@ struct TodayView: View {
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
 
+            Section { ScanButton() }
             earningsSection
             if !todaysExpenses.isEmpty {
                 expensesSection
@@ -254,6 +265,49 @@ struct TodayView: View {
             ExpenseFormView()
         case .editExpense(let record):
             ExpenseFormView(record: record)
+        case .scanResults(let viewModel):
+            ScanResultsView(viewModel: viewModel)
+        }
+    }
+
+    /// Yayin eklentisinin biraktigi yakalama varsa "Taramada bulunanlar" sayfasini acar.
+    private func openScanResultsIfPending() {
+        guard activeSheet == nil, !captureStore.pending().isEmpty else { return }
+        let log: BroadcastLog? = BroadcastLog.load()
+        // Yayin suruyorsa dosyalar yazilmaya devam eder: sonuc sayfasi acilmaz
+        if UIScreen.main.isCaptured { return }
+        let unfinished: Bool = log != nil && log?.finishedAt == nil
+        let lastFrame: Date = log?.lastFrameAt ?? .distantPast
+        if unfinished, Date.now.timeIntervalSince(lastFrame) < 10 {
+            // Uygulama icinden durdurma: yayin bitti ama gunluk henuz kapanmadi; kisa sure sonra tekrar bak
+            scheduleScanRecheck()
+            return
+        }
+        let interrupted: Bool = unfinished
+        let viewModel = ScanResultsViewModel(
+            store: captureStore, templates: sync.mergedTemplates(),
+            knownTextHashes: queuedAndKnownHashes, existingDaily: existingDailyRecords,
+            interrupted: interrupted
+        )
+        activeSheet = .scanResults(viewModel)
+    }
+
+    /// Tek seferlik tekrar kontrol (~2 sn); art arda tetiklenirse biri calisir.
+    private func scheduleScanRecheck() {
+        guard !recheckScheduled else { return }
+        recheckScheduled = true
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            recheckScheduled = false
+            openScanResultsIfPending()
+        }
+    }
+
+    private var existingDailyRecords: [ScanResultsViewModel.ExistingDaily] {
+        allEarnings.map { record in
+            ScanResultsViewModel.ExistingDaily(
+                platformCode: record.platform?.code, day: record.startTime, gross: record.grossEarning
+            )
         }
     }
 
@@ -519,6 +573,7 @@ struct TodayView: View {
     /// Gelen kutusunu isler, sonra otomatik taramayi calistirir.
     private func refreshImports() async {
         await processInbox()
+        openScanResultsIfPending()
         await scanner.scan(knownIdentifiers: knownIDs, knownTextHashes: queuedAndKnownHashes)
     }
 
@@ -610,6 +665,7 @@ struct TodayView: View {
         if activeSheet == nil {
             showNextFromInbox()
         }
+        openScanResultsIfPending()
     }
 
     private func shiftStatus(elapsed: TimeInterval, summary: EarningsSummary) -> String {

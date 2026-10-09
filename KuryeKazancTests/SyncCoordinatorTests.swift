@@ -245,6 +245,19 @@ final class SyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(queue.items.map(\.id), [daily.id])
     }
 
+    func testOrderEvidence_notQueued() async {
+        setConsents(sharing: true, calibration: false)
+        let sync = makeCoordinator(client: fake)
+        let record = makeRecord(level: .ocrUnverified)
+        record.evidence?.periodRaw = OCRTemplate.Period.order.rawValue
+
+        sync.recordSaved(record, vehicle: "motorcycle")
+        await sync.flush()
+
+        XCTAssertTrue(queue.items.isEmpty)
+        XCTAssertTrue(fake.submittedShifts.isEmpty)
+    }
+
     /// `waitUntilIdle` suren gonderim bitene kadar doner.
     func testWaitUntilIdle_waitsForInFlightFlush() async {
         setConsents(sharing: true, calibration: false)

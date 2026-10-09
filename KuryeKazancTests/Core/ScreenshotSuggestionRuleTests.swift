@@ -31,6 +31,14 @@ final class ScreenshotSuggestionRuleTests: XCTestCase {
         XCTAssertFalse(qualifies(["Kazançlarım", "Toplam Kazanç", "₺700"]))
     }
 
+    func testOrderCardNeverQualifies() {
+        var parsed = ParsedEarning(platformCode: "yemeksepeti", date: .now, packageCount: 1, totalEarning: 147.5, bonus: 0,
+                                   totalIncludesBonus: true, fieldsToReview: [], templateID: "yemeksepeti.order",
+                                   fingerprintMatches: 5)
+        parsed.period = .order
+        XCTAssertFalse(ScreenshotSuggestionRule.qualifies(parsed))
+    }
+
     func testUnknownTemplateIDDoesNotQualify() {
         let parsed = ParsedEarning(platformCode: "getir", date: .now, packageCount: 1, totalEarning: 500, bonus: 0,
                                    totalIncludesBonus: true, fieldsToReview: [], templateID: "yok.earnings",

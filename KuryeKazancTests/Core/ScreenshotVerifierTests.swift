@@ -68,6 +68,13 @@ final class ScreenshotVerifierTests: XCTestCase {
         XCTAssertTrue(result.issues.contains { $0.contains("Haftalık") })
     }
 
+    func testOrderCard_isNotDailyScreen() {
+        let result = verifier.assess(parsed(period: .order), template: activeTemplate(), isGenuine: true, referenceDate: now)
+        XCTAssertEqual(result.candidate, .ocrUnverified)
+        XCTAssertFalse(result.isDailyScreen)
+        XCTAssertTrue(result.issues.contains { $0.contains("Tek sipariş") })
+    }
+
     func testOldOrFutureDate_isUnverified() {
         XCTAssertEqual(verifier.assess(parsed(daysAgo: 15), template: activeTemplate(), isGenuine: true, referenceDate: now).candidate, .ocrUnverified)
         XCTAssertEqual(verifier.assess(parsed(daysAgo: -1), template: activeTemplate(), isGenuine: true, referenceDate: now).candidate, .ocrUnverified)

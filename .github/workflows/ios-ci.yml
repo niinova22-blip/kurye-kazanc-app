@@ -68,6 +68,8 @@ jobs:
       - name: Birim testleri (XCTest)
         run: |
           set -o pipefail
+          mkdir -p build
+          export TEST_RUNNER_SCENARIO_REPORT="$GITHUB_WORKSPACE/build/scenario-report.md"
           xcodebuild test-without-building \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -76,6 +78,15 @@ jobs:
             -only-testing:KuryeKazancTests \
             -resultBundlePath build/results/UnitTests.xcresult \
             | xcbeautify --renderer github-actions
+
+      - name: Senaryo raporu
+        if: always()
+        run: |
+          if [ -f build/scenario-report.md ]; then
+            tee -a "$GITHUB_STEP_SUMMARY" < build/scenario-report.md
+          else
+            echo "scenario-report.md olusmadi"
+          fi
 
       - name: UI testleri (XCUITest, simulator)
         if: github.event_name == 'pull_request' || inputs.run_ui_tests

@@ -56,6 +56,8 @@ final class EarningFormViewModel {
     var isResolvingRegion = false
 
     private(set) var editingRecord: EarningRecord?
+    /// Form bir calisma oturumundan acildi: gercek saatler ekran suresiyle ezilmez.
+    @ObservationIgnored private var openedFromSession = false
     @ObservationIgnored private let calendar: Calendar
 
     var isEditing: Bool { editingRecord != nil }
@@ -67,6 +69,14 @@ final class EarningFormViewModel {
         var gross: Double
         var bonus: Double
         var packages: Int?
+    }
+
+    /// Tek vardiya icin en uzun sure; uzunu haftalik/hatali okuma sayilir.
+    static let maxShiftDuration: TimeInterval = ParsedEarning.maxShiftDuration
+
+    /// Sablon tutarlarin KDV haric oldugunu soyluyorsa bilgi notu.
+    var amountNote: String? {
+        imported?.parsed.amountsExcludeVAT == true ? "Bu ekrandaki tutarlar KDV hariç gösteriliyor." : nil
     }
 
     static let duplicateScreenshotIssue = "Bu ekran görüntüsü daha önce kaydedilmiş."
@@ -141,6 +151,7 @@ final class EarningFormViewModel {
             neighborhood = record.neighborhood ?? ""
             source = record.source
         } else if let session {
+            openedFromSession = true
             platform = defaultPlatform
             date = calendar.startOfDay(for: session.start)
             startTime = session.start
@@ -204,8 +215,8 @@ final class EarningFormViewModel {
         self.imported = imported
         isDuplicateScreenshot = !imported.textHash.isEmpty && knownTextHashes.contains(imported.textHash)
         apply(imported.parsed, platforms: platforms)
-        if imported.parsed.period == .week {
-            // Haftalik toplam tek vardiya gibi sessizce kaydedilmesin: "Kontrol ettim" onayi zorunlu
+        if imported.parsed.period == .week || imported.parsed.period == .order {
+            // Haftalik toplam / tek siparis tek vardiya gibi sessizce kaydedilmesin: "Kontrol ettim" onayi zorunlu
             fieldsToReview.formUnion([.gross, .date])
         }
         readBaseline = currentReadValues
@@ -243,7 +254,15 @@ final class EarningFormViewModel {
             case .bonus: review.insert(.bonus)
             }
         }
-        // Ekran goruntusunde calisma saati yoktur; varsayilan saatler mutlaka kontrol edilmeli
+        // Saatler her zaman kullanici onayina birakilir. Ekranda GUNLUK sure varsa, form oturumdan/kayittan
+        // acilmadiysa ve sonuc ayni gune sigiyorsa baslangic bitisten geriye kurulur.
+        if let duration = parsed.workDuration, parsed.period == .day,
+           !openedFromSession, !isEditing, duration <= Self.maxShiftDuration {
+            let start = endTime.addingTimeInterval(-duration)
+            if calendar.isDate(start, inSameDayAs: endTime) {
+                startTime = start
+            }
+        }
         review.insert(.hours)
         fieldsToReview = review
     }

@@ -70,6 +70,26 @@ struct ScreenshotImporter {
         )
     }
 
+    /// Sistem ekran yayindan gelen satirlar (gorsel yok). Cozumleme yakalama anina gore yapilir; yayin
+    /// gercek ekrandir (`isGenuine = true`), `assetIdentifier` yoktur.
+    func importCapture(lines: [RecognizedLine], capturedAt: Date, referenceDate: Date = .now) -> ImportedScreenshot {
+        let texts: [String] = lines.map(\.text)
+        let parsed = parser.parse(lines: texts, referenceDate: capturedAt)
+        return makeImported(parsed: parsed, lines: lines, capturedAt: capturedAt, referenceDate: referenceDate)
+    }
+
+    /// Hazir bir cozumlemeden (or. birlestirilmis siparis grubu) kanit + degerlendirme kurar.
+    func makeImported(parsed: ParsedEarning, lines: [RecognizedLine], capturedAt: Date,
+                      referenceDate: Date = .now) -> ImportedScreenshot {
+        let template = parsed.templateID.flatMap { id in parser.templates.first { $0.id == id } }
+        let assessment = verifier.assess(parsed, template: template, isGenuine: true, referenceDate: referenceDate)
+        return ImportedScreenshot(
+            lines: lines, parsed: parsed, assessment: assessment,
+            capturedAt: capturedAt, assetIdentifier: nil, isGenuine: true,
+            textHash: TextHash.of(lines.map(\.text))
+        )
+    }
+
     struct ImageMetadata {
         var pixelWidth: Int
         var pixelHeight: Int

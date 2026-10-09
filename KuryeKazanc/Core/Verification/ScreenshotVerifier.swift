@@ -62,9 +62,11 @@ struct ScreenshotVerifier {
             issues.append("Tarih son \(maxAgeDays) gün içinde değil.")
         }
 
-        let isDailyScreen = parsed.period != .week
-        if !isDailyScreen {
+        let isDailyScreen = parsed.period == .day || parsed.period == .unknown
+        if parsed.period == .week {
             issues.append("Haftalık ekran: vardiya için günlük kazanç ekranını kullan.")
+        } else if parsed.period == .order {
+            issues.append("Tek sipariş ekranı: günlük kazanç ekranını kullan.")
         }
 
         let readsCore = !parsed.fieldsToReview.contains(.totalEarning) && !parsed.fieldsToReview.contains(.platform)

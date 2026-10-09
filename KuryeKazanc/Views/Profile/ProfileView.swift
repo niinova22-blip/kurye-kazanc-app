@@ -44,6 +44,11 @@ struct ProfileView: View {
                 sharingSection
                 AccountSection()
                 CalibrationSection()
+                if BuildEnvironment.showsTesterTools {
+                    Section("Test araçları") {
+                        NavigationLink("Tarama günlüğü") { ScanLogView() }
+                    }
+                }
                 dataSection
                 aboutSection
             }
@@ -218,6 +223,22 @@ struct ProfileView: View {
                 Button("Fotoğraf izni kapalı — Ayarlar'dan aç") { openSystemSettings() }
                     .accessibilityIdentifier("profile.photoPermission")
             }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Kazanç taraması")
+                Text("Bugün sekmesindeki “Kazanç taraması” düğmesiyle platform uygulamalarındaki kazanç panelini okut; bulunanları onaylayıp kaydedersin.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("profile.scanInfo")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Kısayollar ile")
+                Text("Kısayollar > Otomasyon > + > Uygulama > (platform uygulaması) > Açıldığında > Hemen Çalıştır > eylemler: Bekle (3 sn) → Ekran Görüntüsü Al → Kurye Kazanç'a ekran görüntüsü gönder.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("profile.shortcutsRecipe")
         } header: {
             Text("Ekran görüntüleri")
         } footer: {

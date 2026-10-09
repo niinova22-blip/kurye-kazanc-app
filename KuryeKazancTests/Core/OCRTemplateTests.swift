@@ -8,7 +8,7 @@ import XCTest
 final class OCRTemplateTests: XCTestCase {
     func testBundledTemplatesDecodeAndCoverMainPlatforms() {
         let codes = Set(BundledTemplates.all.map(\.platformCode))
-        XCTAssertEqual(codes, ["trendyol_go", "getir", "yemeksepeti", "migros_hemen"])
+        XCTAssertEqual(codes, ["trendyol_go", "getir", "yemeksepeti", "migros_hemen", "uber", "thekurye", "banabikurye"])
         // Gercek ekranla kalibre edilene kadar hicbiri aktif degil
         XCTAssertTrue(BundledTemplates.all.allSatisfy { $0.status == .calibrating })
         XCTAssertEqual(BundledTemplates.generic.platformCode, "")

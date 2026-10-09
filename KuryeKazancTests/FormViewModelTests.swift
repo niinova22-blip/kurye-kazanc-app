@@ -32,6 +32,81 @@ final class FormViewModelTests: XCTestCase {
 
     // MARK: - Kazanc formu
 
+    func testApplyOCR_dailyDurationSetsStartButKeepsHoursReview() {
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        vm.endTime = at(6, 17)
+        var parsed = ParsedEarning(
+            platformCode: "getir", date: calendar.startOfDay(for: at(6, 0)), packageCount: 12,
+            totalEarning: 1000, bonus: 0, totalIncludesBonus: true, fieldsToReview: []
+        )
+        parsed.period = .day
+        parsed.workDuration = 6 * 3600 + 30 * 60
+        vm.apply(parsed, platforms: platforms)
+
+        XCTAssertEqual(vm.resolvedInterval().start, at(6, 10, 30))
+        XCTAssertEqual(vm.resolvedInterval().end, at(6, 17))
+        XCTAssertTrue(vm.fieldsToReview.contains(.hours))
+    }
+
+    func testApplyOCR_dailyDurationKeepsSessionTimes() {
+        let session = WorkSessionSummary(start: at(6, 8), end: at(6, 14, 15), distanceKm: 10)
+        let vm = EarningFormViewModel(session: session, defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        var parsed = ParsedEarning(
+            platformCode: "getir", date: calendar.startOfDay(for: at(6, 0)), packageCount: 12,
+            totalEarning: 1000, bonus: 0, totalIncludesBonus: true, fieldsToReview: []
+        )
+        parsed.period = .day
+        parsed.workDuration = 3 * 3600
+        vm.apply(parsed, platforms: platforms)
+
+        XCTAssertEqual(vm.resolvedInterval().start, at(6, 8))
+        XCTAssertEqual(vm.resolvedInterval().end, at(6, 14, 15))
+        XCTAssertTrue(vm.fieldsToReview.contains(.hours))
+    }
+
+    func testApplyOCR_dailyDurationCrossingMidnightNotApplied() {
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 9), calendar: calendar)
+        vm.startTime = at(6, 6)
+        vm.endTime = at(6, 9)
+        var parsed = ParsedEarning(
+            platformCode: "getir", date: calendar.startOfDay(for: at(6, 0)), packageCount: 12,
+            totalEarning: 1000, bonus: 0, totalIncludesBonus: true, fieldsToReview: []
+        )
+        parsed.period = .day
+        parsed.workDuration = 10 * 3600
+        vm.apply(parsed, platforms: platforms)
+
+        XCTAssertEqual(vm.resolvedInterval().start, at(6, 6))
+        XCTAssertTrue(vm.fieldsToReview.contains(.hours))
+    }
+
+    /// Review Focus 4: haftalik sure tek vardiya saatine yazilmaz.
+    func testApplyOCR_weeklyDurationIgnored() {
+        let vm = EarningFormViewModel(defaultPlatform: nil, now: at(6, 18), calendar: calendar)
+        vm.startTime = at(6, 10)
+        vm.endTime = at(6, 16)
+        var parsed = ParsedEarning(
+            platformCode: "getir", date: calendar.startOfDay(for: at(6, 0)), packageCount: 54,
+            totalEarning: 6000, bonus: 0, totalIncludesBonus: true, fieldsToReview: []
+        )
+        parsed.period = .week
+        parsed.workDuration = 23 * 3600 + 32 * 60
+        vm.apply(parsed, platforms: platforms)
+
+        XCTAssertEqual(vm.resolvedInterval().start, at(6, 10))
+        XCTAssertTrue(vm.fieldsToReview.contains(.hours))
+    }
+
+    func testImportedOrderCard_forcesReviewAndVATNote() {
+        var item = imported(period: .order)
+        item.parsed.amountsExcludeVAT = true
+        item.assessment.issues = ["Tek sipariş ekranı: günlük kazanç ekranını kullan."]
+        let vm = EarningFormViewModel(defaultPlatform: nil, imported: item, now: at(6, 18), calendar: calendar)
+        XCTAssertTrue(vm.fieldsToReview.contains(.gross))
+        XCTAssertTrue(vm.assessmentIssues.contains { $0.contains("Tek sipariş") })
+        XCTAssertEqual(vm.amountNote, "Bu ekrandaki tutarlar KDV hariç gösteriliyor.")
+    }
+
     func testManualEarning_savesParsedTurkishAmounts() throws {
         let vm = EarningFormViewModel(defaultPlatform: platforms.first, now: at(6, 18), calendar: calendar)
         vm.startTime = at(6, 9)
@@ -307,7 +382,7 @@ final class FormViewModelTests: XCTestCase {
         )
         let assessment = ScreenshotAssessment(
             isGenuine: true, templateActive: candidate == .verified, fingerprintOK: true, dateRecent: true,
-            isDailyScreen: period != .week, internallyConsistent: true, candidate: candidate,
+            isDailyScreen: period == .day || period == .unknown, internallyConsistent: true, candidate: candidate,
             issues: period == .week ? ["Haftalık ekran: vardiya için günlük kazanç ekranını kullan."] : []
         )
         return ImportedScreenshot(lines: [RecognizedLine(text: "Getir", x: 0, y: 0, width: 1, height: 0.1)],

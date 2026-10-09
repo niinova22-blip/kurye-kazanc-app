@@ -128,4 +128,80 @@ enum TextPatterns {
               calendar.component(.day, from: date) == day else { return nil } // 31.02 gibi gecersizleri ele
         return calendar.startOfDay(for: date)
     }
+
+    // MARK: - Sure (1.4a)
+
+    private static let hourMinuteRegex = try! NSRegularExpression(
+        pattern: #"(?<!\d)(\d{1,3})\s*(?:saat|sa|h)\.?\s*(\d{1,2})\s*(?:dakika|dk|min|m)(?!\p{L})"#
+    )
+    private static let clockHoursRegex = try! NSRegularExpression(
+        pattern: #"(?<!\d)(\d{1,3}):(\d{2})\s*(?:saat|sa|h)(?!\p{L})"#
+    )
+    private static let hoursOnlyRegex = try! NSRegularExpression(
+        pattern: #"(?<!\d)(\d{1,3})\s*(?:saat|sa|h)(?!\p{L})"#
+    )
+    private static let minutesOnlyRegex = try! NSRegularExpression(
+        pattern: #"(?<!\d)(\d{1,4})\s*(?:dakika|dk|min)(?!\p{L})"#
+    )
+    /// Bir haftadan uzun sure gercekci degil (OCR hatasi).
+    private static let maxDurationHours = 168
+
+    /// "23 sa 32 dk", "23h 32m", "5 saat", "45 dk", "02:15 saat". Tek basina "12:30" sure DEGILDIR.
+    static func duration(in line: String) -> TimeInterval? {
+        let range = NSRange(line.startIndex..., in: line)
+        func value(_ match: NSTextCheckingResult, _ group: Int) -> Int? {
+            guard let r = Range(match.range(at: group), in: line) else { return nil }
+            return Int(line[r])
+        }
+        func make(hours: Int, minutes: Int) -> TimeInterval? {
+            guard minutes < 60, hours <= maxDurationHours, hours + minutes > 0 else { return nil }
+            return TimeInterval(hours * 3600 + minutes * 60)
+        }
+        if let m = hourMinuteRegex.firstMatch(in: line, range: range),
+           let h = value(m, 1), let min = value(m, 2) {
+            return make(hours: h, minutes: min)
+        }
+        if let m = clockHoursRegex.firstMatch(in: line, range: range),
+           let h = value(m, 1), let min = value(m, 2) {
+            return make(hours: h, minutes: min)
+        }
+        if let m = hoursOnlyRegex.firstMatch(in: line, range: range), let h = value(m, 1) {
+            return make(hours: h, minutes: 0)
+        }
+        if let m = minutesOnlyRegex.firstMatch(in: line, range: range), let min = value(m, 1) {
+            return min < 24 * 60 ? TimeInterval(min * 60) : nil
+        }
+        return nil
+    }
+
+    // MARK: - Tarih araligi (haftalik ozet)
+
+    // Ay adi: bilinen tam ad ya da 3 harfli kisaltma (+ istege bagli nokta); ardindan harf gelmez
+    // ("5 market - 3 kasa" aralik sayilmaz). Normalize metinde Turkce harfler sadelesmis olur.
+    private static let trMonth = #"(?:ocak|oca|subat|sub|mart|mar|nisan|nis|mayis|may|haziran|haz|temmuz|tem|agustos|agu|eylul|eyl|ekim|eki|kasim|kas|aralik|ara)(?!\p{L})"#
+    private static let enMonth = #"(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)(?!\p{L})"#
+    private static let anyMonth = "(?:\(trMonth)|\(enMonth))"
+
+    private static let dateRangeRegexes: [NSRegularExpression] = [
+        // "4 sub - 10 sub", "4 - 10 sub" (gun-ay, gun-ay / gun-gun ay)
+        #"(?<!\d)\d{1,2}\s*(?:\#(anyMonth)\.?)?\s*[-–—]\s*\d{1,2}\s*\#(anyMonth)"#,
+        // "feb 4 - feb 10", "feb 4 - 10" (ay-gun)
+        #"(?<!\p{L})\#(enMonth)\.?\s*\d{1,2}\s*[-–—]\s*(?:\#(enMonth)\.?\s*)?\d{1,2}(?!\d)"#,
+    ].map { try! NSRegularExpression(pattern: $0) }
+
+    /// "4 sub - 10 sub", "4-10 sub", "feb 4 - feb 10" gibi tarih araligi (normalize metin).
+    static func containsDateRange(_ text: String) -> Bool {
+        let range = NSRange(text.startIndex..., in: text)
+        return dateRangeRegexes.contains { $0.firstMatch(in: text, range: range) != nil }
+    }
+
+    // MARK: - Referans numaralari
+
+    private static let referenceRegex = try! NSRegularExpression(pattern: #"(?:#|№|\bno\s*)\d+"#)
+
+    /// "#1420", "№78347", "no 123" gibi is/siparis numaralarini cikarir ki tutar sanilmasin.
+    static func strippingReferenceNumbers(_ line: String) -> String {
+        let range = NSRange(line.startIndex..., in: line)
+        return referenceRegex.stringByReplacingMatches(in: line, range: range, withTemplate: " ")
+    }
 }
