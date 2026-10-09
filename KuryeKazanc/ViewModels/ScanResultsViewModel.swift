@@ -111,13 +111,16 @@ final class ScanResultsViewModel {
             case .daily, .orderGroup: defaultOn = true
             case .weekly, .unknown: defaultOn = false
             }
-            return Row(item: item, isSelected: defaultOn && !saved && !hasSameDay, isAlreadySaved: saved,
+            // Haftalik ozet vardiya degildir: asla secilemez, kaydedilmez
+            return Row(item: item, isSelected: defaultOn && !saved && !hasSameDay && item.kind != .weekly,
+                       isAlreadySaved: saved,
                        hasSameDayRecord: hasSameDay)
         }
     }
 
     func setSelected(_ selected: Bool, for id: String) {
-        guard let index = rows.firstIndex(where: { $0.id == id }), !rows[index].isAlreadySaved else { return }
+        guard let index = rows.firstIndex(where: { $0.id == id }), !rows[index].isAlreadySaved,
+              rows[index].item.kind != .weekly else { return }
         rows[index].isSelected = selected
     }
 

@@ -55,6 +55,21 @@ final class ScanResultsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.selectedCount, 1)
     }
 
+    func testWeeklyRowCannotBeSelectedNorSaved() throws {
+        try add(uberWeekly)
+        let vm = makeVM()
+        vm.load()
+        let row = try XCTUnwrap(vm.rows.first)
+        XCTAssertEqual(row.item.kind, .weekly)
+        XCTAssertFalse(row.isSelected)
+        vm.setSelected(true, for: row.id)
+        XCTAssertFalse(try XCTUnwrap(vm.rows.first).isSelected)
+        XCTAssertEqual(vm.selectedCount, 0)
+        let records = try vm.save(in: context, platforms: platforms())
+        XCTAssertTrue(records.isEmpty)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<EarningRecord>()).count, 0)
+    }
+
     func testAlreadySavedRowIsNotSelectableNorSaved() throws {
         try add(getirDaily)
         let probe = makeVM()
