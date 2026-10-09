@@ -238,6 +238,12 @@ struct EarningFormView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                if let note = viewModel.amountNote {
+                    Label(note, systemImage: "percent")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("earningForm.vatNote")
+                }
             case .failed(let message):
                 Label(message, systemImage: "xmark.octagon")
                     .foregroundStyle(.red)

@@ -95,7 +95,8 @@ final class SyncCoordinator {
 
     private func shiftPayloadData(for record: EarningRecord, vehicle: String) -> Data? {
         // Haftalik ozet ekrani tek vardiya degildir: gonderilmez (yalnizca gunluk / belirsiz donem).
-        guard let evidence = record.evidence, evidence.period != .week else { return nil }
+        // Haftalik ozet ve tek siparis karti vardiya degildir: gonderilmez (yalnizca gunluk / belirsiz donem).
+        guard let evidence = record.evidence, evidence.period != .week, evidence.period != .order else { return nil }
         let hash: String = TextHash.sha256(evidence.lines.map(\.text))
         let payload: ShiftPayload? = ShiftPayloadBuilder.make(
             recordID: record.id, platformCode: record.platform?.code,

@@ -69,7 +69,15 @@ final class EarningFormViewModel {
         var packages: Int?
     }
 
-    static let duplicateScreenshotIssue = "Bu ekran görüntüsü daha önce kaydedilmiş."
+    /// Tek vardiya icin en uzun sure; uzunu haftalik/hatali okuma sayilir.
+    static let maxShiftDuration: TimeInterval = 16 * 3600
+
+    /// Sablon tutarlarin KDV haric oldugunu soyluyorsa bilgi notu.
+    var amountNote: String? {
+        imported?.parsed.amountsExcludeVAT == true ? "Bu ekrandaki tutarlar KDV hariç gösteriliyor." : nil
+    }
+
+    static let duplicateScreenshotIssue ="Bu ekran görüntüsü daha önce kaydedilmiş."
 
     var assessmentIssues: [String] {
         var issues: [String] = imported?.assessment.issues ?? []
@@ -204,8 +212,8 @@ final class EarningFormViewModel {
         self.imported = imported
         isDuplicateScreenshot = !imported.textHash.isEmpty && knownTextHashes.contains(imported.textHash)
         apply(imported.parsed, platforms: platforms)
-        if imported.parsed.period == .week {
-            // Haftalik toplam tek vardiya gibi sessizce kaydedilmesin: "Kontrol ettim" onayi zorunlu
+        if imported.parsed.period == .week || imported.parsed.period == .order {
+            // Haftalik toplam / tek siparis tek vardiya gibi sessizce kaydedilmesin: "Kontrol ettim" onayi zorunlu
             fieldsToReview.formUnion([.gross, .date])
         }
         readBaseline = currentReadValues
@@ -243,8 +251,12 @@ final class EarningFormViewModel {
             case .bonus: review.insert(.bonus)
             }
         }
-        // Ekran goruntusunde calisma saati yoktur; varsayilan saatler mutlaka kontrol edilmeli
-        review.insert(.hours)
+        // Ekranda gunluk calisma suresi varsa vardiya saatini ondan kur; yoksa varsayilan saatler kontrol edilmeli.
+        if let duration = parsed.workDuration, parsed.period != .week, duration <= Self.maxShiftDuration {
+            startTime = endTime.addingTimeInterval(-duration)
+        } else {
+            review.insert(.hours)
+        }
         fieldsToReview = review
     }
 
