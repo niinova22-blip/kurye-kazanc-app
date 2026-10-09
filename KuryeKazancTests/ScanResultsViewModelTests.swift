@@ -98,7 +98,9 @@ final class ScanResultsViewModelTests: XCTestCase {
         let records = try vm.save(in: context, platforms: platforms())
         XCTAssertEqual(records.count, 1)
         XCTAssertEqual(records[0].packageCount, 2)
-        XCTAssertEqual(records[0].grossEarning, 267.5, accuracy: 0.001)
+        // toplam bonusu icerir: brut = 267,50 - 57 bonus
+        XCTAssertEqual(records[0].grossEarning, 210.5, accuracy: 0.001)
+        XCTAssertEqual(records[0].bonus, 57, accuracy: 0.001)
         XCTAssertNotEqual(records[0].verification, .verified)
     }
 
