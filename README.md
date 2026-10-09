@@ -7,7 +7,7 @@ Kuryeler için net kazanç takip uygulaması. Swift + SwiftUI + SwiftData, MVVM,
 1. Swift kaynaklarını ve `project.yml` dosyasını VS Code'da düzenleyin.
 2. `.xcodeproj` repoda **yoktur**; CI'da [XcodeGen](https://github.com/yonaskolb/XcodeGen) ile `project.yml`'den üretilir.
    Yeni bir `.swift` dosyası eklemek için projeye "eklemeniz" gerekmez — ilgili klasöre koymanız yeterli.
-3. Push → Codemagic `ios-ci` akışı: proje üretimi, derleme, birim testleri, UI testleri (simülatör).
+3. Push / PR → GitHub Actions `iOS CI` (`.github/workflows/ios-ci.yml`): proje üretimi, derleme, birim testleri; UI testleri yalnızca PR'da. Codemagic `ios-ci` yalnızca elle (yedek); `main`'e birleştirince Codemagic `ios-release` → TestFlight.
 4. `main` veya `release/*` dalına push → `ios-release`: testler + imzalı IPA + otomatik TestFlight.
    Öncesinde `TESTFLIGHT_NOTES.md` en üstüne yeni sürüm notunu ekleyin.
 

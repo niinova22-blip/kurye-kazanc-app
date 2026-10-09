@@ -1,7 +1,7 @@
 # Codemagic CI/CD - Kurye Kazanc (iOS)
 #
 # Akislar:
-#   ios-ci       : main/release disindaki her dal + PR -> proje uret, build, unit test (UI test yalnizca PR'da)
+#   ios-ci       : yalnizca elle (yedek). Asil CI GitHub Actions'ta: .github/workflows/ios-ci.yml
 #   ios-release  : main ve release/* dallarina push -> testler + imzali IPA + otomatik TestFlight
 #
 # GIZLI BILGILER KODA YAZILMAZ. Codemagic arayuzunde tanimlanmasi gerekenler:
@@ -85,22 +85,8 @@ workflows:
       <<: *env_versions
       vars:
         <<: *common_vars
-    triggering:
-      events:
-        - push
-        - pull_request
-      branch_patterns:
-        - pattern: "*"
-          include: true
-          source: true
-        # Kararli dallar ios-release akisinda test ediliyor; cift calismasin
-        - pattern: "main"
-          include: false
-          source: true
-        - pattern: "release/*"
-          include: false
-          source: true
-      cancel_previous_builds: true
+    # Otomatik tetikleme yok: CI GitHub Actions'ta (.github/workflows/ios-ci.yml).
+    # Bu akis yalnizca Codemagic arayuzunden elle baslatilir (yedek).
     scripts:
       - *generate_project
       - *build_for_testing
