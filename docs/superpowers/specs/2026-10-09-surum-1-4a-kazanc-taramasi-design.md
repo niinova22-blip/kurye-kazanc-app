@@ -66,3 +66,12 @@ Tarih: 2026-10-09 · Önceki: `docs/superpowers/specs/2026-10-09-surum-1-4a-ekra
 - Core (Windows): `CaptureKey` (yuvarlama, şablonsuz nil), `StableCaptureFilter` (iki kare kuralı, tekrar, kısa kalan sayımı, araya giren farklı kare), `ScanResultBuilder` (tekrar, sipariş birleştirme toplam/bonus/paket, haftalık türü, farklı gün/platform ayrımı), `BroadcastCapture` Codable.
 - CI (uygulama): `ScanResultsViewModel` (sahte yakalamalarla liste, seçim, kaydetme → kayıt sayısı ve seviye, zaten kayıtlı kalemin seçilemezliği, dosyaların silinmesi); `SendScreenshotIntent` gelen kutusuna yazar (geçici klasörle).
 - Cihaz: masaüstündeki `Kurye-Senaryo-Gorselleri` ile 5 dk tarama; ölçütler §1.
+
+## 6. v2 — Fotoğraflardan tarama (kullanıcı kararı, 2026-10-09 cihaz testi sonrası)
+
+Cihaz testinden sonra kullanıcı daha basit bir akış istedi ve onayladı:
+- "Kazanç taraması" her basışta kısa rehber açar (kurye platformları + "günlük kazanç ekranının görüntüsünü al, buraya dön").
+- Dönüşte ya da "Tara" ile, fotoğraf izni varsa **son 24 saatin** ekran görüntüleri okunur (işlenmiş olanlar atlanır), sonuçlar "Taramada bulunanlar" ekranında. Ekran kaydı (yayın) düğmesi Bugün'den kaldırılır (eklenti kodu kalır).
+- Topluluğa gidebilmesi için çalışma süresi gerekir (I-1): diğer platform şablonlarına süre etiketleri eklenir; saatler bitiş = görüntünün alındığı an, başlangıç = bitiş − süre.
+- İlçe: tarama anındaki konumdan (yalnızca il/ilçe metni).
+- Test: yalnızca TestFlight/DEBUG'da "Test: son 30 gün ve tüm fotoğraflar" ayarı; 5 platform × 30 gün JPEG test görseli (EXIF tarihli) masaüstünde.
