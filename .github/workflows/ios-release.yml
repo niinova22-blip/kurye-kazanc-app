@@ -91,9 +91,10 @@ jobs:
 
       - name: TestFlight'a yukle
         run: |
+          # Dahili testciler build'i otomatik gorur. --testflight (harici Beta App Review) KULLANILMAZ:
+          # App Store Connect'te test bilgileri (geri bildirim e-postasi, iletisim) dolmadan bu adim hata verir.
           app-store-connect publish \
             --path build/ios/ipa/*.ipa \
-            --testflight \
             --whats-new @file:whats_new.txt
 
       - name: IPA ve gunlukler
