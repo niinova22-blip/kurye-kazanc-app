@@ -237,9 +237,10 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 
 ### Açık konular
 - Authentication: anonim + Apple (`com.kuryekazanc.app`) açık, Email kapalı (kullanıcı teyit etti).
-- Oturumda eski (legacy) service_role anahtarı yanlışlıkla sohbet kaydına düştü → uygulama ve betikler yeni **publishable** anahtara (`sb_publishable_...`, `apikey` başlığında) geçirildi, e2e yeniden geçti. Eski JWT tabanlı anahtarlar (anon + service_role) API Keys → Legacy → "Disable JWT-based API keys" ile kapatılmalı (kullanıcı).
+- Oturumda eski (legacy) service_role anahtarı yanlışlıkla sohbet kaydına düştü → uygulama ve betikler yeni **publishable** anahtara (`sb_publishable_...`, `apikey` başlığında) geçirildi, e2e yeniden geçti. Eski JWT tabanlı anahtarlar kapatıldı.
+
+- **İlk 1.2 + 1.3 CI derlemesi (#19, `a1f1f6a`) başarılı:** derleme + birim testleri **234/234** (UI testleri yalnızca PR'da).
 
 ### Sonraki adım
 1. Apple Developer: `com.kuryekazanc.app`'te Sign in with Apple (profil yeniden üretilir → Codemagic); Canlı Etkinlik App ID `com.kuryekazanc.app.liveactivity` + profil — kullanıcıya sorarak.
-2. develop push → Codemagic `ios-ci`; derleme/test hatalarını düzelt.
-3. TestFlight'tan önce kullanıcıya sor.
+2. develop → main PR (UI testleri burada çalışır) → TestFlight 1.3.0 — kullanıcıya sorarak.
