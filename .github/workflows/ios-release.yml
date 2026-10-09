@@ -1,0 +1,110 @@
+# iOS Release (TestFlight) - Kurye Kazanc
+#
+# main / release/* push (ya da elle): testler (ios-ci.yml, UI dahil) -> imzali IPA -> TestFlight.
+# Codemagic'in acik kaynak araclari (codemagic-cli-tools) kullanilir; adimlar eski codemagic.yaml ios-release ile ayni.
+#
+# GIZLI DEGERLER (GitHub > Settings > Secrets and variables > Actions; koda ASLA yazilmaz):
+#   APP_STORE_CONNECT_ISSUER_ID       App Store Connect API anahtari Issuer ID
+#   APP_STORE_CONNECT_KEY_IDENTIFIER  API anahtari Key ID
+#   APP_STORE_CONNECT_PRIVATE_KEY     API anahtari .p8 dosyasinin icerigi
+#   CERTIFICATE_PRIVATE_KEY           Dagitim (Distribution) sertifikasinin RSA ozel anahtari (PEM)
+# Profiller her calismada App Store Connect'ten indirilir (com.kuryekazanc.app ve uzantilari).
+
+name: iOS Release (TestFlight)
+
+on:
+  push:
+    branches: [main, "release/**"]
+    paths-ignore: ["**.md", "docs/**", "supabase/**", "scripts/server/**", "scripts/design/**"]
+  workflow_dispatch:
+
+# Ayni dalda iki yukleme ayni build numarasini almasin: sirayla calisir, iptal edilmez.
+concurrency:
+  group: ios-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    uses: ./.github/workflows/ios-ci.yml
+    with:
+      run_ui_tests: true
+
+  release:
+    needs: tests
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      XCODE_PROJECT: KuryeKazanc.xcodeproj
+      XCODE_SCHEME: KuryeKazanc
+      BUNDLE_ID: com.kuryekazanc.app
+      APP_STORE_APPLE_ID: "6819440649"   # gizli degil (App Store adresinde gorunur)
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: En yeni Xcode'u sec
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Araclar
+        run: |
+          brew install xcodegen
+          pipx install codemagic-cli-tools
+
+      - name: XcodeGen ile Xcode projesini uret
+        run: xcodegen generate
+
+      - name: Imzalama (sertifika + profiller)
+        run: |
+          keychain initialize
+          # Uzantilar dahil (com.kuryekazanc.app.*): ozel anahtara uyan dagitim sertifikasi ve gecerli App Store profilleri
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --platform IOS
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Build numarasini arttir
+        run: |
+          # Ilk yuklemede TestFlight bos olabilir: sayi gelmezse 0 kabul et
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null | tail -1)
+          case "$LATEST" in ''|*[!0-9]*) LATEST=0 ;; esac
+          NEXT=$((LATEST + 1))
+          echo "Build numarasi: $NEXT"
+          agvtool new-version -all "$NEXT"
+
+      - name: TestFlight degisiklik notu (What to Test)
+        run: |
+          bash scripts/ci/make_release_notes.sh
+          python3 -c "import json;print(json.load(open('release_notes.json'))[0]['text'])" > whats_new.txt
+
+      - name: IPA olustur
+        run: |
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+
+      - name: TestFlight'a yukle
+        run: |
+          app-store-connect publish \
+            --path build/ios/ipa/*.ipa \
+            --testflight \
+            --whats-new @file:whats_new.txt
+
+      - name: IPA ve gunlukler
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release
+          path: |
+            build/ios/ipa/*.ipa
+            /tmp/xcodebuild_logs/*.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Anahtarligi temizle
+        if: always()
+        run: keychain use-login || true

@@ -2,7 +2,7 @@
 #
 # Akislar:
 #   ios-ci       : yalnizca elle (yedek). Asil CI GitHub Actions'ta: .github/workflows/ios-ci.yml
-#   ios-release  : main ve release/* dallarina push -> testler + imzali IPA + otomatik TestFlight
+#   ios-release  : yalnizca elle (yedek). Asil TestFlight GitHub Actions'ta: .github/workflows/ios-release.yml
 #
 # GIZLI BILGILER KODA YAZILMAZ. Codemagic arayuzunde tanimlanmasi gerekenler:
 #   1) Teams > Integrations > Developer Portal: App Store Connect API anahtari
@@ -115,17 +115,8 @@ workflows:
           - kurye-kazanc-liveactivity-appstore
         certificates:
           - selfwake-distribution
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: "main"
-          include: true
-          source: true
-        - pattern: "release/*"
-          include: true
-          source: true
-      cancel_previous_builds: false
+    # Otomatik tetikleme yok: TestFlight GitHub Actions'ta (.github/workflows/ios-release.yml).
+    # Bu akis yalnizca Codemagic arayuzunden elle baslatilir (yedek).
     scripts:
       - *generate_project
       - *build_for_testing
