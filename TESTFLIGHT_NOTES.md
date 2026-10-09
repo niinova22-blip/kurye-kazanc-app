@@ -3,6 +3,26 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.4.1
+
+Kazanç taraması artık ekran kaydı istemiyor; ekran görüntülerinden çalışıyor.
+
+Yeni:
+- Bugün > "Kazanç taraması": kısa rehber açılır. Kullandığın uygulamalarda günlük kazanç ekranının görüntüsünü al, Kurye Kazanç'a dön. Fotoğraf izni varsa son 24 saatin ekran görüntüleri kendiliğinden okunur ve "Taramada bulunanlar" açılır. Daha önce kaydedilenler atlanır.
+- Uber, TheKurye ve Banabikurye platform listesinde; bu kayıtlar artık kaydedilebiliyor.
+- Haftalık özetler kaydedilmez (vardiya değil).
+- Platform şablonları ekrandaki "Çalışma süresi"ni okur: saatler buna göre kurulur ve süre okunan kayıtlar (paylaşım açıksa) topluluğa gider.
+- Kayıt, tarama anındaki ilçenle kaydedilir (yalnızca il/ilçe).
+
+Test (yalnızca TestFlight): Profil > Test araçları > "Test: son 30 gün ve tüm fotoğraflar".
+
+Lütfen test et:
+1. Masaüstündeki Kurye-Test-30-Gun klasörünü telefona aktar (AirDrop / iCloud Drive > Fotoğraflara kaydet). Test ayarını aç, Kazanç taraması > Tara. Tek seferde en fazla 60 görüntü okunur; "Daha fazla görüntü var" yazıyorsa kaydedip tekrar tara.
+2. Kaydedilen günler Analiz'de doğru günlere düşüyor mu? "Ne zaman çalışmalı" ısı haritası doluyor mu? Saatler (ör. 18:10–22:40) mantıklı mı?
+3. Aynı taramayı tekrar yap: kaydedilenler yeniden listelenmemeli.
+4. Test ayarı kapalıyken gerçek bir platform kazanç ekranının görüntüsünü al ve tara (kişisel bilgileri karartıp paylaşabilirsen çok iyi olur).
+5. Fotoğraf iznini reddet: "Ayarlar'ı aç" görünüyor mu?
+
 ## 1.4.0
 
 Yeni okuma motoru:

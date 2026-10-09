@@ -297,3 +297,14 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 - Bilinen sınır: aynı tutarlı iki farklı sipariş kartı tek sayılır (gerçek ekranla sipariş no eklenecek).
 - Sürüm 1.4.0.
 - Sonraki adım: develop→main PR → TestFlight 1.4.0 → cihaz testi.
+
+## Oturum 7 — 2026-10-10: 1.4.1 fotoğraflardan kazanç taraması
+
+- Cihaz testi (1.4.0) sonrası kullanıcı kararı: ekran kaydı yerine rehber + son 24 saatin ekran görüntülerini okuma (spec §6, plan `docs/superpowers/plans/2026-10-09-surum-1-4b-fotograf-taramasi.md`).
+- Test hataları: Uber/TheKurye/Banabikurye platform listesinde; haftalık özet kaydedilmez; platform adları; mesaj.
+- Core: `ScanWindow` (24 sa / test 30 gün); 4 platform şablonuna çalışma süresi etiketleri (sürümler +1).
+- `PhotoScanService` (300 getir → bilinenleri ele → en fazla 60 oku, `didTruncate`, oturumluk red listesi); `ScanResultsViewModel` fotoğraf kaynağı (ilçe, tüm görüntü kimlikleri, kaydedilenler yeniden gelmez).
+- `ScanGuideView`: her basışta rehber, dönüşte otomatik tarama, izin/Ayarlar, test anahtarı (Profil > Test araçları). Yayın düğmesi Bugün'den kaldırıldı (eklenti kodu duruyor).
+- 30 günlük test görselleri: masaüstü `Kurye-Test-30-Gun` (112 JPEG, EXIF tarihli).
+- **CI/CD tekrar Codemagic'te**: GitHub Actions kotası %90 (özel repo, macOS ×10). `.github/workflows` yalnızca elle; Codemagic `ios-ci` push/PR, `ios-release` main/release; yayın eklentisi profili `kurye-kazanc-broadcast-appstore`; `submit_to_testflight: false`.
+- Sürüm 1.4.1. Sıradaki: 1.4b Topluluk (sunucu ısı haritası + test kuryeleri, seçenek a), sonra akıllı çalışma planlama modülü.
