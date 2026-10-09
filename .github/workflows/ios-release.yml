@@ -7,7 +7,7 @@
 #   APP_STORE_CONNECT_ISSUER_ID       App Store Connect API anahtari Issuer ID
 #   APP_STORE_CONNECT_KEY_IDENTIFIER  API anahtari Key ID
 #   APP_STORE_CONNECT_PRIVATE_KEY     API anahtari .p8 dosyasinin icerigi
-#   CERTIFICATE_PRIVATE_KEY           Dagitim (Distribution) sertifikasinin RSA ozel anahtari (PEM)
+#   CERTIFICATE_PRIVATE_KEY           iOS Distribution sertifikasinin RSA ozel anahtari (PEM; sertifika GT35S8T4WB, 2027-10-09'a kadar)
 # Profiller her calismada App Store Connect'ten indirilir (com.kuryekazanc.app ve uzantilari).
 
 name: iOS Release (TestFlight)
@@ -62,8 +62,10 @@ jobs:
       - name: Imzalama (sertifika + profiller)
         run: |
           keychain initialize
-          # Uzantilar dahil (com.kuryekazanc.app.*): ozel anahtara uyan dagitim sertifikasi ve gecerli App Store profilleri
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --platform IOS
+          # Uzantilar dahil (com.kuryekazanc.app.*): ozel anahtara uyan iOS Distribution sertifikasi (GitHub'a ozel,
+          # 2026-10-09'da olusturuldu) ve ona bagli App Store profilleri; profil yoksa --create ile olusturulur.
+          # Codemagic'in profilleri (eski sertifika) dokunulmadan kalir.
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --platform IOS --create
           keychain add-certificates
           xcode-project use-profiles
 
