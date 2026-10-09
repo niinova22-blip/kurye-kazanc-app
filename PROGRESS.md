@@ -314,3 +314,24 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 - Uygulama: `SupabaseClient` RPC'leri, Core `CommunityModels`, `CommunityViewModel` (paylaşım kapalıyken ağ yok), Topluluk sekmesi (ilçe seçici, ₺/saat + kendi karşılaştırma, ortak `HeatmapChart`, platformlar, en iyi saatler).
 - Not (lansman öncesi): anonim kayıt sınırsız olduğundan k=5 hücresi sahte hesaplarla çözülebilir — App Attest / hız sınırı lansmandan önce.
 - Sıradaki: 1.4.1 TestFlight (fotoğraf taraması + Topluluk), sonra akıllı çalışma planlama motoru (hafıza: next-planner-module).
+
+## Oturum 7 (devam) — 2026-10-10: 1.5.0 akıllı çalışma planlama motoru
+
+### Yapılanlar
+- Araştırma `docs/research/2026-10-10-platform-kurallari.md` (kullanıcının 8 başlıklı belge listesi dahil), tasarım `docs/superpowers/specs/2026-10-10-planlama-motoru-design.md`, plan `docs/superpowers/plans/2026-10-10-planlama-motoru.md`.
+- Core `KuryeKazanc/Core/Planner/`: `PlatformRule`/`RuleSet` (kaynaklı, sürümlü, 90 gün stale, kullanıcı onayı), `BundledRules` (44 kural, bulunamayanlar `unknownTerm`), `WorkProfile`, `EarningsForecaster` (p25/p50/p75, ≥3 örnek, 8 hafta), `PlanValidator`, `PlanEngine` (30 dk dilimli DP; en kârlı / düşük riskli / az saat; brüt-gider-vergi; kayıtlı plan yeniden doğrulama). 208 Core testi geçiyor.
+- Sunucu: göç `20261010000004_platform_rules.sql`, pgTAP `003_platform_rules.sql`, `seed_platform_rules.mjs`, `check_sources.mjs`, `approve_rule.mjs`. **Canlıya uygulanmadı.**
+- Uygulama: `SyncCoordinator.refreshRulesIfNeeded/ruleSet`, `SupabaseClient.fetchPlatformRules`, `PlannerViewModel`, `PlannerView`, `WorkProfileView`, `PlatformRulesView`; Bugün > Plan öner, Profil > Çalışma profili ve plan. Sürüm 1.5.0.
+
+### Kullanıcının çalıştıracakları (canlı veritabanı)
+```
+node scripts/server/apply.mjs
+node scripts/server/test.mjs
+node scripts/server/seed_platform_rules.mjs
+node scripts/server/check_sources.mjs --dry-run
+```
+
+### Açık konular
+- Uygulama kodu (fotoğraf taraması + Topluluk + planlayıcı) henüz derlenmedi: tek push → Codemagic.
+- Sözleşme/slot/hakediş/askı/itiraz/çoklu platform belgelerinin çoğu kamuya açık değil; kurye belgeleri gelince kurallar güncellenmeli.
+- Kural kaynakları ayda bir `check_sources.mjs` ile kontrol edilmeli (90 günü geçen kural "güncelliği bilinmiyor" olur).

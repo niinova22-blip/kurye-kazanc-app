@@ -3,7 +3,16 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
-## 1.4.1
+## 1.5.0
+
+Bu sürüm 1.4.1'in (yayımlanmadı) her şeyini ve yeni planlama motorunu içerir.
+
+Yeni (Plan öner):
+- Bugün > "Plan öner" (ya da Profil > "Çalışma profili ve plan"): günün en kârlı, düşük riskli ve daha az saatli planı. Her planda saatler ve platformlar, brüt (düşük–yüksek), yakıt+bakım, Bağ-Kur/sabit gider, net, vergi sonrası, net/saat, km ve güven.
+- Tahmin yalnızca senin kayıtlarından (son 8 hafta, aynı gün+saat) ya da platformun sana yazılı sunduğu saatlik ücretten. Veri yoksa tahmin uydurulmaz.
+- Platform kuralları (slot, vardiya, iptal, devir, ücret, hakediş, askı, itiraz, çoklu platform) kaynaklı ve tarihli. Resmî kaynağı olmayan ya da 90 gündür kontrol edilmeyen koşul varsa plan "Kesin değil" görünür; koşulu kendi sözleşmene göre "Sözleşmemde var" / "Bende geçerli değil" diye işaretleyebilirsin.
+- Çalışma profili: aktif platformlar, çalışma modeli, bölge, gün gün uygun saatler, aldığın slot/vardiyalar, vergi oranı, Bağ-Kur, günlük azami saat, platform geçiş süresi.
+- Seçtiğin plan kurallar değişince yeniden denetlenir.
 
 Kazanç taraması artık ekran kaydı istemiyor; ekran görüntülerinden çalışıyor.
 
@@ -25,6 +34,9 @@ Lütfen test et:
 4. Test ayarı kapalıyken gerçek bir platform kazanç ekranının görüntüsünü al ve tara (kişisel bilgileri karartıp paylaşabilirsen çok iyi olur).
 5. Fotoğraf iznini reddet: "Ayarlar'ı aç" görünüyor mu?
 6. Topluluk: Profil'de paylaşımı aç, kayıtlarının ilçesi Sincan ise ilçe seçicide Sincan çıkıyor mu, ısı haritası ve platformlar doluyor mu? Senin ₺/saatinle karşılaştırma mantıklı mı?
+7. Plan öner: 30 günlük test görüntülerini kaydettikten sonra Bugün > Plan öner. Planlar mantıklı mı? Çalışma profilinde platformları, saatleri ve Bağ-Kur'u değiştir; plan değişiyor mu?
+8. Yemeksepeti'ni aktif et: slot girmeden plana alınmamalı ("slot girmedin"). Profilde bir slot ekle: plan o saati içermeli.
+9. Platform kuralları ekranında kendi sözleşmene göre birkaç koşulu işaretle; "Kesin değil" uyarısı kalkıyor mu?
 
 ## 1.4.0
 
