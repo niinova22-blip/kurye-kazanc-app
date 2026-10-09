@@ -3,6 +3,28 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.4.0
+
+Yeni okuma motoru:
+- Uber "Kazançlar" ekranı (platform adı olmadan), TheKurye faturalar listesi, Yemeksepeti ve Banabikurye sipariş kartları okunur. Ekrandaki çalışma süresi de okunur; KDV hariç notu gösterilir.
+- Şablonlar hâlâ kalibrasyonda: gerçek ekran görüntüleri gelene kadar "Doğrulandı" çıkmaz.
+
+Yeni (Kazanç taraması):
+- Bugün > "Kazanç taraması" > Kurye Kazanç Tarama > Yayını Başlat. Platform uygulamasında kazanç panelini aç, birkaç saniye bekle, kapat. Yayını durdur, "Taramada bulunanlar"dan seç ve kaydet.
+- Görüntü saklanmaz. Sipariş kartları gün + platform bazında birleşir. Haftalık özetler varsayılan seçili değildir.
+
+Yeni (Kısayollar):
+- "Kurye Kazanç'a ekran görüntüsü gönder" eylemi; tarifi Profil'de.
+
+Lütfen test et:
+1. Masaüstündeki taklit ekranları (Kurye-Senaryo-Gorselleri) Fotoğraflar'da açıp tarama yap: her ekran bir kez mi listeleniyor?
+2. Tarama sürerken uygulamaya dön: sonuç ekranı açılmamalı; durdurunca açılmalı.
+3. Aynı gün iki Yemeksepeti sipariş kartı tek satır mı ("2 sipariş")?
+4. Bir kaydı kaydet, aynı ekranı tekrar tara: "Zaten kayıtlı" görünüyor mu?
+5. Kısayollar'da "Kurye Kazanç'a ekran görüntüsü gönder" eylemi görünüyor mu, otomasyonla çalışıyor mu?
+6. Pil: 5 dk taramada yüzde kaç düştü?
+7. Gerçek bir platform kazanç ekranın varsa kişisel bilgileri karartıp paylaş.
+
 ## 1.3.0
 
 1.2 hiç yayınlanmadı; onun yenilikleri de bu sürümde.

@@ -286,3 +286,14 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 - Kısayollar otomasyonu testi kullanıcı tarafından yapılamadı.
 - **Karar:** kazanç taraması uygulanabilir → üretim tasarımına geçilir (spec §5.4). Üretimde: tekrar kontrolü okunan değerlerle (şablon + tutar + tarih), durum çubuğu okumadan hariç, bir ekran ancak art arda 2 karede aynı okunursa kaydedilir; sipariş kartları gün bazında birleştirilir; onay ekranı. Kısayollar ikinci yol (basit hazır kısayol).
 - 8 şablonun hepsi yakalandı (getir, migros_hemen, thekurye, trendyol_go, uber, yemeksepeti.earnings, yemeksepeti.order, banabikurye). Her platformun 3 deneme ekranına karşı Uber/TheKurye/Banabikurye 2'şer yakalandı: bir ekran kaçmış olabilir (liste sonunda hızlı geçiş) — üretimde kısa kalan / onaylanmayan kareler ayrıca sayılacak.
+
+## Oturum 6 (devam 2) — 2026-10-09: Kazanç taraması (üretim) ve Kısayollar
+- Core: CaptureKey, StableCaptureFilter, ScanResultBuilder + sipariş kartı birleştirme (gün + platform).
+- Yayın eklentisi (üretim): ekranın üst %6'sı (durum çubuğu) okumadan hariç, iki kare doğrulama, değer tabanlı tekrar kontrolü, BroadcastCaptureStore, lastFrameAt.
+- ScanResultsViewModel / ScanResultsView: atlanan kalemler silinmez, canlı yayında sonuç ekranı açılmaz.
+- Bugün'de ScanButton + tanıtım.
+- SendScreenshotIntent + KuryeShortcuts (Kısayollar eylemi).
+- TestFlight artık GitHub Actions ile (ios-release.yml, sertifika GT35S8T4WB, profiller --create).
+- Bilinen sınır: aynı tutarlı iki farklı sipariş kartı tek sayılır (gerçek ekranla sipariş no eklenecek).
+- Sürüm 1.4.0.
+- Sonraki adım: develop→main PR → TestFlight 1.4.0 → cihaz testi.
