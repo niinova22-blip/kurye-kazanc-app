@@ -55,7 +55,10 @@ struct WorkProfileView: View {
                         HStack {
                             Text("Sunulan saatlik ücret").font(.subheadline)
                             Spacer()
-                            TextField("yok", value: $platform.offeredHourlyRate, format: .number)
+                            TextField("yok", value: Binding<Double>(
+                                get: { platform.offeredHourlyRate ?? 0 },
+                                set: { platform.offeredHourlyRate = $0 > 0 ? $0 : nil }
+                            ), format: .number)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(maxWidth: 100)
@@ -79,8 +82,9 @@ struct WorkProfileView: View {
                 get: { draft.region ?? "" },
                 set: { draft.region = $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
             ))
-            ForEach(Self.weekdays, id: \.0) { weekday, title in
-                DayAvailabilityRow(title: title, ranges: Binding(
+            ForEach(Self.weekdays.indices, id: \.self) { index in
+                let weekday: Int = Self.weekdays[index].0
+                DayAvailabilityRow(title: Self.weekdays[index].1, ranges: Binding(
                     get: { draft.availability[weekday] ?? [] },
                     set: { draft.availability[weekday] = $0 }
                 ))

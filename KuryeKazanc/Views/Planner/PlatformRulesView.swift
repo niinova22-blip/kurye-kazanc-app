@@ -9,7 +9,13 @@ struct PlatformRulesView: View {
         RuleDay.string(.now, calendar: .current)
     }
 
-    private var groups: [(String, [PlatformRule])] {
+    private struct Group: Identifiable {
+        let code: String
+        let rules: [PlatformRule]
+        var id: String { code }
+    }
+
+    private var groups: [Group] {
         let latest: [PlatformRule] = model.ruleSet.latest
         let codes: [String] = Array(Set(latest.map(\.platformCode))).sorted { a, b in
             if a == "*" { return false }
@@ -17,7 +23,8 @@ struct PlatformRulesView: View {
             return a < b
         }
         return codes.map { code in
-            (code, latest.filter { $0.platformCode == code }.sorted { $0.category.displayName < $1.category.displayName })
+            let rules: [PlatformRule] = latest.filter { $0.platformCode == code }
+            return Group(code: code, rules: rules.sorted { $0.category.displayName < $1.category.displayName })
         }
     }
 
@@ -28,9 +35,9 @@ struct PlatformRulesView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            ForEach(groups, id: \.0) { code, rules in
-                Section(code == "*" ? "Tüm platformlar" : model.name(code)) {
-                    ForEach(rules) { rule in
+            ForEach(groups) { group in
+                Section(group.code == "*" ? "Tüm platformlar" : model.name(group.code)) {
+                    ForEach(group.rules) { rule in
                         RuleRow(model: model, rule: rule, today: today)
                     }
                 }
