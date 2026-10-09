@@ -8,6 +8,11 @@ if (!match) { console.error('JSON bulunamadi'); process.exit(1); }
 const templates = JSON.parse(match[1]);
 const q = (s) => String(s).replace(/'/g, "''");
 for (const t of templates) {
+  // list / orderCard sablonlari 1.3 istemcisini bozar (layout tanimaz): yalnizca gomulu kalir
+  if (t.layout != null && t.layout !== 'summary') {
+    console.log(`atlandi: ${t.id} (layout ${t.layout})`);
+    continue;
+  }
   const body = q(JSON.stringify(t));
   await sql(`insert into public.ocr_templates (id, platform_code, version, status, body)
     values ('${q(t.id)}', '${q(t.platformCode)}', ${Number(t.version)}, '${q(t.status)}', '${body}'::jsonb)

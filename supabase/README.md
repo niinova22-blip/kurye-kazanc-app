@@ -30,5 +30,6 @@ node scripts/server/e2e.mjs             # anon anahtarla uctan uca kontrol
 - `e2e.mjs` her calistirmada bir anonim auth kullanicisi birakir (silinmez).
 - `test.mjs` bitince `tests` semasini siler.
 - Gizli degerler (erisim anahtari, anon anahtar, service role) yalnizca ortam degiskeninde tutulur.
-- Yeni ekran tipli sablonlar (`layout: list/orderCard`, 1.4a) yalnizca 1.4a uygulamasi TestFlight'a cikinca
-  `seed_templates.mjs` ile yazilir: 1.3 uygulamasi `layout`'u tanimaz ve bu sablonlari ozet ekran gibi okur.
+- Ekran tipli sablonlar (`layout: list/orderCard`, 1.4a) 1.3 istemcisini bozar (`layout`'u tanimaz, ozet ekran gibi okur):
+  `seed_templates.mjs` bunlari atlar ("atlandi: ..." yazar); 1.3 emekli olana kadar yalnizca uygulamaya gomulu kalirlar.
+  `layout`'u olmayan / `summary` olan sablonlar (or. yemeksepeti.earnings v2) sunucuya yazilabilir.
