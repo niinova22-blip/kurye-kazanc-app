@@ -77,7 +77,7 @@ final class EarningFormViewModel {
         imported?.parsed.amountsExcludeVAT == true ? "Bu ekrandaki tutarlar KDV hariç gösteriliyor." : nil
     }
 
-    static let duplicateScreenshotIssue ="Bu ekran görüntüsü daha önce kaydedilmiş."
+    static let duplicateScreenshotIssue = "Bu ekran görüntüsü daha önce kaydedilmiş."
 
     var assessmentIssues: [String] {
         var issues: [String] = imported?.assessment.issues ?? []
