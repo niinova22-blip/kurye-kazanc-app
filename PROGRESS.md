@@ -245,3 +245,28 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 
 ### Sonraki adım
 1. develop → main PR (UI testleri burada çalışır) → birleştirme → `ios-release` → TestFlight 1.3.0 — kullanıcıya sorarak.
+
+## Oturum 6 (devam) — 2026-10-09: 1.4a okuma motoru ve senaryo testleri
+
+### Yapılanlar
+- **Okuma motoru:** şablona `layout` (summary/list/orderCard), `durationLabels`, `rowLabels`, `amountsExcludeVAT` alanları eklendi (geriye uyumlu; bilinmeyen layout = summary).
+  - Şablon seçimi: platform adı; yoksa en az 3 parmak izi.
+  - Tarih aralığı = haftalık ekran.
+  - Liste ekranı: satır toplamı (iş numaraları atlanır).
+  - Sipariş kartı: period `.order`, vardiya sayılmaz, sunucuya gönderilmez.
+  - Çalışma süresi okuma: formda vardiya saatini doldurur; haftalık ve >16 sa yok sayılır.
+  - KDV notu.
+- **Yeni şablonlar (hepsi calibrating):** uber.earnings, thekurye.invoices, yemeksepeti.order, banabikurye.order; yemeksepeti.earnings v2 (KDV hariç). Kaynak: App Store mağaza görselleri (gerçek ekran yok).
+- **Senaryo testleri:** 144 satır senaryosu (Windows `swift test`, hepsi geçiyor). Görüntü katmanı CI'da 72 örneklenmiş taklit ekran (SwiftUI + Vision); GitHub Actions özetinde platform × alan tablosu; taban `KuryeKazancTests/Fixtures/scenario-baseline.json` (5 puandan fazla düşüş CI'ı kırmızı yapar).
+  - Ölçülen: tüm hücreler %100, yalnızca yemeksepeti/total %94,4.
+  - Birim test adımı ~81 sn → ~163 sn.
+- Core testleri: 135. CI yeşil.
+- **Yan iş:** TestFlight 1.3.0 Codemagic #3 bir UI testinde düştü. Kök neden: UI testlerinin `-dataSharingOptIn NO` başlatma argümanı (UserDefaults argüman katmanı uygulamanın yazdığı değeri gölgeliyordu). PR #4 ile `-reset-defaults`'a geçildi ve main'e birleşti; Codemagic #4 yeniden denendi.
+
+### Açık konular
+- Gerçek kurye ekran görüntüleri (`Fixtures/RealScreens`) yok.
+- Sunucu şablon tohumlama 1.4a TestFlight'ında yapılacak (`supabase/README.md` notu).
+- yemeksepeti/total %94,4.
+
+### Sonraki adım
+- Kazanç taraması denemesi (plan Görev 10–12), her adımda kullanıcıya sorarak.
