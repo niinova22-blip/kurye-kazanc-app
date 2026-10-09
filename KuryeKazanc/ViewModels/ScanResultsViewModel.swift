@@ -42,6 +42,11 @@ final class ScanResultsViewModel {
     @ObservationIgnored private let store: BroadcastCaptureStore?
     @ObservationIgnored private let photoResults: [PhotoScanResult]?
     @ObservationIgnored private let region: PlaceRegion?
+    /// Fotograf kaynaginda bu oturumda kaydedilen kalemler: yeniden yuklemede geri gelmez.
+    @ObservationIgnored private var savedItemIDs: Set<String> = []
+    /// Kaydedilen kalemlerin ardindaki TUM fotograflarin PhotoKit kimlikleri (siparis grubunun her uyesi dahil);
+    /// sonraki taramada "bilinen" olarak verilir.
+    private(set) var savedAssetIdentifiers: Set<String> = []
     @ObservationIgnored private var itemPhotos: [String: [PhotoScanResult]] = [:]
     @ObservationIgnored private let importer: ScreenshotImporter
     @ObservationIgnored private let knownTextHashes: Set<String>
@@ -133,6 +138,10 @@ final class ScanResultsViewModel {
     private func loadPhotos(_ results: [PhotoScanResult]) {
         let builder = ScanResultBuilder(calendar: calendar)
         var grouped: [String: [PhotoScanResult]] = [:]
+        let results = results.filter { result in
+            guard let id = builder.itemID(for: result.input) else { return true }
+            return !savedItemIDs.contains(id)
+        }
         for result in results {
             if let id = builder.itemID(for: result.input) { grouped[id, default: []].append(result) }
         }
@@ -194,6 +203,12 @@ final class ScanResultsViewModel {
                 let record = try form.save(in: context)
                 saved.append(record)
                 if Self.isSendable(item) { sendableRecordIDs.insert(record.id) }
+                if photoResults != nil {
+                    savedItemIDs.insert(item.id)
+                    for photo in itemPhotos[item.id] ?? [] {
+                        if let id = photo.imported.assetIdentifier { savedAssetIdentifiers.insert(id) }
+                    }
+                }
                 removeFiles(for: item.id)
             } catch {
                 failedCount += 1

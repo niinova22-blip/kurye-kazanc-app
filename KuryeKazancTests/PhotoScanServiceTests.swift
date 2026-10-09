@@ -79,6 +79,25 @@ final class PhotoScanServiceTests: XCTestCase {
         XCTAssertEqual(service.progress.total, 1)
     }
 
+    func testKnownIdentifiersFilteredBeforeLimitAndTruncationFlagged() async {
+        var items = (0..<70).map { item("k\($0)", width: 200) }
+        items += (0..<70).map { item("n\($0)", width: 200) }
+        let service = makeService(FakeLibrary(items: items))
+        let known = Set((0..<70).map { "k\($0)" })
+        _ = await service.scan(since: .distantPast, includeAllPhotos: false, knownIdentifiers: known, knownTextHashes: [])
+        XCTAssertEqual(service.progress.total, PhotoScanService.maxImages)
+        XCTAssertTrue(service.didTruncate)
+    }
+
+    func testRejectedImagesAreNotReprocessedInSession() async {
+        let service = makeService(FakeLibrary(items: [item("b", width: 50)]))
+        _ = await service.scan(since: .distantPast, includeAllPhotos: false, knownIdentifiers: [], knownTextHashes: [])
+        XCTAssertEqual(service.rejectedIdentifiers, ["b"])
+        _ = await service.scan(since: .distantPast, includeAllPhotos: false, knownIdentifiers: [], knownTextHashes: [])
+        XCTAssertEqual(service.progress.total, 0)
+        XCTAssertFalse(service.didTruncate)
+    }
+
     func testAllPhotosModeUsesImageQuery() async {
         let spy = Spy()
         let service = makeService(FakeLibrary(items: [item("a", width: 200)], spy: spy))

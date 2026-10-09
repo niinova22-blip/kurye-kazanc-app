@@ -270,4 +270,41 @@ final class ScanResultsViewModelTests: XCTestCase {
         XCTAssertEqual(record.evidence?.assetIdentifier, "asset-1")
         XCTAssertTrue(vm.rows.isEmpty)
     }
+
+    func testPhotoOrderGroupExposesAllAssetIdentifiersAndNoDuplicatesOnReload() throws {
+        let vm = ScanResultsViewModel(
+            photoResults: [photoResult(orderCardA, assetID: "card-1"), photoResult(orderCardB, assetID: "card-2")],
+            knownTextHashes: [], calendar: calendar, now: now
+        )
+        vm.load()
+        XCTAssertEqual(vm.rows.count, 1)
+        let saved = try vm.save(in: context, platforms: platforms())
+        XCTAssertEqual(saved.count, 1)
+        XCTAssertEqual(vm.savedAssetIdentifiers, ["card-1", "card-2"])
+        XCTAssertEqual(saved.first?.evidence?.assetIdentifier, "card-1")
+    }
+
+    func testPartialSaveDoesNotResurrectSavedPhotoRows() throws {
+        // Ikinci kalem (haftalik) secilemez; ilk kalem kaydedilir. Yeniden yukleme kaydedileni geri getirmez.
+        let vm = ScanResultsViewModel(
+            photoResults: [photoResult(getirDaily, assetID: "a"), photoResult(uberWeekly, assetID: "w")],
+            knownTextHashes: [], calendar: calendar, now: now
+        )
+        vm.load()
+        XCTAssertEqual(vm.selectedCount, 1)
+        _ = try vm.save(in: context, platforms: platforms())
+        vm.load()
+        XCTAssertFalse(vm.rows.contains { $0.item.kind == .daily })
+        XCTAssertEqual(vm.savedAssetIdentifiers, ["a"])
+    }
+
+    func testPhotoDailyDurationSetsStartFromCapturedEnd() throws {
+        var result = photoResult(getirDaily, assetID: "d")
+        result.input.parsed.workDuration = 3 * 3600
+        let vm = ScanResultsViewModel(photoResults: [result], knownTextHashes: [], calendar: calendar, now: now)
+        vm.load()
+        let record = try XCTUnwrap(try vm.save(in: context, platforms: platforms()).first)
+        XCTAssertEqual(record.endTime, now)
+        XCTAssertEqual(record.startTime, now.addingTimeInterval(-3 * 3600))
+    }
 }
