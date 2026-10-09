@@ -15,8 +15,10 @@ final class DashboardUITests: XCTestCase {
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
             "-hasCompletedOnboarding", "YES", "-autoEstimateExpenses", "YES",
-            // Paylasim tercihleri testler arasinda tasinmasin
-            "-dataSharingOptIn", "NO", "-locationSharingOptIn", "NO", "-calibrationOptIn", "NO",
+            // Paylasim tercihleri testler arasinda tasinmasin. "-anahtar NO" argumani KULLANILMAZ: argumanla
+            // verilen deger UserDefaults'ta en ust katmandir; uygulamanin yazdigi "acik" degeri okunamaz olur
+            // (paylasim onayindan sonra anahtar ara sira kapali kaliyordu). Bunun yerine kayitli tercihler silinir.
+            "-reset-defaults",
         ]
         if sampleData { app.launchArguments.append("-sample-data") }
         app.launch()
@@ -185,8 +187,15 @@ final class DashboardUITests: XCTestCase {
 
         let location = app.switches["profile.locationSharing"]
         XCTAssertTrue(location.waitForExistence(timeout: 5))
-        XCTAssertEqual(toggle.value as? String, "1")
-        XCTAssertEqual(location.value as? String, "1", "Konum yogunlugu kazanc paylasimiyla birlikte acik gelir")
+        // Onay sayfasi kapanirken anahtar degeri bir an gecikebiliyor (Codemagic'te 0 okundu): degeri bekle
+        XCTAssertTrue(waitForValue("1", of: toggle), "Kazanc paylasimi acilmadi")
+        XCTAssertTrue(waitForValue("1", of: location), "Konum yogunlugu kazanc paylasimiyla birlikte acik gelir")
+    }
+
+    private func waitForValue(_ value: String, of element: XCUIElement, timeout: TimeInterval = 5) -> Bool {
+        let predicate = NSPredicate(format: "value == %@", value)
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 
     func testLocationSharingRequiresEarningsSharingAndOwnConsent() {
