@@ -22,6 +22,11 @@ struct ParsedEarning: Equatable {
     var fingerprintMatches: Int = 0
     /// Ekran gunluk mu haftalik mi?
     var period: OCRTemplate.Period = .unknown
+    /// Ekrandaki calisma suresi (or. "Cevrimici 23 sa 32 dk"); okunamazsa nil. Kontrol alani degildir.
+    var workDuration: TimeInterval? = nil
+    var layout: OCRTemplate.Layout = .summary
+    /// Sablona gore ekrandaki tutarlar KDV haric (bilgi).
+    var amountsExcludeVAT: Bool = false
 
     /// Bizim modelimizdeki brut (bonus haric) kazanc.
     var grossEarning: Double {
@@ -56,26 +61,52 @@ struct EarningsScreenshotParser {
         }
         let fullText = normalized.joined(separator: " ")
 
-        // 2) Toplam kazanc
-        let excludedForTotal = template.bonusLabels + template.packageLabels
-        var total = findAmount(labels: template.totalLabels, excluding: excludedForTotal, in: normalized)
-        if total == nil {
-            total = largestAmount(in: normalized)
-            review.insert(.totalEarning)
-        }
-
-        // 3) Bonus
-        var bonus = findAmount(labels: template.bonusLabels, excluding: [], in: normalized)
-        if bonus == nil {
+        // 2-4) Toplam, bonus, adet: ekran tipine gore
+        var total: Double?
+        var bonus: Double
+        var packages: Int
+        switch template.layout {
+        case .summary:
+            let excludedForTotal = template.bonusLabels + template.packageLabels
+            total = findAmount(labels: template.totalLabels, excluding: excludedForTotal, in: normalized)
+            if total == nil {
+                total = largestAmount(in: normalized)
+                review.insert(.totalEarning)
+            }
+            if let found = findAmount(labels: template.bonusLabels, excluding: [], in: normalized) {
+                bonus = found
+            } else {
+                bonus = 0
+                review.insert(.bonus)
+            }
+            if let found = findCount(labels: template.packageLabels, in: normalized) {
+                packages = found
+            } else {
+                packages = 0
+                review.insert(.packageCount)
+            }
+        case .list:
+            let rows = listRowAmounts(labels: template.rowLabels, in: normalized)
             bonus = 0
-            review.insert(.bonus)
-        }
-
-        // 4) Paket / siparis sayisi
-        var packages = findCount(labels: template.packageLabels, in: normalized)
-        if packages == nil {
-            packages = 0
-            review.insert(.packageCount)
+            if rows.isEmpty {
+                total = findAmount(labels: template.totalLabels, excluding: [], in: normalized) ?? largestAmount(in: normalized)
+                packages = 0
+                review.formUnion([.totalEarning, .packageCount])
+            } else {
+                let sum = rows.reduce(0, +)
+                total = sum
+                packages = rows.count
+                if let shown = findAmount(labels: template.totalLabels, excluding: template.rowLabels, in: normalized),
+                   abs(shown - sum) > max(shown, 1) * 0.01 {
+                    review.insert(.totalEarning)
+                }
+            }
+        case .orderCard:
+            total = findAmount(labels: template.totalLabels, excluding: template.bonusLabels, in: normalized)
+                ?? largestCurrencyAmount(in: normalized)
+            if total == nil { review.insert(.totalEarning) }
+            bonus = firstAmountInLine(containing: template.bonusLabels, in: normalized) ?? 0
+            packages = 1
         }
 
         // 5) Tarih
@@ -92,16 +123,19 @@ struct EarningsScreenshotParser {
         return ParsedEarning(
             platformCode: template.platformCode.isEmpty ? nil : template.platformCode,
             date: date!,
-            packageCount: packages!,
+            packageCount: packages,
             totalEarning: total ?? 0,
-            bonus: bonus!,
+            bonus: bonus,
             totalIncludesBonus: template.totalIncludesBonus,
             fieldsToReview: review,
             templateID: detected?.id,
             templateVersion: detected?.version,
             templateStatus: detected?.status,
             fingerprintMatches: detected?.fingerprintMatches(in: fullText) ?? 0,
-            period: template.period(in: fullText)
+            period: template.layout == .orderCard ? .order : template.period(in: fullText),
+            workDuration: findDuration(labels: template.durationLabels, in: normalized),
+            layout: template.layout,
+            amountsExcludeVAT: template.amountsExcludeVAT
         )
     }
 
@@ -169,6 +203,66 @@ struct EarningsScreenshotParser {
         let withCurrency = lines.filter(TextPatterns.hasCurrencyMarker).flatMap(TextPatterns.allAmounts)
         if let max = withCurrency.max() { return max }
         return lines.flatMap(TextPatterns.allAmounts).filter { $0 >= 10 }.max()
+    }
+
+    /// Para birimi isaretli tutarlarin en buyugu (siparis karti: km/dk/yuzde sayilmaz).
+    func largestCurrencyAmount(in lines: [String]) -> Double? {
+        lines.filter(TextPatterns.hasCurrencyMarker).flatMap(TextPatterns.allAmounts).max()
+    }
+
+    func firstAmountInLine(containing labels: [String], in lines: [String]) -> Double? {
+        for label in labels {
+            if let line = lines.first(where: { TextPatterns.containsWord(label, in: $0) }),
+               let value = TextPatterns.firstAmount(in: line) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    /// Liste ekrani: her etiket satirinin para birimli tutari (Review Focus 2: is numaralari tutar degildir).
+    func listRowAmounts(labels: [String], in lines: [String]) -> [Double] {
+        let cleaned = lines.map(TextPatterns.strippingReferenceNumbers)
+        var amounts: [Double] = []
+        for (index, line) in cleaned.enumerated() {
+            guard let label = labels.first(where: { line.contains($0) }), let range = line.range(of: label) else { continue }
+            let rest = String(line[range.upperBound...])
+            if TextPatterns.hasCurrencyMarker(rest), let value = TextPatterns.firstAmount(in: rest) {
+                amounts.append(value)
+                continue
+            }
+            for offset in [1, 2, -1] {
+                let neighbor = index + offset
+                guard cleaned.indices.contains(neighbor) else { continue }
+                let candidate = cleaned[neighbor]
+                if labels.contains(where: { candidate.contains($0) }) { break }
+                guard TextPatterns.hasCurrencyMarker(candidate),
+                      !TextPatterns.containsLetters(candidate, minimum: 4),
+                      let value = TextPatterns.firstAmount(in: candidate) else { continue }
+                amounts.append(value)
+                break
+            }
+        }
+        return amounts
+    }
+
+    // MARK: - Sure
+
+    func findDuration(labels: [String], in lines: [String]) -> TimeInterval? {
+        for label in labels {
+            for (index, line) in lines.enumerated() where TextPatterns.containsWord(label, in: line) {
+                if let range = line.range(of: label),
+                   let value = TextPatterns.duration(in: String(line[range.upperBound...])) {
+                    return value
+                }
+                for offset in [1, -1, 2] {
+                    let neighbor = index + offset
+                    guard lines.indices.contains(neighbor) else { continue }
+                    if let value = TextPatterns.duration(in: lines[neighbor]) { return value }
+                }
+            }
+        }
+        return nil
     }
 
     // MARK: - Adet
