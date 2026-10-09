@@ -71,18 +71,16 @@ jobs:
             -derivedDataPath build/DerivedData \
             -only-testing:KuryeKazancTests \
             -resultBundlePath build/results/UnitTests.xcresult \
-            | tee build/unit-raw.log | xcbeautify --renderer github-actions
+            | xcbeautify --renderer github-actions
 
       - name: Senaryo raporu
         if: always()
         run: |
           if [ -f build/scenario-report.md ]; then
-            cat build/scenario-report.md >> "$GITHUB_STEP_SUMMARY"
+            tee -a "$GITHUB_STEP_SUMMARY" < build/scenario-report.md
           else
-            echo "scenario-report.md yok; ham gunlukten ozet aranıyor"
-            sed -n '/SCENARIO_REPORT_BEGIN/,/SCENARIO_REPORT_END/p' build/unit-raw.log | sed '1d;$d' >> "$GITHUB_STEP_SUMMARY" || true
+            echo "scenario-report.md olusmadi"
           fi
-          sed -n '/SCENARIO_BASELINE_BEGIN/,/SCENARIO_BASELINE_END/p' build/unit-raw.log || true
 
       - name: UI testleri (XCUITest, simulator)
         if: github.event_name == 'pull_request' || inputs.run_ui_tests
