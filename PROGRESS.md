@@ -285,4 +285,4 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 - 38 yakalama / 24 tanınmayan / 24 tekrar. 24 farklı deneme ekranına karşı 38 yakalama: metin özetiyle tekrar kontrolü yetmiyor (durum çubuğundaki saat, kaydırma sırasındaki yarım kareler metni değiştiriyor).
 - Kısayollar otomasyonu testi kullanıcı tarafından yapılamadı.
 - **Karar:** kazanç taraması uygulanabilir → üretim tasarımına geçilir (spec §5.4). Üretimde: tekrar kontrolü okunan değerlerle (şablon + tutar + tarih), durum çubuğu okumadan hariç, bir ekran ancak art arda 2 karede aynı okunursa kaydedilir; sipariş kartları gün bazında birleştirilir; onay ekranı. Kısayollar ikinci yol (basit hazır kısayol).
-- Açık: 8 şablonun hepsinin yakalandığı henüz doğrulanmadı (günlüğün kalanı bekleniyor).
+- 8 şablonun hepsi yakalandı (getir, migros_hemen, thekurye, trendyol_go, uber, yemeksepeti.earnings, yemeksepeti.order, banabikurye). Her platformun 3 deneme ekranına karşı Uber/TheKurye/Banabikurye 2'şer yakalandı: bir ekran kaçmış olabilir (liste sonunda hızlı geçiş) — üretimde kısa kalan / onaylanmayan kareler ayrıca sayılacak.
