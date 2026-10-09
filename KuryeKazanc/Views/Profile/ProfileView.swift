@@ -231,6 +231,14 @@ struct ProfileView: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("profile.scanInfo")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Kısayollar ile")
+                Text("Kısayollar > Otomasyon > + > Uygulama > (platform uygulaması) > Açıldığında > Hemen Çalıştır > eylemler: Bekle (3 sn) → Ekran Görüntüsü Al → Kurye Kazanç'a ekran görüntüsü gönder.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("profile.shortcutsRecipe")
         } header: {
             Text("Ekran görüntüleri")
         } footer: {
