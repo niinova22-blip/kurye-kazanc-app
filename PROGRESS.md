@@ -340,3 +340,4 @@ node --env-file=.env.supabase scripts/server/check_sources.mjs --dry-run
 - PR #7 (develop → main) birleşti; Codemagic `ios-release` #6 (67b829c) başarılı: derleme, birim + UI testleri yeşil, **1.5.0 (6) App Store Connect'e yüklendi** (TestFlight işleme sonrası "İç Test").
 - Develop'taki ara CI derlemeleri (#23–#32) `cancel_previous_builds` nedeniyle iptal; doğrulama main yayın derlemesinde yapıldı.
 - Sıradaki: cihazda 1.5.0 testi (fotoğraf taraması, Topluluk, Plan öner); canlı veritabanına `platform_rules` göçü + tohum (yukarıdaki komutlar) uygulanmadıysa uygulanmalı — uygulanmazsa uygulama gömülü kurallarla çalışır.
+- Canlı veritabanı (2026-10-10): göçler zaten uygulanmış (4/4 atlandı), pgTAP 22/22 geçti, `seed_platform_rules.mjs` 44 kural yazdı (KVKK v2 dahil).
