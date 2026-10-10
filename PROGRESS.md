@@ -335,3 +335,8 @@ node scripts/server/check_sources.mjs --dry-run
 - Uygulama kodu (fotoğraf taraması + Topluluk + planlayıcı) henüz derlenmedi: tek push → Codemagic.
 - Sözleşme/slot/hakediş/askı/itiraz/çoklu platform belgelerinin çoğu kamuya açık değil; kurye belgeleri gelince kurallar güncellenmeli.
 - Kural kaynakları ayda bir `check_sources.mjs` ile kontrol edilmeli (90 günü geçen kural "güncelliği bilinmiyor" olur).
+
+### 1.5.0 yayın durumu (2026-10-10)
+- PR #7 (develop → main) birleşti; Codemagic `ios-release` #6 (67b829c) başarılı: derleme, birim + UI testleri yeşil, **1.5.0 (6) App Store Connect'e yüklendi** (TestFlight işleme sonrası "İç Test").
+- Develop'taki ara CI derlemeleri (#23–#32) `cancel_previous_builds` nedeniyle iptal; doğrulama main yayın derlemesinde yapıldı.
+- Sıradaki: cihazda 1.5.0 testi (fotoğraf taraması, Topluluk, Plan öner); canlı veritabanına `platform_rules` göçü + tohum (yukarıdaki komutlar) uygulanmadıysa uygulanmalı — uygulanmazsa uygulama gömülü kurallarla çalışır.
