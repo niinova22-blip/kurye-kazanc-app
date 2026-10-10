@@ -325,10 +325,10 @@ Tasarım: `docs/superpowers/specs/2026-10-09-surum-1-3-sunucu-design.md` · Plan
 
 ### Kullanıcının çalıştıracakları (canlı veritabanı)
 ```
-node scripts/server/apply.mjs
-node scripts/server/test.mjs
-node scripts/server/seed_platform_rules.mjs
-node scripts/server/check_sources.mjs --dry-run
+node --env-file=.env.supabase scripts/server/apply.mjs
+node --env-file=.env.supabase scripts/server/test.mjs
+node --env-file=.env.supabase scripts/server/seed_platform_rules.mjs
+node --env-file=.env.supabase scripts/server/check_sources.mjs --dry-run
 ```
 
 ### Açık konular
