@@ -40,10 +40,11 @@ final class PayrollUITests: XCTestCase {
         XCTAssertTrue(estimate.label.contains("4.512"), "gelen: \(estimate.label)")
 
         let save = app.buttons["quick.save"]
-        for _ in 0..<5 where !save.isHittable { app.swipeUp() }
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
         save.tap()
-        XCTAssertTrue(app.buttons["payroll.logRow"].waitForExistence(timeout: 5) || app.otherElements["payroll.logRow"].exists
-                      || app.staticTexts["dashboard.monthGross"].exists)
-        XCTAssertTrue(app.staticTexts["dashboard.monthGross"].label.contains("4.512"))
+        // Kayit sonrasi Hakedis ekranina donulur, pano bu ayin brutunu gosterir
+        let monthGross = app.staticTexts["dashboard.monthGross"]
+        XCTAssertTrue(monthGross.waitForExistence(timeout: 5))
+        XCTAssertTrue(monthGross.label.contains("4.512"), "gelen: \(monthGross.label)")
     }
 }
