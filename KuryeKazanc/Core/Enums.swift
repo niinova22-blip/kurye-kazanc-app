@@ -44,6 +44,10 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
     case fuel
     case maintenance
     case tire
+    // 1.6: hakedis raporlari icin ek kategoriler (ham deger olarak saklanir, goc gerekmez)
+    case insurance
+    case phone
+    case equipment
     case depreciation
     case other
 
@@ -51,9 +55,12 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .fuel: "Yakıt"
-        case .maintenance: "Bakım"
+        case .fuel: "Yakıt / elektrik"
+        case .maintenance: "Bakım-onarım"
         case .tire: "Lastik"
+        case .insurance: "Sigorta"
+        case .phone: "Telefon-internet"
+        case .equipment: "Ekipman"
         case .depreciation: "Amortisman"
         case .other: "Diğer"
         }

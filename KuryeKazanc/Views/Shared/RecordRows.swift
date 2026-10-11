@@ -131,6 +131,9 @@ extension ExpenseType {
         case .fuel: "fuelpump"
         case .maintenance: "wrench.and.screwdriver"
         case .tire: "circle.circle"
+        case .insurance: "shield"
+        case .phone: "iphone"
+        case .equipment: "backpack"
         case .depreciation: "chart.line.downtrend.xyaxis"
         case .other: "ellipsis.circle"
         }

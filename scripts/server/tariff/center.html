@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarife Merkezi</title>
+<style>
+  :root { --bg:#f5f6f7; --card:#fff; --text:#16181b; --muted:#5f6670; --line:#e1e4e8; --accent:#1f7a4d; --warn:#a15c00; --bad:#b42318; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111315; --card:#1b1e21; --text:#eceef0; --muted:#9aa1a9; --line:#2c3035; --accent:#4cc38a; --warn:#f0a43a; --bad:#ff6b5e; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); background:var(--card); position:sticky; top:0; z-index:1; }
+  h1 { font-size:18px; margin:0; } h2 { font-size:16px; margin:24px 0 8px; } h3 { font-size:15px; margin:0 0 6px; }
+  main { padding:16px; max-width:1100px; margin:0 auto; }
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:999px; border:1px solid var(--line); font-size:12px; margin:2px 4px 2px 0; }
+  .ok { color:var(--accent); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+  button, select, input, textarea { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
+  button { cursor:pointer; } button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button.danger { color:var(--bad); }
+  table { width:100%; border-collapse:collapse; font-size:13px; } th, td { text-align:left; padding:6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .scroll { overflow-x:auto; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
+  #detail { display:none; } #error { display:none; background:var(--bad); color:#fff; padding:10px 14px; border-radius:8px; margin-bottom:12px; }
+  label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:2px; }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Tarife Merkezi</h1><div class="muted">Yönetici: __ACTOR__ · tüm onaylar denetim kaydına yazılır</div></div>
+  <div class="row"><button id="checkAll">Tüm kaynakları kontrol et</button><button id="refresh">Yenile</button></div>
+</header>
+<main>
+  <div id="error"></div>
+  <section><h2>Platformlar</h2><div id="platforms" class="grid"></div></section>
+
+  <section>
+    <h2>Tarife adayları</h2>
+    <div class="row">
+      <select id="fPlatform"><option value="">Tüm platformlar</option></select>
+      <select id="fStatus">
+        <option value="">Tüm durumlar</option><option value="pending_verification">Doğrulama bekliyor</option>
+        <option value="needs_more_sources">Ek kaynak gerekli</option><option value="approved">Onaylandı</option>
+        <option value="published">Yayında</option><option value="rejected">Reddedildi</option>
+        <option value="withdrawn">Geri çekildi</option><option value="expired">Süresi doldu</option>
+      </select>
+    </div>
+    <div class="card scroll"><table id="candidates"></table></div>
+  </section>
+
+  <section id="detail" class="card" style="margin-top:12px"></section>
+
+  <section>
+    <h2>Elle aday ekle (form / belge / ekran görüntüsü)</h2>
+    <div class="card">
+      <div class="row">
+        <label>Platform<select id="mPlatform"></select></label>
+        <label>Sürüm<select id="mVersion"></select></label>
+        <label>Kalem<select id="mItem"></select></label>
+        <label>Yeni tutar (TL)<input id="mAmount" inputmode="decimal" placeholder="40,00"></label>
+        <label>Yürürlük<input id="mDate" type="date"></label>
+      </div>
+      <div class="row">
+        <label style="flex:1">Kaynak (URL ya da belge adı — zorunlu)<input id="mSource" placeholder="https://… ya da sozlesme-ek-2026-10.pdf"></label>
+        <label>Kaynak türü<select id="mType">
+          <option value="user_upload">Kullanıcı yüklemesi</option><option value="official_announcement">Resmî duyuru</option>
+          <option value="official_document">Resmî belge</option><option value="news">Sektör haberi</option>
+          <option value="courier_reports">Kurye bildirimleri</option></select></label>
+        <label>OCR güveni (0–1, varsa)<input id="mOcr" inputmode="decimal" placeholder="1"></label>
+      </div>
+      <div class="row"><input id="mNote" style="flex:1" placeholder="Not"><button class="primary" id="mSave">Aday oluştur</button></div>
+      <div class="muted">Elle eklenen aday her zaman insan onayına düşer; onaylanmadan hesaplamaya girmez.</div>
+    </div>
+  </section>
+
+  <section><h2>Sürüm geçmişi</h2><div class="row"><select id="vPlatform"></select></div><div id="versions"></div></section>
+  <section><h2>Kaynak kontrolleri</h2><div class="card scroll"><table id="checks"></table></div></section>
+  <section><h2>Denetim kaydı</h2><div class="card scroll"><table id="audit"></table></div></section>
+</main>
+<script>
+const currentToken = () => location.hash.slice(1);
+const PLATFORMS = { trendyol_go: 'Trendyol GO', getir: 'Getir', yemeksepeti: 'Yemeksepeti Express', migros_hemen: 'Paket Taxi / Migros Hemen' };
+const STATUS = { draft: 'Taslak', pending_verification: 'Doğrulama bekliyor', needs_more_sources: 'Ek kaynak gerekli', approved: 'Onaylandı',
+  published: 'Yayında', rejected: 'Reddedildi', expired: 'Süresi doldu', withdrawn: 'Geri çekildi' };
+const RESULT = { changed: 'Bilinen değişiklik', unchanged: 'Değişiklik yok', unreachable: 'Erişilemedi', unreadable: 'Okunamadı',
+  needs_verification: 'Doğrulama gerekli', new_candidate: 'Yeni aday' };
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const day = (v) => (v ? String(v).slice(0, 10) : '—');
+const when = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '—');
+const tl = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const $ = (id) => document.getElementById(id);
+let versionsCache = [];
+
+async function api(path, body) {
+  const res = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'X-Admin-Token': currentToken(), 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.status);
+  return data;
+}
+
+function showError(err) { const box = $('error'); box.textContent = String(err.message || err); box.style.display = 'block'; setTimeout(() => (box.style.display = 'none'), 8000); }
+
+async function loadOverview() {
+  const list = await api('/api/overview');
+  $('platforms').innerHTML = list.map((p) => {
+    const versions = p.versions.map((v) => `<div><span class="tag">v${v.version_number}.${v.revision}${v.vehicle_type ? ' · ' + esc(v.vehicle_type) : ''}</span>
+      <span class="${v.verification_status === 'verified' ? 'ok' : 'warn'}">${v.verification_status === 'verified' ? 'Doğrulanmış' : 'Doğrulanmamış'}</span></div>`).join('') || '<div class="bad">Yayında sürüm yok</div>';
+    const pending = p.pending.map((x) => `<span class="tag">${esc(STATUS[x.status])}: ${x.n}</span>`).join('') || '<span class="muted">Bekleyen aday yok</span>';
+    const sources = p.sources.map((s) => `<div class="muted">${esc(s.source_id)} · <span class="${s.last_result === 'unreachable' || s.last_result === 'unreadable' ? 'bad' : ''}">${esc(RESULT[s.last_result] || 'Henüz kontrol edilmedi')}</span></div>`).join('');
+    const upcoming = p.upcoming.map((u) => `<span class="tag">${day(u.effective_from)} · ${esc(STATUS[u.status])}</span>`).join('') || '<span class="muted">—</span>';
+    return `<div class="card"><h3>${esc(PLATFORMS[p.platform_id] || p.platform_name)}</h3>${versions}
+      <div class="muted">Son başarılı kontrol: ${when(p.last_successful_check_at)}<br>Sonraki kontrol: ${when(p.next_scheduled_check_at)}<br>Son güncelleme: ${when(p.last_update)}</div>
+      <div style="margin:6px 0">${pending}</div>${sources}<div class="muted" style="margin-top:6px">Yaklaşan yürürlük: ${upcoming}</div>
+      <div class="row"><button data-check="${esc(p.platform_id)}">Kontrol et</button></div></div>`;
+  }).join('');
+  document.querySelectorAll('[data-check]').forEach((b) => (b.onclick = () => runCheck({ platform: b.dataset.check })));
+}
+
+async function loadCandidates() {
+  const params = new URLSearchParams({ platform: $('fPlatform').value, status: $('fStatus').value });
+  const list = await api('/api/candidates?' + params);
+  $('candidates').innerHTML = '<tr><th>Platform</th><th>Durum</th><th>Yürürlük</th><th>Gerekçe</th><th>Oluşturma</th><th></th></tr>' +
+    list.map((c) => `<tr><td>${esc(PLATFORMS[c.platform_id])}</td><td>${esc(STATUS[c.status])}</td>
+      <td>${day(c.effective_from)}${c.effective_date_certain ? '' : ' <span class="warn">(belirsiz)</span>'}</td>
+      <td>${(c.reasons || []).map((r) => `<span class="tag warn">${esc(r)}</span>`).join('')}</td><td>${when(c.created_at)}</td>
+      <td><button data-open="${esc(c.candidate_id)}">Aç</button></td></tr>`).join('');
+  document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => openCandidate(b.dataset.open)));
+}
+
+async function openCandidate(id) {
+  const { candidate: c, active, sources, checks } = await api('/api/candidates/' + encodeURIComponent(id));
+  const rows = c.changes.map((ch) => {
+    const cur = active.find((a) => a.item_key === ch.item_key);
+    return `<tr><td>${esc(ch.label || ch.item_key)}</td><td>${esc(ch.kind)}</td><td>${tl(ch.old_amount ?? (cur ? cur.amount : null))}</td>
+      <td><b>${tl(ch.new_amount)}</b></td><td>${ch.abs === undefined ? '—' : tl(ch.abs)}</td><td>${ch.pct === undefined ? '—' : '%' + esc(ch.pct)}</td></tr>`;
+  }).join('');
+  const docs = sources.map((s) => `<div>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.url)}</a>` : esc(s.document_ref)}
+    <span class="tag">${esc(s.source_type)}</span><span class="tag">güvenilirlik: ${esc(s.reliability)}</span></div>`).join('');
+  const editable = ['draft', 'pending_verification', 'needs_more_sources'].includes(c.status);
+  $('detail').style.display = 'block';
+  $('detail').innerHTML = `<h3>${esc(PLATFORMS[c.platform_id])} · ${esc(STATUS[c.status])}</h3>
+    <div class="muted">Sürüm ${esc(c.tariff_version_id)} · OCR/çıkarım güveni ${c.ocr_confidence ?? '—'} · doğrulama: ${esc(c.verification)}</div>
+    <div class="scroll"><table><tr><th>Kalem</th><th>Tür</th><th>Eski</th><th>Yeni</th><th>Fark</th><th>%</th></tr>${rows}</table></div>
+    <div style="margin:8px 0">${(c.reasons || []).map((r) => `<span class="tag warn">${esc(r)}</span>`).join('') || '<span class="muted">İnsan onayı gerekçesi yok</span>'}</div>
+    <div><b>Kaynak belgeler</b>${docs || '<div class="muted">—</div>'}</div>
+    <div class="row">
+      <label>Yürürlük tarihi<input id="dDate" type="date" value="${day(c.effective_from) === '—' ? '' : day(c.effective_from)}" ${editable || c.status === 'approved' ? '' : 'disabled'}></label>
+      <label style="flex:1">Not / neden<input id="dNote" placeholder="Karar gerekçesi"></label>
+    </div>
+    <div class="row">
+      ${editable ? '<button class="primary" data-act="approved">Onayla</button><button data-act="needs_more_sources">Ek kaynak gerekli</button><button data-act="pending_verification">Doğrulamaya al</button><button class="danger" data-act="rejected">Reddet</button><button data-act="edit">Tarihi kaydet</button>' : ''}
+      ${c.status === 'approved' ? '<button class="primary" data-act="publish">Yayımla</button><button class="danger" data-act="rejected">Reddet</button>' : ''}
+      ${c.status === 'published' ? '<button class="danger" data-act="withdraw">Geri çek</button>' : ''}
+    </div>
+    <div class="muted">Kontroller: ${checks.map((k) => `${when(k.checked_at)} ${esc(RESULT[k.result])}`).join(' · ') || '—'}</div>`;
+  $('detail').querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => act(c.candidate_id, b.dataset.act)));
+  $('detail').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function act(id, action) {
+  try {
+    const note = $('dNote').value.trim();
+    const effectiveFrom = $('dDate').value || undefined;
+    if (action === 'publish') await api(`/api/candidates/${encodeURIComponent(id)}/publish`, {});
+    else if (action === 'withdraw') {
+      if (!note) throw new Error('Geri çekme nedeni yaz (Not alanı).');
+      await api(`/api/candidates/${encodeURIComponent(id)}/withdraw`, { reason: note });
+    } else if (action === 'edit') await api(`/api/candidates/${encodeURIComponent(id)}/edit`, { effectiveFrom, note: note || undefined });
+    else await api(`/api/candidates/${encodeURIComponent(id)}/decision`, { status: action, note: note || undefined, effectiveFrom });
+    await refreshAll();
+    await openCandidate(id);
+  } catch (err) { showError(err); }
+}
+
+async function runCheck(target) {
+  try {
+    const out = await api('/api/check', target);
+    showError({ message: `Kontrol tamam: ${out.results.map((r) => `${r.source_id}: ${RESULT[r.result] || r.result}`).join(' · ') || 'kaynak yok'}` });
+    $('error').style.background = 'var(--accent)';
+    await refreshAll();
+  } catch (err) { $('error').style.background = 'var(--bad)'; showError(err); }
+}
+
+async function loadVersions() {
+  versionsCache = await api('/api/versions');
+  const platform = $('vPlatform').value;
+  $('versions').innerHTML = versionsCache.filter((v) => !platform || v.platform_id === platform).map((v) => `
+    <div class="card" style="margin-bottom:10px"><h3>${esc(PLATFORMS[v.platform_id])} · v${v.version_number}.${v.revision} ${v.vehicle_type ? '· ' + esc(v.vehicle_type) : ''}</h3>
+    <div class="muted">${esc(STATUS[v.approval_status])} · ${esc(v.verification_status)} · ${day(v.effective_from)} → ${day(v.effective_until)} · ${esc(v.change_summary)}</div>
+    <div class="scroll"><table><tr><th>Kalem</th><th>Tutar</th><th>Eşik</th><th>Geçerlilik</th><th>Güven</th></tr>
+    ${v.items.map((i) => `<tr${i.withdrawn ? ' class="muted"' : ''}><td>${esc(i.label)}${i.withdrawn ? ' (geri çekildi)' : ''}${i.is_cash ? '' : ' <span class="tag">yan hak</span>'}</td>
+      <td>${tl(i.amount)}${i.amount_upper ? ' – ' + tl(i.amount_upper) : ''}</td><td>${i.lower_threshold == null ? '' : Number(i.lower_threshold)}${i.upper_threshold == null ? '' : ' – ' + Number(i.upper_threshold)}</td>
+      <td>${day(i.effective_from)} → ${day(i.effective_until)}</td><td>${esc(i.confidence_status)}</td></tr>`).join('')}</table></div>
+    ${v.approval_status === 'published' ? `<div class="row"><input placeholder="Geri çekme nedeni" data-reason="${esc(v.tariff_version_id)}"><button class="danger" data-withdraw="${esc(v.tariff_version_id)}">Sürümü geri çek</button></div>` : ''}
+    </div>`).join('');
+  document.querySelectorAll('[data-withdraw]').forEach((b) => (b.onclick = async () => {
+    const reason = document.querySelector(`[data-reason="${b.dataset.withdraw}"]`).value.trim();
+    try { if (!reason) throw new Error('Neden gerekli'); await api(`/api/versions/${encodeURIComponent(b.dataset.withdraw)}/withdraw`, { reason }); await refreshAll(); } catch (err) { showError(err); }
+  }));
+  fillManualForm();
+}
+
+function fillManualForm() {
+  const platform = $('mPlatform').value;
+  const versions = versionsCache.filter((v) => v.platform_id === platform && v.approval_status === 'published');
+  const current = $('mVersion').value;
+  $('mVersion').innerHTML = versions.map((v) => `<option value="${esc(v.tariff_version_id)}">${esc(v.tariff_version_id)}</option>`).join('');
+  if (versions.some((v) => v.tariff_version_id === current)) $('mVersion').value = current;
+  const version = versions.find((v) => v.tariff_version_id === $('mVersion').value);
+  const items = (version?.items || []).filter((i) => !i.withdrawn && !i.effective_until);
+  $('mItem').innerHTML = items.map((i) => `<option value="${esc(i.item_key)}" data-amount="${esc(i.amount)}" data-label="${esc(i.label)}">${esc(i.label)} (${tl(i.amount)})</option>`).join('');
+}
+
+async function saveManual() {
+  try {
+    const opt = $('mItem').selectedOptions[0];
+    if (!opt) throw new Error('Kalem seç');
+    const newAmount = Number($('mAmount').value.replace(/\./g, '').replace(',', '.'));
+    if (!(newAmount >= 0)) throw new Error('Tutar geçersiz');
+    const old = Number(opt.dataset.amount);
+    const change = { kind: 'changed', item_key: opt.value, label: opt.dataset.label, old_amount: old, new_amount: newAmount,
+      abs: Math.round((newAmount - old) * 100) / 100, pct: old ? Math.round(((newAmount - old) / old) * 10000) / 100 : undefined };
+    const ocr = $('mOcr').value ? Number($('mOcr').value.replace(',', '.')) : undefined;
+    const out = await api('/api/candidates', { platform: $('mPlatform').value, versionId: $('mVersion').value, changes: [change],
+      effectiveFrom: $('mDate').value || undefined, sourceRef: $('mSource').value.trim(), sourceType: $('mType').value,
+      note: $('mNote').value.trim() || undefined, ocrConfidence: ocr });
+    await refreshAll();
+    await openCandidate(out.candidate_id);
+  } catch (err) { showError(err); }
+}
+
+async function loadLogs() {
+  const [checks, audit] = await Promise.all([api('/api/checks'), api('/api/audit')]);
+  $('checks').innerHTML = '<tr><th>Zaman</th><th>Kaynak</th><th>Sonuç</th><th>HTTP</th><th>Not</th></tr>' + checks.map((c) =>
+    `<tr><td>${when(c.checked_at)}</td><td>${esc(c.source_id)}</td><td>${esc(RESULT[c.result])}</td><td>${c.http_status ?? ''}</td><td>${esc(c.note)}</td></tr>`).join('');
+  $('audit').innerHTML = '<tr><th>Zaman</th><th>Kim</th><th>İşlem</th><th>Kayıt</th><th>Not</th></tr>' + audit.map((a) =>
+    `<tr><td>${when(a.at)}</td><td>${esc(a.actor)}</td><td>${esc(a.action)}</td><td>${esc(a.entity_id)}</td><td>${esc(a.note)}</td></tr>`).join('');
+}
+
+async function refreshAll() {
+  try { await Promise.all([loadOverview(), loadCandidates(), loadVersions(), loadLogs()]); } catch (err) { showError(err); }
+}
+
+for (const id of ['fPlatform', 'vPlatform', 'mPlatform']) {
+  const sel = $(id);
+  for (const [code, name] of Object.entries(PLATFORMS)) sel.insertAdjacentHTML('beforeend', `<option value="${code}">${esc(name)}</option>`);
+}
+$('vPlatform').insertAdjacentHTML('afterbegin', '<option value="">Tüm platformlar</option>'); $('vPlatform').value = '';
+$('fPlatform').onchange = loadCandidates; $('fStatus').onchange = loadCandidates; $('vPlatform').onchange = loadVersions;
+$('mPlatform').onchange = fillManualForm; $('mVersion').onchange = fillManualForm; $('mSave').onclick = saveManual;
+$('refresh').onclick = refreshAll; $('checkAll').onclick = () => runCheck({});
+if (!currentToken()) showError({ message: 'Belirteç yok: konsolda yazan tam adresi açın.' }); else refreshAll();
+</script>
+</body>
+</html>

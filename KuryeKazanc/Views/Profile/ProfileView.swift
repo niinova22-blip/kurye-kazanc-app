@@ -115,6 +115,12 @@ struct ProfileView: View {
                 } label: {
                     Label("Çalışma profili ve plan", systemImage: "calendar.badge.clock")
                 }
+                NavigationLink {
+                    PlatformPickerView()
+                } label: {
+                    Label("Hakediş platformu", systemImage: "turkishlirasign.circle")
+                }
+                .accessibilityIdentifier("profile.payrollPlatform")
             } else {
                 Text("Profil bulunamadı").foregroundStyle(.secondary)
             }

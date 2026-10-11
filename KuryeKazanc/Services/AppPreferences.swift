@@ -48,5 +48,9 @@ enum AppPreferences {
     /// Son basarili yedekleme (Unix zaman damgasi). Cikista silinir.
     static let lastBackupDateKey = "lastBackupDate"
 
+    /// 1.6: yayimlanan hakedis tarifelerini indir (herkese acik tablo; cihazdan veri gonderilmez). Varsayilan ACIK.
+    static let tariffUpdatesEnabledKey = "tariffUpdatesEnabled"
+    static let tariffsFetchedAtKey = "tariffsFetchedAt"
+
     static let defaultCostPerKm = VehicleType.motorcycle.defaultCostPerKm
 }

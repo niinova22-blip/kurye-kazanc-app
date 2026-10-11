@@ -56,3 +56,28 @@ Sira: `apply` -> `test` -> `seed_synthetic`. `seed_synthetic.mjs` sentetik satir
   `per_hour`/`couriers` yalnizca ilcede >= 5 kurye varsa bulunur.
 - Il/ilce eslesmesi buyuk/kucuk harf duyarsizdir (`Ankara` / `Sincan` yazilir).
 - Sentetik kuryeler gercek verilerle karisir (k-anonimlige katkida bulunurlar); gercek yayindan once `purge_synthetic.mjs`.
+
+## Hakedis tarifeleri ve tarife takibi (1.6)
+
+Goc: `20261011000005_tariffs.sql`. Ilke: kaynakta gorulen degisiklik tarifeyi kendiliginden degistirmez
+(kontrol -> aday -> dogrulama/onay -> yayim). Istemci yalnizca yayindaki surumleri, kalemlerini ve `tariff_change_events`'i okur.
+
+```
+node --env-file=.env.supabase scripts/server/apply.mjs          # goc
+node --env-file=.env.supabase scripts/server/test.mjs           # pgTAP (004_tariffs dahil)
+node --env-file=.env.supabase scripts/server/seed_tariffs.mjs   # ORNEK tarifeler ("dogrulama gerekli") + izlenecek kaynaklar
+node --env-file=.env.supabase scripts/server/tariff_check.mjs   # zamani gelen kaynaklar + gunluk bakim (--all, --platform, --source)
+node --env-file=.env.supabase scripts/server/tariff_center.mjs --admin "Ad Soyad"   # Tarife Merkezi (yalnizca 127.0.0.1)
+```
+
+- Yerel testler (kimlik bilgisi gerekmez, gercek Postgres = PGlite): `cd scripts/server && npm install && npm test`.
+- Demo panel (bellekte veritabani, ag istegi yok): `cd scripts/server && node tariff/demo_center.mjs`.
+- Zamanlama: `.github/workflows/tariff-check.yml` her gun 07:30 (Ubuntu, ~1 dk). Gizli degerler: `SUPABASE_PROJECT_REF`,
+  `SUPABASE_ACCESS_TOKEN`. Tanimli degilse calisma atlanir. Kaynak basina siklik `tariff_sources.check_interval_minutes`.
+- Ayarlar `tariff_config`: `auto_publish_official` (varsayilan **false**), `min_ocr_confidence` 0.9, `large_change_pct` 25,
+  `per_host_delay_ms` 5000, `candidate_expiry_days` 60. Otomatik yayim yalnizca ayar acikken, tek ve guvenilir resmi kaynak,
+  kesin yururluk tarihi ve baska belirsizlik yokken olur.
+- Kaynaklar robots.txt'ye uyularak, giris gerektirmeyen herkese acik sayfalardan okunur. Alan cikarim profili
+  (`extraction_profile`) olmayan kaynak yalnizca "sayfa degisti, dogrulama gerekli" uretir.
+- Yayim/geri cekme `publish_tariff_candidate` / `withdraw_tariff_candidate` / `withdraw_tariff_version` ile tek islemde;
+  ayni aday iki kez yayimlanmaz. Her karar `tariff_audit_log`'a yonetici adiyla yazilir.

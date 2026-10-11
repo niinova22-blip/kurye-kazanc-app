@@ -7,6 +7,8 @@ protocol SupabaseServing {
     func submitCalibration(platformCode: String?, templateID: String?, lines: [RecognizedLine]) async -> OutboxResult
     func fetchTemplates() async -> [OCRTemplate]?
     func fetchPlatformRules() async -> [PlatformRule]?
+    func fetchTariffVersions() async -> [TariffVersion]?
+    func fetchTariffEvents(platform: String) async -> [TariffChangeEvent]?
     func communityHeatmap(province: String, district: String) async -> [CommunityCell]?
     func communitySummary(province: String, district: String) async -> CommunitySummary?
     func signInWithApple(idToken: String, nonce: String) async throws -> AuthSession
@@ -20,6 +22,9 @@ protocol SupabaseServing {
 extension SupabaseServing {
     /// Varsayilan: kural yok (test istemcileri icin). Gercek istemci sunucudan ceker.
     func fetchPlatformRules() async -> [PlatformRule]? { nil }
+    /// Varsayilan: tarife yok (test istemcileri). Uygulama gomulu ornek tarifeyle calisir.
+    func fetchTariffVersions() async -> [TariffVersion]? { nil }
+    func fetchTariffEvents(platform: String) async -> [TariffChangeEvent]? { nil }
 }
 
 /// Elle yazilmis kucuk Supabase REST istemcisi (GoTrue + PostgREST). Ucuncu taraf bagimlilik yok.
@@ -104,6 +109,35 @@ final class SupabaseClient: SupabaseServing {
         guard let result = try? await perform(request), result.isSuccess else { return nil }
         guard let rows = try? decoder.decode([LossyRule].self, from: result.body) else { return nil }
         return rows.compactMap(\.rule)
+    }
+
+    // MARK: - Hakedis tarifeleri
+
+    /// Yayindaki tarife surumleri ve kalemleri (herkese acik; RLS yalnizca yayimlanmis / suresi dolmus surumleri dondurur).
+    /// Bozuk satir atlanir; istek basarisizsa nil (uygulama son bilinen / gomulu tarifeyle devam eder).
+    func fetchTariffVersions() async -> [TariffVersion]? {
+        let query: [URLQueryItem] = [
+            URLQueryItem(name: "select", value: "*,items:tariff_items(*)"),
+            URLQueryItem(name: "approval_status", value: "in.(published,expired)"),
+        ]
+        let request: URLRequest = makeRequest(method: "GET", path: "rest/v1/tariff_versions", query: query)
+        guard let result = try? await perform(request), result.isSuccess else { return nil }
+        guard let rows = try? decoder.decode([LossyTariffVersion].self, from: result.body) else { return nil }
+        return rows.compactMap(\.version)
+    }
+
+    /// Bir platformun son tarife olaylari (yayim / geri cekme). Yalnizca istenen platform sorgulanir.
+    func fetchTariffEvents(platform: String) async -> [TariffChangeEvent]? {
+        let query: [URLQueryItem] = [
+            URLQueryItem(name: "select", value: "*"),
+            URLQueryItem(name: "platform_id", value: "eq.\(platform)"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "30"),
+        ]
+        let request: URLRequest = makeRequest(method: "GET", path: "rest/v1/tariff_change_events", query: query)
+        guard let result = try? await perform(request), result.isSuccess else { return nil }
+        guard let rows = try? decoder.decode([LossyTariffEvent].self, from: result.body) else { return nil }
+        return rows.compactMap(\.event)
     }
 
     // MARK: - Topluluk

@@ -1,0 +1,12 @@
+{
+  "name": "kurye-kazanc-server-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Sunucu yonetim betikleri (Supabase). Calisma zamani bagimliligi yok; PGlite yalnizca yerel SQL testleri icin.",
+  "scripts": {
+    "test": "node --test tariff/tests/core.test.mjs tariff/tests/pipeline.test.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.2.17"
+  }
+}
