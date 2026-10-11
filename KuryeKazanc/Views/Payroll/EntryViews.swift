@@ -21,20 +21,25 @@ struct QuickEstimateView: View {
             } footer: {
                 Text("Paketler gündüz tekli paket sayılır. Gece, birleşen paket, km ve bonus ayrıntısı için detaylı kayıt kullan.")
             }
+            if let error = model.lastError {
+                Section {
+                    Text(error).font(.caption).foregroundStyle(Theme.negative)
+                }
+            }
             if let input {
                 CalculationSections(result: model.calculate(input))
-                Section {
-                    Button("Günlük kayıt olarak kaydet") { save(input) }
-                        .disabled(PayFormat.parseInt(packages) == 0)
-                        .accessibilityIdentifier("quick.save")
-                    if let error = model.lastError {
-                        Text(error).font(.caption).foregroundStyle(Theme.negative)
-                    }
-                }
             }
         }
         .navigationTitle("Hızlı tahmin")
         .navigationBarTitleDisplayMode(.inline)
+        // Uzun dokumun altinda kaybolmasin: kaydet her zaman ust cubukta
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Kaydet") { if let input { save(input) } }
+                    .disabled(input == nil || PayFormat.parseInt(packages) == 0)
+                    .accessibilityIdentifier("quick.save")
+            }
+        }
         .dismissesKeyboard()
     }
 
