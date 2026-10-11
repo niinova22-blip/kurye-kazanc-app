@@ -213,7 +213,8 @@ struct TariffItem: Codable, Equatable, Identifiable {
         case versionID = "tariff_version_id"
         case key = "item_key"
         case type = "item_type"
-        case label, amount, currency, unit, note, withdrawn, group
+        case label, amount, currency, unit, note, withdrawn
+        case group = "item_group"
         case amountUpper = "amount_upper"
         case lowerThreshold = "lower_threshold"
         case upperThreshold = "upper_threshold"

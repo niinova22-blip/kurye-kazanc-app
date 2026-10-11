@@ -1,0 +1,50 @@
+[
+  {
+    "source_id": "ys-express-sss",
+    "platform_id": "yemeksepeti",
+    "tariff_version_id": "yemeksepeti-esnaf-v1",
+    "url": "https://yemeksepetiexpress.com/s-s-s/",
+    "source_type": "official_channel",
+    "priority": 2,
+    "check_interval_minutes": 1440,
+    "reliability": "medium",
+    "summary": "Yemeksepeti Express kurye sıkça sorulan sorular (platformun kendi sitesi). Ücret alanı profili yok: yalnızca içerik değişimi izlenir.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "pakettaxi-migros-ucret",
+    "platform_id": "migros_hemen",
+    "tariff_version_id": "migros_hemen-esnaf-v1",
+    "url": "https://www.pakettaxi.com/migros-kurye-nasil-olunur-guncel-migros-kurye-ucretleri-nedir/",
+    "source_type": "official_announcement",
+    "priority": 1,
+    "check_interval_minutes": 1440,
+    "reliability": "medium",
+    "summary": "Paket Taxi'nin kendi sitesindeki Migros kurye ücretleri yazısı. Profil yönetici tarafından sayfa incelenerek eklenmeli.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "eleman-getir-ucret",
+    "platform_id": "getir",
+    "tariff_version_id": "getir-esnaf-motorcycle-v1",
+    "url": "https://www.eleman.net/is-rehberi/maaslar-ve-ucretler/getir-kuryesi-ne-kadar-kazaniyor-2025-yeni-ucretler-h2086",
+    "source_type": "news",
+    "priority": 4,
+    "check_interval_minutes": 1440,
+    "reliability": "low",
+    "summary": "İkincil kaynak (iş ilanı sitesi rehberi). Tek başına tarife değiştirmez.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "srckurye-trendyol-go",
+    "platform_id": "trendyol_go",
+    "tariff_version_id": "trendyol_go-esnaf-v1",
+    "url": "https://srckurye.com.tr/trendyol-go-kurye/",
+    "source_type": "news",
+    "priority": 4,
+    "check_interval_minutes": 1440,
+    "reliability": "low",
+    "summary": "İkincil kaynak (kurye firması blog yazısı). Tek başına tarife değiştirmez.",
+    "extraction_profile": []
+  }
+]

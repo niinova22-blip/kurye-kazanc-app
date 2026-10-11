@@ -35,3 +35,6 @@ Thumbs.db
 # Claude Code calisma kopyalari
 .claude/
 .superpowers/
+
+# Sunucu betikleri test bagimliliklari
+scripts/server/node_modules/
