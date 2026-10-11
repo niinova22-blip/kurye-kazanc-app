@@ -341,3 +341,42 @@ node --env-file=.env.supabase scripts/server/check_sources.mjs --dry-run
 - Develop'taki ara CI derlemeleri (#23–#32) `cancel_previous_builds` nedeniyle iptal; doğrulama main yayın derlemesinde yapıldı.
 - Sıradaki: cihazda 1.5.0 testi (fotoğraf taraması, Topluluk, Plan öner); canlı veritabanına `platform_rules` göçü + tohum (yukarıdaki komutlar) uygulanmadıysa uygulanmalı — uygulanmazsa uygulama gömülü kurallarla çalışır.
 - Canlı veritabanı (2026-10-10): göçler zaten uygulanmış (4/4 atlandı), pgTAP 22/22 geçti, `seed_platform_rules.mjs` 44 kural yazdı (KVKK v2 dahil).
+
+## Oturum 8 — 2026-10-11: 1.6.0 çoklu platform hakediş ve dinamik tarife takibi
+
+Dal: `feature/hakedis-tarife` (develop'tan). Üç katman:
+
+### Katman A — Core (`KuryeKazanc/Core/Tariff/`, Windows'ta `swift test`)
+- `Money` (Decimal, kuruş yuvarlama, JSON'da metin), `TariffVersion` / `TariffItem` (kalem bazlı geçerlilik, `confidence_status`: doğrulanmış / kullanıcı / doğrulama gerekli), `TariffSettings` (km bandı dilimli/tüm mesafe, bonus en yüksek/toplanır, kademe tüm paketlere/eşik üstü, sabit ücret bölge/kıdem, sabit ücretin kapsadığı paket).
+- `TariffCatalog`: yalnızca `published`/`expired` sürüm; kullanıcı onaylı > en özel kapsam (bölge, araç, model) > en yeni. Sunucu bir platform yayımladıysa gömülü örnek kullanılmaz.
+- `PayEngine` + platform hesaplayıcıları (`TrendyolGoCalculator`, `GetirCalculator`, `YemeksepetiCalculator`, `PaketTaxiCalculator`); bonus kademeleri, yan haklar, referans, kesinti ortak kurallarla. Belirsiz ayar doğrulanmamışsa diğer yorumun brütü uyarıda (`alternativeGross`, son brütten çözülür).
+- `PeriodAggregator`: günlük satırlar kayıtların dondurulmuş sonucundan, haftalık kalemler Pazarı dönemde olan haftadan, aylık kalemler ay toplamından; Paket Taxi taban ücreti aylık kademe hesaplanınca sayılmaz (çift sayım yok).
+- `PaymentReconciler`, `ExpenseReport`, `PlatformComparison`, `CostCoverage` (yalnızca uyarı), `TariffDiff` + `TariffNotifier` (yalnızca aktif platform; doğrulanmamışsa "doğrulama bekliyor"), `TariffImport` (CSV, OCR/PDF metni → taslak), `PayrollStore` (JSON, `payroll.json`; SwiftData şeması değişmedi).
+- `BundledTariffs`: kullanıcının verdiği değerler ÖRNEK, tüm kalemler "doğrulama gerekli". Uydurulmayanlar: Trendyol 3–6 km bandı, Yemeksepeti haftalık bonus kademesi, Getir ekipman/sağlık tutarı.
+- Core testleri: **268** (60 yeni), hepsi geçti.
+
+### Katman B — Sunucu
+- Göç `20261011000005_tariffs.sql`: `tariff_platforms/versions/items/sources/source_checks/candidates/item_revisions/audit_log/change_events/economic_indicators/config`; aday durum makinesi tetikleyiciyle; `decide_/publish_/withdraw_tariff_candidate`, `withdraw_tariff_version` (atomik, idempotent, denetim kaydı); RLS: istemci yalnızca yayındakini okur.
+- `scripts/server/tariff/`: `core.mjs` (normalize, çıkarım, yürürlük tarihi, fark, parmak izi, onay politikası, robots.txt, zamanlama), `checker.mjs`, `runner.mjs`, `repo.mjs`, `admin.mjs`, `seed.mjs` + `sources.json` (4 kaynak, profil yok → yalnızca içerik değişimi), Tarife Merkezi (`tariff_center.mjs`, 127.0.0.1 + belirteç) ve `demo_center.mjs` (PGlite, kimlik bilgisi yok).
+- Testler: `cd scripts/server && npm install && npm test` → **34/34** (PGlite = gerçek Postgres 16 üzerinde göç). Demo panel tarayıcıda denendi (kontrol → aday → onay → yayım).
+- Zamanlama: `.github/workflows/tariff-check.yml` (günlük, Ubuntu; gizli değer yoksa atlanır). `auto_publish_official` varsayılan **false**.
+- **Canlıya uygulanmadı.** Kullanıcı çalıştırmalı:
+```
+node --env-file=.env.supabase scripts/server/apply.mjs
+node --env-file=.env.supabase scripts/server/test.mjs
+node --env-file=.env.supabase scripts/server/seed_tariffs.mjs
+node --env-file=.env.supabase scripts/server/tariff_check.mjs --all
+node --env-file=.env.supabase scripts/server/tariff_center.mjs --admin "Ad Soyad"
+```
+
+### Katman C — Uygulama
+- Yeni "Hakediş" sekmesi (`Views/Payroll/`), `PayrollModel`, `TariffSyncService` (6 saatte bir; hata → son bilinen/gömülü tarife), `SupabaseClient.fetchTariffVersions/fetchTariffEvents`. Profil > "Hakediş platformu". Günlük kayıt Bugün/Analiz için `EarningRecord` da oluşturur.
+- Gider türleri: sigorta, telefon-internet, ekipman (ham değer; göç yok). Sürüm 1.6.0.
+- Uygulama testleri: `PayrollModelTests` (7), `PayrollUITests` (1) — CI'da.
+
+### Açık konular / kararlar
+- Tarife indirme varsayılan AÇIK (`tariffUpdatesEnabled`): yalnızca herkese açık tablo okunur, veri gönderilmez; mevcut "rıza yoksa ağ yok" kuralından farklı — KVKK metninde belirtilmeli.
+- Doğrulanmış platform logoları eklenmedi (lisanslı varlık yok); nötr baş harf simgesi.
+- Ödeme ekstresi OCR yapılmadı (ödeme tutarı elle).
+- Supabase erişim anahtarı 7 günlük: zamanlanmış kontrol için uzun süreli anahtar / servis hesabı gerekir.
+- Kaynakların alan çıkarım profilleri boş: yönetici sayfaları inceleyip `extraction_profile` eklemeli; o zamana kadar yalnızca "sayfa değişti, doğrulama gerekli".
