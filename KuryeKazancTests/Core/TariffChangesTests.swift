@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(KuryeCore)
 @testable import KuryeCore
+#else
+@testable import KuryeKazanc
+#endif
 
 /// Degisiklik karsilastirmasi, bildirim dili, kullanici tarifesi ice aktarimi, ekonomik gosterge ve para aritmetigi.
 final class TariffChangesTests: XCTestCase {

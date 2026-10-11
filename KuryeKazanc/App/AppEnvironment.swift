@@ -15,6 +15,8 @@ final class AppEnvironment {
     let autoShift: AutoShiftCoordinator
     let sync: SyncCoordinator
     let account: AccountService
+    let tariffs: TariffSyncService
+    let payroll: PayrollModel
 
     private init() {
         let launch = LaunchOptions.current
@@ -43,6 +45,13 @@ final class AppEnvironment {
         let sync = SyncCoordinator(client: client, queue: OutboxQueue(fileURL: OutboxQueue.defaultFileURL()))
         self.sync = sync
         account = AccountService(client: client, syncCoordinator: sync)
+        // Hakedis: UI testlerinde bellekte (dosya yok, ag yok)
+        let tariffs = TariffSyncService(client: client, defaults: testDefaults ?? .standard,
+                                        fileURL: launch.isUITesting ? nil : TariffSyncService.defaultFileURL())
+        self.tariffs = tariffs
+        let payrollStore = PayrollStore(fileURL: launch.isUITesting ? nil : PayrollModel.defaultFileURL(),
+                                        writeOptions: OutboxQueue.writeOptions)
+        payroll = PayrollModel(store: payrollStore, tariffs: tariffs)
         let templates: @MainActor () -> [OCRTemplate] = { sync.mergedTemplates() }
         if let testDefaults {
             scanner = ScreenshotScanner(defaults: testDefaults, templates: templates)

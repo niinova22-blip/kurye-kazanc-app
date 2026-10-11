@@ -193,3 +193,22 @@ struct LossyRule: Decodable {
         rule = try? PlatformRule(from: decoder)
     }
 }
+
+/// Bozuk tarife satiri tum listeyi dusurmesin.
+struct LossyTariffVersion: Decodable {
+    let version: TariffVersion?
+
+    init(from decoder: Decoder) throws {
+        var decoded: TariffVersion? = try? TariffVersion(from: decoder)
+        decoded?.origin = .remote
+        version = decoded
+    }
+}
+
+struct LossyTariffEvent: Decodable {
+    let event: TariffChangeEvent?
+
+    init(from decoder: Decoder) throws {
+        event = try? TariffChangeEvent(from: decoder)
+    }
+}

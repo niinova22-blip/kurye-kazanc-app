@@ -21,6 +21,8 @@ struct KuryeKazancApp: App {
                 .environment(environment.autoShift)
                 .environment(environment.sync)
                 .environment(environment.account)
+                .environment(environment.payroll)
+                .environment(environment.tariffs)
                 .task {
                     // Acilis: sablonlar (12 saatte bir) ve bekleyen gonderimler. Riza yoksa ag yok.
                     await syncNow()
@@ -46,6 +48,9 @@ struct KuryeKazancApp: App {
         let sync: SyncCoordinator = environment.sync
         await sync.refreshTemplatesIfNeeded()
         await sync.refreshRulesIfNeeded()
+        // Tarifeler: basarisizlikta son bilinen / gomulu tarife kullanilir; hesaplama aga bagli degil
+        await environment.tariffs.refreshIfNeeded()
+        await environment.payroll.refreshNotices()
         await sync.flush()
     }
 }

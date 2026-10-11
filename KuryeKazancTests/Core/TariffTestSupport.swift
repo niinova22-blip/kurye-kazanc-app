@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(KuryeCore)
 @testable import KuryeCore
+#else
+@testable import KuryeKazanc
+#endif
 
 /// Kontrollu ornek tarifeler: gercek sirket verisine bagli degil; gomulu ornek JSON ve elle kurulan surumler.
 enum TariffFixtures {

@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(KuryeCore)
 @testable import KuryeCore
+#else
+@testable import KuryeKazanc
+#endif
 
 /// Donem sinirlari, cift sayim, odeme karsilastirmasi ve gider / net raporlari.
 final class PeriodAggregatorTests: XCTestCase {

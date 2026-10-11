@@ -1,0 +1,285 @@
+import Foundation
+import Observation
+import SwiftData
+
+/// Hakedis ekranlarinin ortak modeli. Dort giris yontemi (hizli, detayli, donem, odeme karsilastirma) ayni motoru
+/// (`PayEngine`) ve ayni tarife katalogunu kullanir; kayitlar `PayrollStore`'da dondurulmus sonuclariyla saklanir.
+@MainActor
+@Observable
+final class PayrollModel {
+    /// Deponun gozlenebilir kopyasi (her degisiklikten sonra yenilenir).
+    private(set) var state: PayrollState
+    private(set) var lastError: String?
+
+    let store: PayrollStore
+    let tariffs: TariffSyncService
+    private let calendar: Calendar
+    private let clock: () -> Date
+
+    init(store: PayrollStore, tariffs: TariffSyncService, calendar: Calendar = .current, clock: @escaping () -> Date = { Date() }) {
+        self.store = store
+        self.tariffs = tariffs
+        self.calendar = calendar
+        self.clock = clock
+        self.state = store.state
+    }
+
+    nonisolated static func defaultFileURL() -> URL {
+        let base: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("payroll.json")
+    }
+
+    private func reload() {
+        state = store.state
+    }
+
+    // MARK: - Katalog ve motor
+
+    var catalog: TariffCatalog {
+        TariffCatalog.merged(bundled: BundledTariffs.all, remote: tariffs.remoteVersions, user: state.userTariffs)
+    }
+
+    var engine: PayEngine { PayEngine(catalog: catalog) }
+
+    var aggregator: PeriodAggregator {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "UTC")!
+        c.firstWeekday = 2
+        return PeriodAggregator(engine: engine, calendar: c)
+    }
+
+    var activePlatform: PayPlatform? { state.activePlatform.flatMap { PayPlatform.named($0) } }
+
+    func day(_ date: Date) -> String { RuleDay.string(date, calendar: calendar) }
+    var today: String { day(clock()) }
+
+    /// Aktif platformun bugunku tarife surumu (gosterim icin).
+    func currentVersion(platform: String? = nil) -> TariffVersion? {
+        guard let code = platform ?? state.activePlatform else { return nil }
+        return catalog.current(platform: code, day: today, vehicleType: code == "getir" ? state.vehicleType ?? "motorcycle" : nil)
+    }
+
+    // MARK: - Platform ve tercihler
+
+    func select(platform code: String) {
+        store.select(platform: code, at: clock())
+        reload()
+    }
+
+    func setPreferences(regionTier: String?, seniorityYears: Int?, vehicleType: String?) {
+        store.setPreferences(regionTier: regionTier, seniorityYears: seniorityYears, vehicleType: vehicleType)
+        reload()
+    }
+
+    /// Kayitli tercihlerle doldurulmus girdi (aktif platform).
+    func baseInput(day: String, span: PaySpan = .day, end: String? = nil) -> PayInput? {
+        guard let code = state.activePlatform else { return nil }
+        var input = PayInput(platformCode: code, span: span, startDay: day, endDay: end)
+        input.regionTier = state.regionTier
+        input.seniorityYears = state.seniorityYears
+        if code == "getir" { input.vehicleType = state.vehicleType ?? "motorcycle" }
+        return input
+    }
+
+    func calculate(_ input: PayInput) -> Result<PayBreakdown, PayError> {
+        engine.calculate(input)
+    }
+
+    // MARK: - Kayitlar
+
+    var logs: [WorkLog] {
+        state.logs.sorted { (a: WorkLog, b: WorkLog) -> Bool in
+            if a.startDay != b.startDay { return a.startDay > b.startDay }
+            return a.createdAt > b.createdAt
+        }
+    }
+
+    func logs(platform: String) -> [WorkLog] { logs.filter { $0.platformCode == platform } }
+
+    /// Kaydeder. Gunluk kayit icin mevcut Bugun/Analiz ekranlarina yansiyan bir kazanc kaydi da olusturulur.
+    @discardableResult
+    func save(_ input: PayInput, method: EntryMethod, start: Date? = nil, end: Date? = nil, context: ModelContext?) -> WorkLog? {
+        lastError = nil
+        let breakdown: PayBreakdown
+        switch calculate(input) {
+        case let .success(value): breakdown = value
+        case let .failure(error):
+            lastError = error.message
+            return nil
+        }
+        let log = WorkLog(method: method, input: input, result: breakdown, createdAt: clock())
+        do {
+            try store.add(log)
+        } catch let error as PayrollStoreError {
+            lastError = error.message
+            return nil
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+        if input.span == .day, let context {
+            let recordID: UUID? = createEarningRecord(for: log, start: start, end: end, context: context)
+            if let recordID { store.linkEarningRecord(recordID, to: log.id) }
+        }
+        reload()
+        return store.log(id: log.id)
+    }
+
+    private func createEarningRecord(for log: WorkLog, start: Date?, end: Date?, context: ModelContext) -> UUID? {
+        let parts: [Int] = log.startDay.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        let localDay: Date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 9)) ?? clock()
+        let hours: Double = log.input.hours.doubleValue
+        let recordStart: Date = start ?? localDay
+        let recordEnd: Date = end ?? recordStart.addingTimeInterval(max(hours, 0) * 3600)
+        let code: String = log.platformCode
+        let platform: Platform? = try? context.fetch(FetchDescriptor<Platform>(predicate: #Predicate { $0.code == code })).first
+        let bonus: Money = log.result.bonusTotal
+        let gross: Money = log.result.gross - bonus + log.result.tips + log.result.extraPayments
+        let record = EarningRecord(
+            startTime: recordStart, endTime: recordEnd, platform: platform, grossEarning: gross.doubleValue,
+            bonus: bonus.doubleValue, distanceKm: log.input.distanceKm.doubleValue,
+            packageCount: log.input.totalPackages, source: .manual, verification: .manual
+        )
+        context.insert(record)
+        try? context.save()
+        return record.id
+    }
+
+    func delete(_ log: WorkLog, context: ModelContext?) {
+        if let recordID = log.earningRecordID, let context {
+            let id: UUID = recordID
+            if let record = try? context.fetch(FetchDescriptor<EarningRecord>(predicate: #Predicate { $0.id == id })).first {
+                context.delete(record)
+                try? context.save()
+            }
+        }
+        store.deleteLog(id: log.id)
+        reload()
+    }
+
+    /// Acik yeniden hesaplama (kullanici istegiyle). Sonuc degismediyse nil.
+    func recalculate(_ log: WorkLog, reason: String) -> Recalculation? {
+        lastError = nil
+        do {
+            let result: Recalculation? = try store.recalculate(logID: log.id, engine: engine, reason: reason, at: clock())
+            reload()
+            if result == nil { lastError = "Güncel tarifeyle sonuç aynı; değişiklik kaydedilmedi." }
+            return result
+        } catch {
+            lastError = PayrollStoreError.notFound.message
+            return nil
+        }
+    }
+
+    func setAdjustment(_ amount: Money?, note: String?, log: WorkLog) {
+        store.setAdjustment(amount, note: note, logID: log.id)
+        reload()
+    }
+
+    // MARK: - Donem ve pano
+
+    func monthRange(containing date: Date) -> (start: String, end: String) {
+        aggregator.monthRange(containing: day(date)) ?? (today, today)
+    }
+
+    func weekRange(containing date: Date) -> (start: String, end: String) {
+        aggregator.weekRange(containing: day(date)) ?? (today, today)
+    }
+
+    func period(platform: String, start: String, end: String) -> PeriodResult {
+        var preferences = PayInput(platformCode: platform, startDay: start, endDay: end)
+        preferences.regionTier = state.regionTier
+        preferences.seniorityYears = state.seniorityYears
+        preferences.vehicleType = platform == "getir" ? state.vehicleType ?? "motorcycle" : nil
+        let isMonth: Bool = aggregator.monthRange(containing: start).map { $0.start == start && $0.end == end } ?? false
+        return aggregator.summarize(platform: platform, logs: state.logs, start: start, end: end, preferences: preferences,
+                                    includeMonthly: isMonth)
+    }
+
+    func dashboard(expenses: [DatedExpense], month date: Date = Date()) -> PayrollDashboard? {
+        guard let code = state.activePlatform else { return nil }
+        let range = monthRange(containing: date)
+        let result: PeriodResult = period(platform: code, start: range.start, end: range.end)
+        let monthExpenses: Money = expenses.filter { $0.day >= range.start && $0.day <= range.end }.map(\.amount).sum()
+        let lastPayment: PaymentRecord? = store.payments(platform: code).first { $0.periodEnd >= range.start }
+        return PayrollDashboard(period: result, expenses: monthExpenses, paymentDifference: lastPayment?.difference)
+    }
+
+    // MARK: - Odeme kontrolu
+
+    func reconcile(platform: String, start: String, end: String, actual: Money, advances: Money, deductions: Money) -> (PeriodResult, Reconciliation) {
+        let result: PeriodResult = period(platform: platform, start: start, end: end)
+        let days: Int = (RuleDay.days(from: start, to: end) ?? 0) + 1
+        let reconciliation = PaymentReconciler.reconcile(period: result, actual: actual, advances: advances, deductions: deductions,
+                                                         periodDays: days)
+        return (result, reconciliation)
+    }
+
+    func savePayment(platform: String, start: String, end: String, paidOn: String, actual: Money, advances: Money,
+                     deductions: Money, note: String) {
+        let result: PeriodResult = period(platform: platform, start: start, end: end)
+        let payment = PaymentRecord(platformCode: platform, periodStart: start, periodEnd: end, paidOn: paidOn, actualAmount: actual,
+                                    advances: advances, deductions: deductions, note: note, expected: result.prePayment,
+                                    expectedUpper: result.prePaymentUpper, createdAt: clock())
+        store.add(payment)
+        reload()
+    }
+
+    func deletePayment(_ payment: PaymentRecord) {
+        store.deletePayment(id: payment.id)
+        reload()
+    }
+
+    // MARK: - Kullanici tarifesi
+
+    func saveUserTariff(_ version: TariffVersion, activate: Bool) -> Bool {
+        lastError = nil
+        do {
+            try store.saveUserTariff(version, activate: activate)
+            reload()
+            return true
+        } catch let error as PayrollStoreError {
+            lastError = error.message
+            return false
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
+    func deleteUserTariff(_ version: TariffVersion) {
+        store.deleteUserTariff(id: version.id)
+        reload()
+    }
+
+    // MARK: - Bildirimler
+
+    var unreadNoticeCount: Int {
+        guard let code = state.activePlatform else { return 0 }
+        return state.notices.filter { $0.platformCode == code && !$0.isRead }.count
+    }
+
+    /// Aktif platformun yeni tarife olaylarini bildirim yapar. Diger platformlarin olaylari istenmez bile.
+    func refreshNotices() async {
+        guard let code = state.activePlatform else { return }
+        let events: [TariffChangeEvent] = await tariffs.events(platform: code)
+        let notices: [TariffNotice] = TariffNotifier.notices(from: events, activePlatform: code, seen: store.seenEventIDs, now: clock())
+        guard !notices.isEmpty else { return }
+        store.addNotices(notices, eventIDs: events.map(\.id))
+        reload()
+    }
+
+    func markNoticesRead() {
+        guard let code = state.activePlatform else { return }
+        store.markNoticesRead(platform: code)
+        reload()
+    }
+}
+
+extension ExpenseRecord {
+    var datedExpense: DatedExpense {
+        DatedExpense(day: RuleDay.string(date, calendar: .current), category: type, amount: Money(Decimal(amount)))
+    }
+}

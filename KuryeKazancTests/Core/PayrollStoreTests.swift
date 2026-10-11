@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(KuryeCore)
 @testable import KuryeCore
+#else
+@testable import KuryeKazanc
+#endif
 
 /// Kayitlarin kaliciligi, platform degisimi, gecmis surumlerin korunmasi ve acik yeniden hesaplama.
 final class PayrollStoreTests: XCTestCase {

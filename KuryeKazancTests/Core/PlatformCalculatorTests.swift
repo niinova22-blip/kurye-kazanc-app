@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(KuryeCore)
 @testable import KuryeCore
+#else
+@testable import KuryeKazanc
+#endif
 
 /// Platforma ozgu hesaplamalar (ornek baslangic tarifesiyle; degerler dogrulanmis tarife degildir).
 final class PlatformCalculatorTests: XCTestCase {

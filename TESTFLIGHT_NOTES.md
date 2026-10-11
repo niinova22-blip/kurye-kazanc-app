@@ -3,6 +3,23 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.6.0
+
+Yeni: Hakediş sekmesi (Trendyol GO, Getir, Yemeksepeti Express, Paket Taxi / Migros Hemen).
+- İlk açılışta çalıştığın platformu seç (Profil > "Hakediş platformu" ile değiştirilebilir). Platform değiştirince eski kayıtların kendi platformu ve tarife sürümüyle kalır.
+- Dört yol: Hızlı tahmin (paket + süre), Detaylı günlük kayıt (gündüz/gece, birleşen paket, km, bahşiş, kesinti…), Dönem özeti (hafta/ay; kayıtlardan ya da toplamları girerek) ve Ödeme karşılaştırma (beklenen ↔ gerçekleşen, kontrol edilecek kalemler).
+- Pano: bu ay tahmini brüt/net, paket, bonusa kalan, saat başına, gider, ödeme farkı + platforma özgü kart.
+- Tarifeler: başlangıçtaki değerler ÖRNEK ve "Doğrulama gerekli" etiketli. Belirsiz kurallarda (km primi, bonus birleşmesi, kademe ücreti, bölge/kıdem) diğer yorumun sonucu da gösterilir. Yemeksepeti saatlik garantisi doğrulanana kadar hesaba katılmaz.
+- Kendi tarifeni gir: form, CSV, ekran görüntüsü ya da PDF (taslak; onaylayınca kullanılır).
+- Yeni tarife yayımlanınca yalnızca kendi platformun için bildirim. Eski kayıtlar sessizce değişmez; "Güncel tarifeyle yeniden hesapla" ayrı işlem olarak saklanır.
+- Gider kategorileri: sigorta, telefon-internet, ekipman eklendi; gider ve net kazanç raporu.
+
+Lütfen test et:
+- Hakediş sekmesi > platform seç > Hızlı tahmin: 45 paket → Trendyol GO örnek tarifesiyle ~4.512 TL; kaydet → Bugün ekranında da görünmeli.
+- Detaylı kayıt: teslimat başına km gir (ör. "2,5 7 4"); km satırları ve uyarılar.
+- Dönem özeti ve Ödeme karşılaştırma ekranları.
+- Platform değiştir → eski kayıt Geçmiş'te eski platform ve sürümüyle duruyor mu?
+
 ## 1.5.0
 
 Bu sürüm 1.4.1'in (yayımlanmadı) her şeyini ve yeni planlama motorunu içerir.
