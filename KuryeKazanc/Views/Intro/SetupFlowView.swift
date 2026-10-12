@@ -85,7 +85,7 @@ struct SetupFlowView: View {
                 ForEach(FuelType.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.segmented)
-            AmountField(title: "Güncel fiyat (\(fuelType.unitName) başına)", value: $fuelPrice, identifier: "fuel.price")
+            HeroAmountField(title: "Güncel fiyat (\(fuelType.unitName) başına)", value: $fuelPrice, identifier: "fuel.price")
             DecimalStepper(title: "Tüketim", value: $consumption, range: 1...20, step: Decimal(string: "0.5")!,
                            unit: "\(fuelType.unitName)/100 km", identifier: "fuel.consumption")
         } footer: {
@@ -99,7 +99,7 @@ struct SetupFlowView: View {
                 ForEach(GoalPeriod.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.segmented)
-            AmountField(title: "Net hedef (yakıt düşülmüş)", value: $goalAmount, identifier: "goal.amount")
+            HeroAmountField(title: "Net hedef (yakıt düşülmüş)", value: $goalAmount, identifier: "goal.amount")
             CountStepper(title: "Haftada", value: $daysPerWeek, range: 1...7, unit: "gün", identifier: "goal.days")
             CountStepper(title: "Günde en fazla", value: $maxHours, range: 2...16, unit: "saat", identifier: "goal.hours")
         } footer: {

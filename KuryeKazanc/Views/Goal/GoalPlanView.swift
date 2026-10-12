@@ -40,7 +40,7 @@ struct GoalPlanView: View {
                 ForEach(GoalPeriod.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.segmented)
-            AmountField(title: "Net hedef (yakıt düşülmüş)", value: $amount, identifier: "plan.amount")
+            HeroAmountField(title: "Net hedef (yakıt düşülmüş)", value: $amount, identifier: "plan.amount")
             CountStepper(title: "Haftada", value: $daysPerWeek, range: 1...7, unit: "gün", identifier: "plan.days")
             CountStepper(title: "Günde en fazla", value: $maxHours, range: 2...16, unit: "saat", identifier: "plan.hours")
             Button("Hedefi kaydet", action: save)

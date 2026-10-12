@@ -17,6 +17,7 @@ struct EarningFormView: View {
     /// Kayitli kanitlar: ayni ekran goruntusu ikinci kez eklenirse uyarilir.
     @Query private var evidences: [ScreenshotEvidence]
 
+    @State private var saved = false
     @State private var viewModel: EarningFormViewModel
     @State private var photoItem: PhotosPickerItem?
     @State private var showUnreviewedConfirmation = false
@@ -156,6 +157,7 @@ struct EarningFormView: View {
                 }
             }
             .dismissesKeyboard()
+            .saveConfirmation(isPresented: $saved)
             .navigationTitle(vm.isEditing ? "Kazancı düzenle" : "Kazanç ekle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -377,11 +379,14 @@ struct EarningFormView: View {
     }
 
     private func save() {
+        // Onay animasyonu sirasinda ikinci kayit olmasin
+        guard !saved else { return }
         do {
             let record: EarningRecord = try viewModel.save(in: modelContext)
             afterSave(record)
             onSaved?()
-            dismiss()
+            withAnimation { saved = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
         } catch {
             saveError = error.localizedDescription
         }

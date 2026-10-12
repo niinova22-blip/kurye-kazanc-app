@@ -293,15 +293,8 @@ struct NumberField: View {
     var decimal: Bool = false
     var identifier: String
 
+    /// 1.7: ortak premium alan (odak cercevesi + titresim).
     var body: some View {
-        HStack {
-            Text(title)
-            Spacer()
-            TextField("0", text: $text)
-                .keyboardType(decimal ? .decimalPad : .numberPad)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 120)
-                .accessibilityIdentifier(identifier)
-        }
+        AmountField(title: title, text: $text, suffix: "", keyboard: decimal ? .decimalPad : .numberPad, identifier: identifier)
     }
 }

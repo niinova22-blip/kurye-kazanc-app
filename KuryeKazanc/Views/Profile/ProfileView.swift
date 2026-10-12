@@ -10,6 +10,8 @@ struct ProfileView: View {
     @Environment(ScreenshotScanner.self) private var scanner
     @Environment(SyncCoordinator.self) private var sync
     @Environment(AccountService.self) private var account
+    @Environment(PayrollModel.self) private var payroll
+    @Environment(\.showIntro) private var showIntro
 
     @Query private var couriers: [Courier]
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
@@ -20,12 +22,9 @@ struct ProfileView: View {
     @AppStorage(AppPreferences.dataSharingConsentDateKey) private var consentTimestamp: Double = 0
     @AppStorage(AppPreferences.locationSharingOptInKey) private var locationSharingOptIn = false
     @AppStorage(AppPreferences.locationSharingConsentDateKey) private var locationConsentTimestamp: Double = 0
-    @AppStorage(AppPreferences.weeklyGoalKey) private var weeklyGoal = 0.0
-    @AppStorage(AppPreferences.dailyGoalKey) private var dailyGoal = 0.0
 
     @State private var costText = ""
-    @State private var weeklyGoalText = ""
-    @State private var dailyGoalText = ""
+    @State private var showsFirmSetup = false
     @State private var showConsentSheet = false
     @State private var showLocationConsentSheet = false
     @State private var showDeleteConfirmation = false
@@ -36,8 +35,8 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             Form {
+                settingsSection
                 profileSection
-                goalsSection
                 expenseSection
                 locationSection
                 AutoShiftSection()
@@ -47,6 +46,8 @@ struct ProfileView: View {
                 CalibrationSection()
                 if BuildEnvironment.showsTesterTools {
                     Section("Test araçları") {
+                        NavigationLink("Test senaryoları") { DemoScenarioView() }
+                        NavigationLink("Veritabanı") { DatabaseInspectorView() }
                         NavigationLink("Tarama günlüğü") { ScanLogView() }
                         Toggle("Test: son 30 gün ve tüm fotoğraflar", isOn: $scanTestWindow)
                             .accessibilityIdentifier("profile.scanTestWindow")
@@ -61,6 +62,9 @@ struct ProfileView: View {
             // Geri yukleme ayarlari degistirir (taban tarihi de degisir): alanlar yeniden okunur.
             .onChange(of: account.lastBackupDate) { _, _ in
                 loadFieldTexts()
+            }
+            .sheet(isPresented: $showsFirmSetup) {
+                SetupFlowView(firmOnly: true) { showsFirmSetup = false }
             }
             .sheet(isPresented: $showConsentSheet) {
                 DataSharingConsentView {
@@ -110,49 +114,43 @@ struct ProfileView: View {
                         .sorted { $0.sortOrder < $1.sortOrder }
                         .map(\.name).joined(separator: ", "))
                 }
-                NavigationLink {
-                    PlannerView()
-                } label: {
-                    Label("Çalışma profili ve plan", systemImage: "calendar.badge.clock")
-                }
-                NavigationLink {
-                    PlatformPickerView()
-                } label: {
-                    Label("Hakediş platformu", systemImage: "turkishlirasign.circle")
-                }
-                .accessibilityIdentifier("profile.payrollPlatform")
             } else {
                 Text("Profil bulunamadı").foregroundStyle(.secondary)
             }
         }
     }
 
-    // MARK: - Hedefler
+    // MARK: - Ayarlar (1.7)
 
-    private var goalsSection: some View {
+    private var settingsSection: some View {
         Section {
-            goalField("Haftalık net hedef", text: $weeklyGoalText, identifier: "profile.weeklyGoal") { weeklyGoal = $0 }
-            goalField("Günlük net hedef", text: $dailyGoalText, identifier: "profile.dailyGoal") { dailyGoal = $0 }
+            Button {
+                showsFirmSetup = true
+            } label: {
+                LabeledContent("Çalıştığım firma",
+                               value: PayrollModel.platformName(payroll.tariffProfile?.platformCode ?? "—"))
+            }
+            .foregroundStyle(.primary)
+            .accessibilityIdentifier("profile.firm")
+            NavigationLink { FuelSettingsView() } label: {
+                Label("Araç ve yakıt", systemImage: "fuelpump")
+            }
+            .accessibilityIdentifier("profile.fuel")
+            NavigationLink { GoalPlanView() } label: {
+                Label("Hedef ve plan", systemImage: "target")
+            }
+            .accessibilityIdentifier("profile.goal")
+            Button { showIntro() } label: {
+                Label("Tanıtımı izle", systemImage: "play.circle")
+            }
+            .accessibilityIdentifier("profile.intro")
+            NavigationLink { AdvancedView() } label: {
+                Label("Gelişmiş", systemImage: "gearshape.2")
+            }
         } header: {
-            Text("Hedefler")
+            Text("Ayarlar")
         } footer: {
-            Text("Bugün ekranındaki halka haftalık hedefi gösterir. Boş bırakırsan hedef kapalı olur.")
-        }
-    }
-
-    private func goalField(_ title: String, text: Binding<String>, identifier: String, onValue: @escaping (Double) -> Void) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            TextField("—", text: text)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 110)
-                .onChange(of: text.wrappedValue) { _, value in
-                    onValue(value.nilIfBlank.flatMap(TurkishNumberParser.parseDecimal).map { max(0, $0) } ?? 0)
-                }
-                .accessibilityIdentifier(identifier)
-            Text("₺").foregroundStyle(.secondary)
+            Text("Tüm hesaplar çalıştığın firmanın tarifesine göre yapılır.")
         }
     }
 
@@ -163,7 +161,7 @@ struct ProfileView: View {
             Toggle("Otomatik gider tahmini", isOn: $autoEstimate)
                 .accessibilityIdentifier("settings.autoEstimate")
             HStack {
-                Text("Km başına yakıt + bakım")
+                Text("Km başına maliyet (yedek)")
                 Spacer()
                 TextField("0", text: $costText)
                     .keyboardType(.decimalPad)
@@ -188,7 +186,7 @@ struct ProfileView: View {
         } header: {
             Text("Gider hesaplama")
         } footer: {
-            Text("Net kazanç = brüt + bonus − giderler. Tahmin, kat edilen km × bu tutardır. Bir gün için yakıt veya bakım gideri girersen o günün tahmini kullanılmaz.")
+            Text("Net kazanç = brüt + bonus − giderler. Yakıt fiyatı girdiysen tahmin km × tüketim × fiyattır; girmediysen km × bu tutar. Bir gün için yakıt veya bakım gideri girersen o günün tahmini kullanılmaz.")
         }
     }
 
@@ -361,8 +359,6 @@ struct ProfileView: View {
 
     private func loadFieldTexts() {
         costText = TurkishNumberParser.format(costPerKm)
-        weeklyGoalText = weeklyGoal > 0 ? TurkishNumberParser.format(weeklyGoal) : ""
-        dailyGoalText = dailyGoal > 0 ? TurkishNumberParser.format(dailyGoal) : ""
     }
 
     private func deleteAllRecords() {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Buyuk TL girisi: odakta vurgu parlamasi + titresim, gecersiz degerde sallanma, rakam gecis animasyonu.
-struct AmountField: View {
+struct HeroAmountField: View {
     let title: String
     @Binding var value: Decimal?
     var unit: String = "TL"

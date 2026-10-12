@@ -562,7 +562,9 @@ struct PayrollSettingsView: View {
                 Text("Yalnızca yayımlanmış tarife tabloları indirilir; cihazından veri gönderilmez. Kapalıysa son bilinen tarife kullanılır.")
             }
             Section {
-                NavigationLink("Platformu değiştir") { PlatformPickerView() }
+                Text("Firmanı Profil > Ayarlar > Çalıştığım firma'dan değiştirebilirsin; tarifenin istediği bilgiler de orada sorulur.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Hakediş ayarları")
