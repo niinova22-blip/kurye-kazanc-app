@@ -284,9 +284,9 @@ final class PayrollModel {
         let weekly: Double = defaults.double(forKey: AppPreferences.weeklyGoalKey)
         let daily: Double = defaults.double(forKey: AppPreferences.dailyGoalKey)
         if weekly > 0 {
-            setGoal(GoalSpec(amount: Money(weekly), period: .week))
+            setGoal(GoalSpec(amount: Money(double: weekly), period: .week))
         } else if daily > 0 {
-            setGoal(GoalSpec(amount: Money(daily), period: .day))
+            setGoal(GoalSpec(amount: Money(double: daily), period: .day))
         }
     }
 
@@ -306,7 +306,7 @@ final class PayrollModel {
     }
 
     func fuelModel(fallbackCostPerKm: Double) -> FuelCostModel {
-        FuelCostModel(settings: state.fuel, vehicleType: state.vehicleType, fallbackCostPerKm: Money(fallbackCostPerKm))
+        FuelCostModel(settings: state.fuel, vehicleType: state.vehicleType, fallbackCostPerKm: Money(double: fallbackCostPerKm))
     }
 
     func pace(entries: [EarningEntry]) -> PaceEstimate {

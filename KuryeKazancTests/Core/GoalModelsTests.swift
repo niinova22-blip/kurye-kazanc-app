@@ -74,4 +74,10 @@ final class GoalModelsTests: XCTestCase {
         store.markEventsSeen(["switch:a|b"])
         XCTAssertEqual(store.state.seenEventIDs, ["switch:a|b"])
     }
+
+    func testMoneyFromDoubleDropsBinaryNoise() {
+        XCTAssertEqual(Money(double: 64.5), Money(Decimal(string: "64.5")!))
+        XCTAssertEqual(Money(double: 0.1 + 0.2), Money(Decimal(string: "0.3")!))
+        XCTAssertEqual(Money(double: 2.5).value, Decimal(string: "2.5"))
+    }
 }
