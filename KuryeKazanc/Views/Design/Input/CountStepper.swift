@@ -102,9 +102,9 @@ struct RepeatButton: View {
             .onTapGesture {
                 if isEnabled { action() }
             }
-            .onLongPressGesture(minimumDuration: 0.35, pressing: { pressing in
+            .onLongPressGesture(minimumDuration: 0.35, perform: start, onPressingChanged: { pressing in
                 if !pressing { stop() }
-            }, perform: start)
+            })
             .accessibilityElement()
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(symbol == "plus" ? "Artır" : "Azalt")

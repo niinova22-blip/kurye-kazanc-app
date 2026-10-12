@@ -3,7 +3,7 @@ import SwiftData
 
 /// Salt okunur veritabani goruntuleyici (yalnizca test surumu): tablolar, satir sayisi, satir ayrintisi.
 struct DatabaseInspectorView: View {
-    enum Table: String, CaseIterable, Identifiable {
+    enum DBTable: String, CaseIterable, Identifiable {
         case earnings = "Kazançlar"
         case expenses = "Giderler"
         case payroll = "Hakediş"
@@ -29,13 +29,13 @@ struct DatabaseInspectorView: View {
     @Environment(PayrollModel.self) private var payroll
     @Query(sort: \EarningRecord.startTime, order: .reverse) private var earnings: [EarningRecord]
     @Query(sort: \ExpenseRecord.date, order: .reverse) private var expenses: [ExpenseRecord]
-    @State private var table: Table = .earnings
+    @State private var table: DBTable = .earnings
 
     var body: some View {
         let rows: [Row] = rows(for: table)
         List {
             Picker("Tablo", selection: $table) {
-                ForEach(Table.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(DBTable.allCases) { Text($0.rawValue).tag($0) }
             }
             .accessibilityIdentifier("db.table")
             Section {
@@ -61,7 +61,7 @@ struct DatabaseInspectorView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func rows(for table: Table) -> [Row] {
+    private func rows(for table: DBTable) -> [Row] {
         switch table {
         case .earnings: earningRows
         case .expenses: expenseRows

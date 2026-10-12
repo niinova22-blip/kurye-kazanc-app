@@ -14,7 +14,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.6.0"
+    MARKETING_VERSION: "1.7.0"
     CURRENT_PROJECT_VERSION: "1"
     VERSIONING_SYSTEM: apple-generic   # CI'da agvtool ile build numarasi arttirilir
     # DEVELOPMENT_TEAM bilerek yok: Codemagic `xcode-project use-profiles` ile imzalama ayarlarini enjekte eder.

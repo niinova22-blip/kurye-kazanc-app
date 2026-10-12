@@ -3,6 +3,25 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.7.0
+
+Yeni:
+- Tanıtım: ilk açılışta 6 sayfalık animasyonlu tanıtım; her ekrandaki soru balonu (?) > "Uygulamayı tanı" ya da Profil > "Tanıtımı izle" ile tekrar.
+- Kurulum: "Hangi firmayla çalışıyorsun?" (Getir, Trendyol GO, Yemeksepeti, Paket Taxi). Firmanın tarifesine göre bölge, kıdem, kadın istihdam desteği, araç soruları; yakıt fiyatı ve hedef. Profil > Ayarlar > Çalıştığım firma ile değişir.
+- Hedef planı: günlük/haftalık/aylık NET hedef (yakıt düşülmüş). Sonuç kartı: zaten alacakların (sabit ücret, destekler), bölge, ayda/günde paket, günde saat, brüt − yakıt = net, sonraki kademe ipucu. Bugün ekranında günlük pay.
+- Firmalar sekmesi (Topluluk yerine): aynı işi diğer firmalarda yapsan ne kazanırdın (yeni başlayan kademesiyle), tarife detayı, kampanyalar, tarife–yakıt ilişkisi; tarifeler değişip başka firma ≥%5 kazançlı olursa bildirim.
+- Yakıt: Profil > Araç ve yakıt (fiyat + tarih + tüketim, geçmiş). Km gideri = km × tüketim × fiyat. Fiyat 7 günden eskiyse hatırlatma.
+- Kazanç sekmesi: Hakediş + Analiz tek sekmede. Teknik ekranlar Profil > Gelişmiş'te.
+- "Doğrulanmamış" uyarıları artık her sayfanın altında tek not.
+- Giriş alanları: odak çerçevesi, titreşim, kaydetme onay animasyonu, −/+ seçiciler.
+- Kaldırıldı: Vardiyayı başlat düğmesi (otomatik vardiya sürerken yalnızca "Vardiyayı bitir"), Topluluk, ekran kaydı eklentisi.
+- Test sürümü: Profil > Test araçları > Test senaryoları (4 hazır senaryo) ve Veritabanı görüntüleyici.
+
+Lütfen test et:
+- Test senaryoları > "Paket Taxi · 30 gün" yükle → Plan: aylık 100.000 TL için paket/saat/bölge kartı; Veritabanı'nda 26 kazanç satırı; "Senaryoyu sil".
+- "Tarife değişti + yakıt arttı" → Firmalar'da bildirim şeridi ve Trendyol GO detayında "Yakıt değişimiyle uyumlu".
+- Soru balonu > Uygulamayı tanı; Profil > Çalıştığım firma ile firma değiştir.
+
 ## 1.6.0
 
 Yeni: Hakediş sekmesi (Trendyol GO, Getir, Yemeksepeti Express, Paket Taxi / Migros Hemen).

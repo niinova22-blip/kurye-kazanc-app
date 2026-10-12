@@ -380,3 +380,24 @@ node --env-file=.env.supabase scripts/server/tariff_center.mjs --admin "Ad Soyad
 - Ödeme ekstresi OCR yapılmadı (ödeme tutarı elle).
 - Supabase erişim anahtarı 7 günlük: zamanlanmış kontrol için uzun süreli anahtar / servis hesabı gerekir.
 - Kaynakların alan çıkarım profilleri boş: yönetici sayfaları inceleyip `extraction_profile` eklemeli; o zamana kadar yalnızca "sayfa değişti, doğrulama gerekli".
+
+## Oturum 9 — 2026-10-13: 1.7.0 tek firma hedef planı, Firmalar, yakıt, tanıtım
+
+Dal: `feature/surum-1-7` (main 1.6.0 üzerinden). Tasarım `docs/superpowers/specs/2026-10-13-surum-1-7-design.md`, plan `docs/superpowers/plans/2026-10-13-surum-1-7.md`.
+
+### Kullanıcı kararları
+- Kurye aynı anda TEK firmada çalışır; plan/hedef kurulumda seçilen firmaya göre. Firmalar ekranı yalnızca tarifeler değişince karşılaştırma için.
+- Ücret = firmanın yayımladığı tarife/kampanya/bonus; kurye ortalaması kullanılmaz. Gider = km × tüketim × yakıt fiyatı (şimdilik elle; ileride sunucu).
+- Hedef NET (yakıt düşülmüş). Karşılaştırmada diğer firmalar en düşük kıdemle.
+
+### Yapılanlar
+- Core `KuryeKazanc/Core/Goal/`: `GoalModels` (GoalSpec, CourierTariffProfile, FuelSettings), `FuelCostModel`, `TariffQuestions`, `PaceEstimate`, `GoalPlanner` (PayEngine ikili aramayla tersine; Paket Taxi Plus + kadın desteği, 45 TL/L, 3 L/100 km, 4,2 paket/sa → aylık 100.000 TL için 986 paket, günde 38, 9,5 sa), `DailyGoalProgress`, `TariffComparison` + `TariffFuelCorrelation` + geçiş önerisi, `UnverifiedItems`, `DemoScenario`. `PayrollState`'e flags/goal/fuel/demo kimlikleri (decodeIfPresent; SwiftData şeması değişmedi). Core testleri 268 → 324.
+- Uygulama: tanıtım (6 animasyonlu sayfa) + kurulum (firma → tarife soruları → yakıt → hedef → araç/konum/paylaşım), soru balonu (?) ile tekrar; Plan ekranı + Bugün hedef kartı; Kazanç sekmesi (Hakediş + Analiz); Firmalar sekmesi; Profil > Ayarlar (Çalıştığım firma, Araç ve yakıt, Hedef ve plan, Tanıtımı izle, Gelişmiş); premium giriş alanları (AmountField yükseltildi, HeroAmountField, CountStepper, SaveConfirmation); tek "doğrulanmamış" notu; test senaryoları + Veritabanı ekranı (test sürümü).
+- Kaldırılanlar: Topluluk sekmesi (sunucu fonksiyonları duruyor), "Vardiyayı başlat" (otomatik vardiya sürerken yalnızca "Vardiyayı bitir"), KuryeBroadcast eklentisi + imza profili.
+- Sürüm 1.7.0, TESTFLIGHT_NOTES 1.7.0.
+
+### Açık konular
+- Uygulama kodu GitHub Actions `ios-ci.yml` ile derlenecek (Windows'ta derlenemez).
+- Sunucudan otomatik yakıt fiyatı (economic_indicators.fuel_price) sonraki sürüm.
+- Bölge kademesinin ilçe listesi resmî kaynakta yok; kullanıcı seçer.
+- Lansman öncesi: sentetik Topluluk verisi temizliği ve Topluluk RPC'lerinin kaldırılması (uygulama artık çağırmıyor).
