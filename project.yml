@@ -30,11 +30,8 @@ targets:
           - "Supporting/Info.plist"
           - "Supporting/*.entitlements"
       - path: Shared
-      - path: KuryeBroadcast/BroadcastLog.swift
     dependencies:
       - target: KuryeShareExtension
-        embed: true
-      - target: KuryeBroadcast
         embed: true
       - target: KuryeLiveActivity
         embed: true
@@ -75,29 +72,6 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: "Kurye Kazanç"
         CODE_SIGN_ENTITLEMENTS: KuryeShareExtension/KuryeShareExtension.entitlements
-        TARGETED_DEVICE_FAMILY: "1"
-        SKIP_INSTALL: YES
-
-  # Ekran yayini eklentisi: kazanc ekranlarini yakalar (kazanc taramasi)
-  KuryeBroadcast:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: KuryeBroadcast
-        excludes:
-          - "Info.plist"
-          - "*.entitlements"
-      - path: KuryeKazanc/Core
-      - path: KuryeKazanc/Services/OCR/TextRecognitionService.swift
-      - path: KuryeKazanc/Services/Screenshots/ScreenshotInbox.swift
-      - path: KuryeKazanc/Services/Screenshots/BroadcastCaptureStore.swift
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.kuryekazanc.app.broadcast
-        INFOPLIST_FILE: KuryeBroadcast/Info.plist
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: "Kurye Kazanç Tarama"
-        CODE_SIGN_ENTITLEMENTS: KuryeBroadcast/KuryeBroadcast.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
 

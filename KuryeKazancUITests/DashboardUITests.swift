@@ -258,13 +258,6 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(breakdown.label.contains("1.050"), "Beklenen brut 1.050, gelen: \(breakdown.label)")
         XCTAssertTrue(breakdown.label.contains("200"), "Beklenen gider 200, gelen: \(breakdown.label)")
     }
-
-    func testCommunityTabExists() {
-        let app = launch(sampleData: false)
-        XCTAssertTrue(app.tabBars.buttons["Topluluk"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Topluluk"].tap()
-        XCTAssertTrue(app.staticTexts["Bölgendeki kuryelerle karşılaştır"].waitForExistence(timeout: 5))
-    }
 }
 
 final class OnboardingUITests: XCTestCase {

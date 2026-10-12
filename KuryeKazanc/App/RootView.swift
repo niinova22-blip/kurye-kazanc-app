@@ -32,8 +32,6 @@ struct MainTabView: View {
                 .tabItem { Label("Hakediş", systemImage: "turkishlirasign.circle") }
             AnalysisView()
                 .tabItem { Label("Analiz", systemImage: "chart.bar.xaxis") }
-            CommunityView()
-                .tabItem { Label("Topluluk", systemImage: "person.3") }
             ProfileView()
                 .tabItem { Label("Profil", systemImage: "person.crop.circle") }
         }

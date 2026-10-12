@@ -212,7 +212,7 @@ struct ProfileView: View {
         } header: {
             Text("Arka plan konumu")
         } footer: {
-            Text("Konum yalnızca “Vardiyayı başlat” ile başlattığın vardiya boyunca takip edilir (mesafe ve ilçe için), bitirince durur. “Uygulamayı kullanırken” izni de yeterlidir; vardiya ön planda başlatıldığında arka planda devam eder. Tam konum saklanmaz.")
+            Text("Konum yalnızca otomatik vardiya sırasında (mesafe ve ilçe için) kullanılır; vardiya bitince durur. “Uygulamayı kullanırken” izni de yeterlidir. Tam konum saklanmaz.")
         }
     }
 

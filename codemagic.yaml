@@ -137,7 +137,6 @@ workflows:
           - kurye-kazanc-appstore-v3
           - kurye-kazanc-share-appstore
           - kurye-kazanc-liveactivity-appstore
-          - kurye-kazanc-broadcast-appstore
         certificates:
           - selfwake-distribution
     triggering:

@@ -148,11 +148,13 @@ struct TodayView: View {
             autoShiftSections
             heroSection(summary)
 
-            Section {
-                shiftPanel(summary)
+            if workSession.isWorking {
+                Section {
+                    shiftPanel(summary)
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
 
             Section { ScanButton() }
             Section {
@@ -468,12 +470,10 @@ struct TodayView: View {
         .accessibilityIdentifier("dashboard.addMenu")
     }
 
+    /// Yalnizca otomatik vardiya surerken: sure/mesafe ve "Vardiyayi bitir" (baslatma dugmesi 1.7'de kaldirildi).
     private func shiftPanel(_ summary: EarningsSummary) -> some View {
         VStack(spacing: 8) {
-            Button(workSession.isWorking ? "Vardiyayı bitir" : "Vardiyayı başlat", action: toggleWork)
-                .buttonStyle(PrimaryActionButtonStyle(isDestructive: workSession.isWorking))
-                .accessibilityIdentifier("dashboard.workToggle")
-            if workSession.isWorking, let start = workSession.sessionStart {
+            if let start = workSession.sessionStart {
                 TimelineView(.periodic(from: start, by: 30)) { context in
                     Text(shiftStatus(elapsed: context.date.timeIntervalSince(start), summary: summary))
                         .font(.footnote)
@@ -482,12 +482,10 @@ struct TodayView: View {
                         .multilineTextAlignment(.center)
                         .accessibilityIdentifier("dashboard.shiftStatus")
                 }
-            } else {
-                Text("Süre ve mesafe ölçülür; konum yalnızca vardiya boyunca kullanılır.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
             }
+            Button("Vardiyayı bitir", action: endShift)
+                .buttonStyle(PrimaryActionButtonStyle(isDestructive: true))
+                .accessibilityIdentifier("dashboard.endShift")
         }
     }
 
@@ -641,15 +639,11 @@ struct TodayView: View {
         return parts.joined(separator: " · ")
     }
 
-    private func toggleWork() {
+    private func endShift() {
         Haptics.impact()
-        if workSession.isWorking {
-            // Vardiya bitince kazanc formu sure + mesafe + bolgeyle on doldurulmus acilir
-            if let summary = autoShift.endShift() {
-                activeSheet = .addEarning(session: summary)
-            }
-        } else {
-            autoShift.startManualShift()
+        // Vardiya bitince kazanc formu sure + mesafe + bolgeyle on doldurulmus acilir
+        if let summary = autoShift.endShift() {
+            activeSheet = .addEarning(session: summary)
         }
     }
 

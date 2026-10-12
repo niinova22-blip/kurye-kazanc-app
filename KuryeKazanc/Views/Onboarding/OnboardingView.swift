@@ -160,7 +160,7 @@ struct OnboardingView: View {
                 .accessibilityHidden(true)
             Text("Konum yalnızca vardiyada")
                 .font(.title.bold())
-            Text("Vardiyayı başlattığında mesafeni ölçer, bitirince durur. Kayıtlara yalnızca ilçe eklenir.")
+            Text("Otomatik vardiya açıksa sürüşünü algılar, mesafeni ölçer; bitince durur. Kayıtlara yalnızca ilçe eklenir.")
                 .foregroundStyle(.secondary)
 
             if location.isAuthorized {
