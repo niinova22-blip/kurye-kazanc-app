@@ -112,6 +112,13 @@ struct PayrollState: Codable, Equatable {
     var regionTier: String? = nil
     var seniorityYears: Int? = nil
     var vehicleType: String? = nil
+    /// 1.7: kosula bagli kalemler icin isaretler (or. "woman_employment").
+    var flags: [String] = []
+    var goal: GoalSpec? = nil
+    var fuel: FuelSettings = FuelSettings()
+    /// Test senaryosunun olusturdugu kayitlar (yalnizca bunlar silinir).
+    var demoRecordIDs: [UUID] = []
+    var demoLogIDs: [UUID] = []
 
     init() {}
 
@@ -127,9 +134,22 @@ struct PayrollState: Codable, Equatable {
         regionTier = try c.decodeIfPresent(String.self, forKey: .regionTier)
         seniorityYears = try c.decodeIfPresent(Int.self, forKey: .seniorityYears)
         vehicleType = try c.decodeIfPresent(String.self, forKey: .vehicleType)
+        flags = try c.decodeIfPresent([String].self, forKey: .flags) ?? []
+        goal = try c.decodeIfPresent(GoalSpec.self, forKey: .goal)
+        fuel = try c.decodeIfPresent(FuelSettings.self, forKey: .fuel) ?? FuelSettings()
+        demoRecordIDs = try c.decodeIfPresent([UUID].self, forKey: .demoRecordIDs) ?? []
+        demoLogIDs = try c.decodeIfPresent([UUID].self, forKey: .demoLogIDs) ?? []
     }
 
     var activePlatform: String? { platformHistory.last?.code }
+
+    var hasChosenFirm: Bool { activePlatform != nil }
+
+    var tariffProfile: CourierTariffProfile? {
+        guard let code = activePlatform else { return nil }
+        return CourierTariffProfile(platformCode: code, regionTier: regionTier, seniorityYears: seniorityYears,
+                                    vehicleType: vehicleType, flags: flags)
+    }
 }
 
 enum PayrollStoreError: Error, Equatable {
@@ -199,6 +219,50 @@ final class PayrollStore {
         state.regionTier = regionTier
         state.seniorityYears = seniorityYears
         state.vehicleType = vehicleType
+        persist()
+    }
+
+    // MARK: - 1.7 hedef, yakit, isaretler
+
+    func setFlags(_ flags: [String]) {
+        state.flags = Array(Set(flags)).sorted()
+        persist()
+    }
+
+    func setGoal(_ goal: GoalSpec?) {
+        state.goal = goal
+        persist()
+    }
+
+    func addFuelPrice(_ entry: FuelPriceEntry) {
+        state.fuel.entries.append(entry)
+        state.fuel.entries.sort { $0.day < $1.day }
+        persist()
+    }
+
+    func deleteFuelPrice(id: UUID) {
+        state.fuel.entries.removeAll { $0.id == id }
+        persist()
+    }
+
+    func setConsumption(_ value: Decimal?) {
+        state.fuel.consumptionPer100Km = value
+        persist()
+    }
+
+    func replaceFuel(_ fuel: FuelSettings) {
+        state.fuel = fuel
+        persist()
+    }
+
+    func setDemoIDs(records: [UUID], logs: [UUID]) {
+        state.demoRecordIDs = records
+        state.demoLogIDs = logs
+        persist()
+    }
+
+    func removeLogs(ids: Set<UUID>) {
+        state.logs.removeAll { ids.contains($0.id) }
         persist()
     }
 
