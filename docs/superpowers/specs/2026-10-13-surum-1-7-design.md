@@ -161,8 +161,8 @@ haftalık varsa haftalık hedef olur).
 ## 6. Yakıt
 
 - `FuelPriceEntry { date, pricePerLiter (Money), fuelType (benzin/motorin/elektrik-kWh), source:
-  manual|server, province? }`, `FuelStore` (JSON `fuel.json`, `PayrollStore` deseni).
-  SwiftData şeması değişmez.
+  manual|server }`, `FuelSettings` mevcut `PayrollState` JSON'una (`payroll.json`) eklenir
+  (`decodeIfPresent`). SwiftData şeması değişmez.
 - Profil > Araç ve yakıt: fiyat girişi (tarih varsayılan bugün), tüketim (L/100 km; motosiklet
   varsayılan 3,0, otomobil 6,5), geçmiş listesi (silinebilir).
 - Fiyat 7 günden eskiyse Bugün ve Firmalar'da "Yakıt fiyatını güncelle" satırı.
@@ -212,7 +212,7 @@ haftalık varsa haftalık hedef olur).
   4. `fresh` — boş; tanıtım + kurulum baştan.
   Senaryolar deterministiktir (sabit tohum, bugüne göre göreli tarihler).
 - `DemoScenarioLoader` (uygulama): kazanç/gider (SwiftData), hakediş kayıtları (`PayrollStore`),
-  yakıt (`FuelStore`), profil ve hedef (UserDefaults) yazar; oluşturulan kimlikleri
+  yakıt (`PayrollState.fuel`), profil ve hedef (UserDefaults) yazar; oluşturulan kimlikleri
   `demoRecordIDs` altında saklar. "Senaryoyu sil" yalnızca bunları ve senaryonun ayarlarını
   geri alır (yükleme öncesi ayarların yedeği). Gerçek kayıt varken yüklemede onay uyarısı.
 - `DatabaseInspectorView` (salt okunur): sekmeler Kazançlar, Giderler, Hakediş, Yakıt, Ayarlar
