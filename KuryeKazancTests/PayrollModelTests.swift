@@ -220,4 +220,14 @@ final class PayrollModelTests: XCTestCase {
         if let suggestion { model.markSwitchSeen(suggestion) }
         XCTAssertNil(model.pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: 2))
     }
+
+    func testSwitchNotificationOnlyOnce() {
+        let model = makeModel()
+        model.chooseFirm("migros_hemen", regionTier: "standard", seniorityYears: 0, vehicleType: nil, flags: [])
+        for version in DemoScenarioCatalog.scenario("tariffChanged")!.userTariffs(today: model.today) {
+            _ = model.saveUserTariff(version, activate: true)
+        }
+        XCTAssertNotNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2))
+        XCTAssertNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2))
+    }
 }

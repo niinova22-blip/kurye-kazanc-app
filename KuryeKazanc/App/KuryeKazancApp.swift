@@ -51,7 +51,21 @@ struct KuryeKazancApp: App {
         // Tarifeler: basarisizlikta son bilinen / gomulu tarife kullanilir; hesaplama aga bagli degil
         await environment.tariffs.refreshIfNeeded()
         await environment.payroll.refreshNotices()
+        await notifyTariffSwitchIfNeeded()
         await sync.flush()
+    }
+}
+
+extension KuryeKazancApp {
+    /// Tarife esitlemesinden sonra baska bir firma belirgin sekilde daha kazancli hale geldiyse bir kez bildirir.
+    @MainActor
+    private func notifyTariffSwitchIfNeeded() async {
+        let records: [EarningRecord] = (try? environment.container.mainContext.fetch(FetchDescriptor<EarningRecord>())) ?? []
+        let costPerKm: Double = UserDefaults.standard.object(forKey: AppPreferences.costPerKmKey) as? Double
+            ?? AppPreferences.defaultCostPerKm
+        guard let suggestion = environment.payroll.switchSuggestionToNotify(entries: records.map(\.entry),
+                                                                             fallbackCostPerKm: costPerKm) else { return }
+        await TariffSwitchNotifier.notify(suggestion)
     }
 }
 

@@ -343,6 +343,18 @@ final class PayrollModel {
         reload()
     }
 
+    /// Tarife esitlemesinden sonra: yeni bir gecis onerisi varsa bir kez bildirilmek uzere dondurur
+    /// (bildirim kaydi ayri tutulur; Firmalar ekranindaki serit "Anladim"a kadar kalir).
+    func switchSuggestionToNotify(entries: [EarningEntry], fallbackCostPerKm: Double) -> SwitchSuggestion? {
+        let workload = WorkloadSpec.from(pace: pace(entries: entries), goal: state.goal)
+        guard let suggestion = pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: fallbackCostPerKm) else { return nil }
+        let key: String = "notified:" + suggestion.key
+        guard !state.seenEventIDs.contains(key) else { return nil }
+        store.markEventsSeen([key])
+        reload()
+        return suggestion
+    }
+
     /// Senaryo yukleyici gibi depoya dogrudan yazanlar icin.
     func reloadState() { reload() }
 
