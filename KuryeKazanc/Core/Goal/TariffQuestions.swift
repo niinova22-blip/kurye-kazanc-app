@@ -9,6 +9,10 @@ struct TariffQuestions: Equatable {
 
     var isEmpty: Bool { regionTiers.isEmpty && !asksSeniority && flags.isEmpty && vehicleTypes.isEmpty }
 
+    /// Kisinin kendisine ait (donemden donem degismeyen) isaretler. "weekly_performance", "referral" gibi
+    /// donemlik basari kosullari kurulumda sorulmaz ve plana girmez.
+    static let profileFlags: Set<String> = ["woman_employment"]
+
     static func required(platform: String, catalog: TariffCatalog, day: String) -> TariffQuestions {
         let versions: [TariffVersion] = catalog.usable(platform: platform, day: day)
         var tiers: Set<String> = []
@@ -20,7 +24,7 @@ struct TariffQuestions: Equatable {
             for item in version.activeItems(on: day) {
                 let c = item.conditions
                 if let tier = c.regionTier { tiers.insert(tier) }
-                if let flag = c.requiresFlag { flags.insert(flag) }
+                if let flag = c.requiresFlag, profileFlags.contains(flag) { flags.insert(flag) }
                 if c.minSeniorityYears != nil || c.maxSeniorityYears != nil { seniority = true }
             }
         }

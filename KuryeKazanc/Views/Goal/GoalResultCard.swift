@@ -51,11 +51,19 @@ struct GoalResultCard: View {
             } icon: {
                 Image(systemName: "banknote.fill").foregroundStyle(Theme.accent)
             }
-            Text("Net \(PayFormat.tl(plan.net)) / ay")
+            Text(netText)
                 .font(.title2.bold())
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .accessibilityIdentifier("goal.net")
+        }
+    }
+
+    private var netText: String {
+        switch plan.goal.period {
+        case .month: "Net \(PayFormat.tl(plan.net)) / ay"
+        case .week: "Net ≈ \(PayFormat.tl(plan.periodNet())) / hafta (\(PayFormat.tl(plan.net)) / ay)"
+        case .day: "Net ≈ \(PayFormat.tl(plan.periodNet())) / gün (\(PayFormat.tl(plan.net)) / ay)"
         }
     }
 

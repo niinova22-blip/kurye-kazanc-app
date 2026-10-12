@@ -75,7 +75,7 @@ final class DemoScenarioTests: XCTestCase {
         let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: versions)
         XCTAssertEqual(TariffFuelCorrelation.evaluate(platform: "trendyol_go", catalog: catalog, fuel: fuel(s), today: today)?.verdict,
                        .consistent)
-        let rows = TariffComparison.rows(workload: WorkloadSpec(packagesPerDay: 35, hoursPerDay: 9, kmPerPackage: 3, daysPerMonth: 26),
+        let rows = TariffComparison.rows(workload: WorkloadSpec(packagesPerDay: 32, hoursPerDay: 8, kmPerPackage: 3, daysPerMonth: 26),
                                          profile: try XCTUnwrap(s.profile), catalog: catalog, fuel: fuel(s), day: today)
         XCTAssertEqual(TariffComparison.switchSuggestion(rows: rows)?.platformCode, "trendyol_go")
     }
@@ -89,5 +89,16 @@ final class DemoScenarioTests: XCTestCase {
 
     func testDayOffset() {
         XCTAssertEqual(DemoScenarioCatalog.day(offset: -13, from: "2026-10-13"), "2026-09-30")
+    }
+
+    /// Uygulamada kayit yokken varsayilan is yuku (2,5 paket/sa × 8 sa = 20 paket/gun) ile de oneri cikmali.
+    func testTariffChangedSuggestionWithDefaultWorkload() throws {
+        let s = try XCTUnwrap(DemoScenarioCatalog.scenario("tariffChanged"))
+        let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: s.userTariffs(today: today))
+        let pace = PaceEstimate.estimate(entries: [], platform: "migros_hemen", now: Date())
+        let workload = WorkloadSpec.from(pace: pace, goal: s.goal)
+        let rows = TariffComparison.rows(workload: workload, profile: try XCTUnwrap(s.profile), catalog: catalog,
+                                         fuel: fuel(s), day: today)
+        XCTAssertEqual(TariffComparison.switchSuggestion(rows: rows)?.platformCode, "trendyol_go")
     }
 }

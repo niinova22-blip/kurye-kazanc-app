@@ -27,6 +27,15 @@ struct GoalSpec: Codable, Equatable {
         self.maxHoursPerDay = maxHoursPerDay
     }
 
+    /// Ileri uyumluluk: eksik alanlar varsayilanla okunur (yeni surumde eklenen alan eski dosyayi bozmasin).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(amount: try c.decode(Money.self, forKey: .amount),
+                  period: try c.decodeIfPresent(GoalPeriod.self, forKey: .period) ?? .month,
+                  daysPerWeek: try c.decodeIfPresent(Int.self, forKey: .daysPerWeek) ?? 6,
+                  maxHoursPerDay: try c.decodeIfPresent(Decimal.self, forKey: .maxHoursPerDay) ?? 10)
+    }
+
     /// Ayda calisilan gun: haftalik gun × 52 / 12, en yakin tam sayi (6 -> 26).
     var monthWorkDays: Int { GoalSpec.monthWorkDays(daysPerWeek: daysPerWeek) }
 
@@ -95,10 +104,30 @@ struct FuelPriceEntry: Codable, Equatable, Identifiable {
         self.type = type
         self.source = source
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID(),
+                  day: try c.decode(String.self, forKey: .day),
+                  pricePerUnit: try c.decode(Money.self, forKey: .pricePerUnit),
+                  type: try c.decodeIfPresent(FuelType.self, forKey: .type) ?? .gasoline,
+                  source: try c.decodeIfPresent(FuelPriceSource.self, forKey: .source) ?? .manual)
+    }
 }
 
 struct FuelSettings: Codable, Equatable {
     var entries: [FuelPriceEntry] = []
     /// L (ya da kWh) / 100 km. nil: arac turunun varsayilani.
     var consumptionPer100Km: Decimal? = nil
+
+    init(entries: [FuelPriceEntry] = [], consumptionPer100Km: Decimal? = nil) {
+        self.entries = entries
+        self.consumptionPer100Km = consumptionPer100Km
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        entries = try c.decodeIfPresent([FuelPriceEntry].self, forKey: .entries) ?? []
+        consumptionPer100Km = try c.decodeIfPresent(Decimal.self, forKey: .consumptionPer100Km)
+    }
 }

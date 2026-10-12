@@ -36,8 +36,36 @@ final class PayrollModel {
 
     // MARK: - Katalog ve motor
 
+    /// Katalog yalnizca uzak / kullanici surumleri degisince yeniden kurulur (gorunum govdeleri sik okur).
     var catalog: TariffCatalog {
-        TariffCatalog.merged(bundled: BundledTariffs.all, remote: tariffs.remoteVersions, user: state.userTariffs)
+        let key: String = catalogKey
+        if let cached = catalogCache, cached.key == key { return cached.catalog }
+        let merged = TariffCatalog.merged(bundled: BundledTariffs.all, remote: tariffs.remoteVersions, user: state.userTariffs)
+        catalogCache = (key, merged)
+        return merged
+    }
+
+    @ObservationIgnored private var catalogCache: (key: String, catalog: TariffCatalog)?
+    @ObservationIgnored private var planCache: (key: PlanCacheKey, result: Result<GoalPlan, PayError>)?
+    @ObservationIgnored private var comparisonCache: (key: PlanCacheKey, rows: [FirmComparisonRow])?
+
+    private var catalogKey: String {
+        let versions: [TariffVersion] = tariffs.remoteVersions + state.userTariffs
+        return versions.map { v in
+            "\(v.id).\(v.revision).\(v.approvalStatus.rawValue).\(v.effectiveFrom).\(v.effectiveUntil ?? "").\(v.items.count)"
+        }.joined(separator: ",")
+    }
+
+    /// Plan ve karsilastirma onbellek anahtari: girdilerden biri degismedikce motor yeniden calismaz.
+    private struct PlanCacheKey: Equatable {
+        var catalog: String
+        var profile: CourierTariffProfile?
+        var goal: GoalSpec?
+        var fuel: FuelSettings
+        var pace: PaceEstimate?
+        var workload: WorkloadSpec?
+        var day: String
+        var fallback: Double
     }
 
     var engine: PayEngine { PayEngine(catalog: catalog) }
@@ -288,6 +316,9 @@ final class PayrollModel {
         } else if daily > 0 {
             setGoal(GoalSpec(amount: Money(double: daily), period: .day))
         }
+        // Bir kerelik: eski anahtarlar silinir (hedef sonradan kaldirilirsa geri gelmesin)
+        defaults.removeObject(forKey: AppPreferences.weeklyGoalKey)
+        defaults.removeObject(forKey: AppPreferences.dailyGoalKey)
     }
 
     func addFuelPrice(_ price: Money, type: FuelType, on date: Date) {
@@ -316,14 +347,25 @@ final class PayrollModel {
     /// Secili firmanin tarifesiyle hedef plani; firma ya da hedef yoksa nil.
     func goalPlan(entries: [EarningEntry], fallbackCostPerKm: Double) -> Result<GoalPlan, PayError>? {
         guard let profile = tariffProfile, let goal = state.goal else { return nil }
+        let currentPace: PaceEstimate = pace(entries: entries)
+        let key = PlanCacheKey(catalog: catalogKey, profile: profile, goal: goal, fuel: state.fuel, pace: currentPace,
+                               workload: nil, day: today, fallback: fallbackCostPerKm)
+        if let cached = planCache, cached.key == key { return cached.result }
         let planner = GoalPlanner(engine: engine, fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm))
-        return planner.plan(goal: goal, profile: profile, pace: pace(entries: entries), day: today)
+        let result: Result<GoalPlan, PayError> = planner.plan(goal: goal, profile: profile, pace: currentPace, day: today)
+        planCache = (key, result)
+        return result
     }
 
     func comparison(workload: WorkloadSpec, fallbackCostPerKm: Double) -> [FirmComparisonRow] {
         guard let profile = tariffProfile else { return [] }
-        return TariffComparison.rows(workload: workload, profile: profile, catalog: catalog,
-                                     fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm), day: today)
+        let key = PlanCacheKey(catalog: catalogKey, profile: profile, goal: nil, fuel: state.fuel, pace: nil,
+                               workload: workload, day: today, fallback: fallbackCostPerKm)
+        if let cached = comparisonCache, cached.key == key { return cached.rows }
+        let rows: [FirmComparisonRow] = TariffComparison.rows(workload: workload, profile: profile, catalog: catalog,
+                                                              fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm), day: today)
+        comparisonCache = (key, rows)
+        return rows
     }
 
     func correlation(platform: String, fallbackCostPerKm: Double) -> TariffFuelCorrelation? {
@@ -347,6 +389,16 @@ final class PayrollModel {
     /// (bildirim kaydi ayri tutulur; Firmalar ekranindaki serit "Anladim"a kadar kalir).
     func switchSuggestionToNotify(entries: [EarningEntry], fallbackCostPerKm: Double) -> SwitchSuggestion? {
         let workload = WorkloadSpec.from(pace: pace(entries: entries), goal: state.goal)
+        // Yalnizca tarife surumleri degistiyse: ilk degerlendirme (kurulum / guncelleme) sessizce taban olur
+        let rows: [FirmComparisonRow] = comparison(workload: workload, fallbackCostPerKm: fallbackCostPerKm)
+        guard !rows.isEmpty else { return nil }
+        let baseline: String = rows.map(\.versionID).sorted().joined(separator: "|")
+        let previous: String? = state.switchBaseline
+        if previous != baseline {
+            store.setSwitchBaseline(baseline)
+            reload()
+        }
+        guard let previous, previous != baseline else { return nil }
         guard let suggestion = pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: fallbackCostPerKm) else { return nil }
         let key: String = "notified:" + suggestion.key
         guard !state.seenEventIDs.contains(key) else { return nil }

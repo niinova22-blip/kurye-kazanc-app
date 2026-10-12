@@ -47,7 +47,7 @@ struct FirmsView: View {
     @ViewBuilder private var switchBanner: some View {
         if let suggestion = payroll.pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: costPerKm) {
             Section {
-                Label("Tarifeler değişti: bu işi \(PayrollModel.platformName(suggestion.platformCode))'de yapsan ayda +\(PayFormat.tl(suggestion.extraNet)) net.",
+                Label("Güncel tarifelerle bu işi \(PayrollModel.platformName(suggestion.platformCode))'de yapsan ayda +\(PayFormat.tl(suggestion.extraNet)) net.",
                       systemImage: "arrow.triangle.2.circlepath")
                     .font(.subheadline)
                 Button("Anladım") {

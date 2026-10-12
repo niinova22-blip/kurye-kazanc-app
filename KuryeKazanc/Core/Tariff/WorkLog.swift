@@ -119,6 +119,8 @@ struct PayrollState: Codable, Equatable {
     /// Test senaryosunun olusturdugu kayitlar (yalnizca bunlar silinir).
     var demoRecordIDs: [UUID] = []
     var demoLogIDs: [UUID] = []
+    /// Firma gecis bildirimi: en son degerlendirilen tarife surumu cifti (ilk degerlendirmede bildirim yok).
+    var switchBaseline: String? = nil
 
     init() {}
 
@@ -139,6 +141,7 @@ struct PayrollState: Codable, Equatable {
         fuel = try c.decodeIfPresent(FuelSettings.self, forKey: .fuel) ?? FuelSettings()
         demoRecordIDs = try c.decodeIfPresent([UUID].self, forKey: .demoRecordIDs) ?? []
         demoLogIDs = try c.decodeIfPresent([UUID].self, forKey: .demoLogIDs) ?? []
+        switchBaseline = try c.decodeIfPresent(String.self, forKey: .switchBaseline)
     }
 
     var activePlatform: String? { platformHistory.last?.code }
@@ -258,6 +261,11 @@ final class PayrollStore {
     func setDemoIDs(records: [UUID], logs: [UUID]) {
         state.demoRecordIDs = records
         state.demoLogIDs = logs
+        persist()
+    }
+
+    func setSwitchBaseline(_ key: String?) {
+        state.switchBaseline = key
         persist()
     }
 

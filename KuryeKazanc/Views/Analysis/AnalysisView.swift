@@ -75,6 +75,12 @@ private struct AnalysisContentView: View {
 
     @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
+    @Environment(PayrollModel.self) private var payroll
+
+    /// Bugun ekraniyla ayni: yakit fiyati girildiyse km × tuketim × fiyat, yoksa km basi maliyet.
+    private var effectiveCostPerKm: Double {
+        payroll.fuelModel(fallbackCostPerKm: costPerKm).costPerKm(on: payroll.today).doubleValue
+    }
 
     @State private var editingEarning: EarningRecord?
     @State private var editingExpense: ExpenseRecord?
@@ -108,11 +114,11 @@ private struct AnalysisContentView: View {
     }
 
     private var calculator: EarningsCalculator {
-        EarningsCalculator(costPerKm: costPerKm, autoEstimateEnabled: autoEstimate)
+        EarningsCalculator(costPerKm: effectiveCostPerKm, autoEstimateEnabled: autoEstimate)
     }
 
     private var analytics: EarningsAnalytics {
-        EarningsAnalytics(calendar: .current, costPerKm: costPerKm)
+        EarningsAnalytics(calendar: .current, costPerKm: effectiveCostPerKm)
     }
 
     private var platformNames: [String: String] {

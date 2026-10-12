@@ -47,8 +47,8 @@ struct DemoScenario: Identifiable, Equatable {
             }
             return v
         }
-        let v1 = make("v1", number: 1, from: -60, until: -21, factor: Decimal(string: "1.6")!)
-        let v2 = make("v2", number: 2, from: -20, until: nil, factor: Decimal(string: "1.728")!) // 1,6 × 1,08
+        let v1 = make("v1", number: 1, from: -60, until: -20, factor: 2)
+        let v2 = make("v2", number: 2, from: -20, until: nil, factor: Decimal(string: "2.16")!) // 2 × 1,08
         return [v1, v2]
     }
 }

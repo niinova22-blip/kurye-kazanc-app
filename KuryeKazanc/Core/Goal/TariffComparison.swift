@@ -15,6 +15,8 @@ struct WorkloadSpec: Codable, Equatable {
     }
 
     var monthlyPackages: Int { packagesPerDay * daysPerMonth }
+    /// Ayda gun -> haftada gun (26 -> 6), 1...7.
+    var daysPerWeek: Int { min(7, max(1, Int((Double(daysPerMonth) * 12 / 52).rounded()))) }
     var monthlyHours: Decimal { hoursPerDay * Decimal(daysPerMonth) }
 
     /// Planlayicinin hiz bicimine cevrim.
@@ -84,7 +86,8 @@ enum TariffComparison {
         for platform in PayPlatform.all where platform.isActive {
             let (profile, notes) = comparisonProfile(for: platform.code, own: own, catalog: catalog, day: day)
             guard case let .success(e) = planner.evaluate(packages: workload.monthlyPackages, profile: profile,
-                                                          pace: workload.pace, day: day) else { continue }
+                                                          pace: workload.pace, day: day,
+                                                          daysPerWeek: workload.daysPerWeek) else { continue }
             let version: TariffVersion? = catalog.versions.first { $0.id == e.breakdown.tariffVersionID }
             rows.append(FirmComparisonRow(
                 platformCode: platform.code, isCurrent: platform.code == own.platformCode, gross: e.gross,

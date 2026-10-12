@@ -81,6 +81,17 @@ struct SetupFlowView: View {
 
     private var fuelSection: some View {
         Section {
+            if questions.vehicleTypes.isEmpty {
+                Picker("Araç", selection: $vehicle) {
+                    Text("Motosiklet").tag("motorcycle")
+                    Text("Otomobil").tag("car")
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("fuel.vehicle")
+                .onChange(of: vehicle) { _, value in
+                    consumption = FuelCostModel.defaultConsumption(vehicleType: value)
+                }
+            }
             Picker("Yakıt", selection: $fuelType) {
                 ForEach(FuelType.allCases) { Text($0.displayName).tag($0) }
             }
@@ -183,7 +194,7 @@ struct SetupFlowView: View {
         payroll.chooseFirm(firm,
                            regionTier: q.regionTiers.isEmpty ? nil : regionTier,
                            seniorityYears: q.asksSeniority ? seniority : nil,
-                           vehicleType: q.vehicleTypes.isEmpty ? nil : vehicle,
+                           vehicleType: vehicle,
                            flags: Array(flags.intersection(Set(q.flags))))
         if !firmOnly {
             payroll.setConsumption(consumption)

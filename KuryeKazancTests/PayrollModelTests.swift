@@ -204,6 +204,7 @@ final class PayrollModelTests: XCTestCase {
         defaults.set(15_000.0, forKey: AppPreferences.weeklyGoalKey)
         model.migrateLegacyGoal(defaults: defaults)
         XCTAssertEqual(model.goal, GoalSpec(amount: Money(15_000), period: .week))
+        XCTAssertEqual(defaults.double(forKey: AppPreferences.weeklyGoalKey), 0)
         model.setGoal(GoalSpec(amount: Money(1), period: .month))
         model.migrateLegacyGoal(defaults: defaults)
         XCTAssertEqual(model.goal?.amount, Money(1))
@@ -214,7 +215,7 @@ final class PayrollModelTests: XCTestCase {
         model.chooseFirm("migros_hemen", regionTier: "standard", seniorityYears: 0, vehicleType: nil, flags: [])
         let scenario = DemoScenarioCatalog.scenario("tariffChanged")!
         for version in scenario.userTariffs(today: model.today) { _ = model.saveUserTariff(version, activate: true) }
-        let workload = WorkloadSpec(packagesPerDay: 35, hoursPerDay: 9, kmPerPackage: 3, daysPerMonth: 26)
+        let workload = WorkloadSpec(packagesPerDay: 32, hoursPerDay: 8, kmPerPackage: 3, daysPerMonth: 26)
         let suggestion = model.pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: 2)
         XCTAssertEqual(suggestion?.platformCode, "trendyol_go")
         if let suggestion { model.markSwitchSeen(suggestion) }
@@ -224,10 +225,23 @@ final class PayrollModelTests: XCTestCase {
     func testSwitchNotificationOnlyOnce() {
         let model = makeModel()
         model.chooseFirm("migros_hemen", regionTier: "standard", seniorityYears: 0, vehicleType: nil, flags: [])
+        XCTAssertNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2)) // taban
         for version in DemoScenarioCatalog.scenario("tariffChanged")!.userTariffs(today: model.today) {
             _ = model.saveUserTariff(version, activate: true)
         }
         XCTAssertNotNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2))
         XCTAssertNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2))
+    }
+
+    func testFirstSwitchEvaluationIsSilent() {
+        let model = makeModel()
+        model.chooseFirm("migros_hemen", regionTier: "standard", seniorityYears: 0, vehicleType: nil, flags: [])
+        // Kurulum: taban kaydedilir, bildirim yok
+        XCTAssertNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2))
+        for version in DemoScenarioCatalog.scenario("tariffChanged")!.userTariffs(today: model.today) {
+            _ = model.saveUserTariff(version, activate: true)
+        }
+        // Tarife degisti: oneri bir kez
+        XCTAssertNotNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2))
     }
 }
