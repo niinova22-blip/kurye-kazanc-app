@@ -174,4 +174,50 @@ final class PayrollModelTests: XCTestCase {
         XCTAssertEqual(dashboard.estimatedNet, Money(500))
         XCTAssertEqual(dashboard.netPerHour, Money(100))
     }
+
+    // MARK: - 1.7
+
+    func testChooseFirmStoresProfileAndGoalPlan() throws {
+        let model = makeModel()
+        model.chooseFirm("migros_hemen", regionTier: "plus", seniorityYears: 1, vehicleType: nil, flags: ["woman_employment"])
+        model.setGoal(GoalSpec(amount: Money(100_000), period: .month))
+        model.setConsumption(3)
+        model.addFuelPrice(Money(45), type: .gasoline, on: now)
+        XCTAssertEqual(model.tariffProfile?.platformCode, "migros_hemen")
+        XCTAssertEqual(model.tariffProfile?.flags, ["woman_employment"])
+        let result = try XCTUnwrap(model.goalPlan(entries: [], fallbackCostPerKm: 2))
+        guard case let .success(plan) = result else { return XCTFail("\(result)") }
+        XCTAssertTrue(plan.pace.isAssumed)
+        XCTAssertGreaterThan(plan.monthlyPackages, 0)
+        XCTAssertFalse(plan.usesFuelFallback)
+    }
+
+    func testGoalPlanNilWithoutFirmOrGoal() {
+        let model = makeModel()
+        XCTAssertNil(model.goalPlan(entries: [], fallbackCostPerKm: 2))
+        model.chooseFirm("getir", regionTier: nil, seniorityYears: nil, vehicleType: "motorcycle", flags: [])
+        XCTAssertNil(model.goalPlan(entries: [], fallbackCostPerKm: 2))
+    }
+
+    func testLegacyWeeklyGoalMigrates() {
+        let model = makeModel()
+        defaults.set(15_000.0, forKey: AppPreferences.weeklyGoalKey)
+        model.migrateLegacyGoal(defaults: defaults)
+        XCTAssertEqual(model.goal, GoalSpec(amount: Money(15_000), period: .week))
+        model.setGoal(GoalSpec(amount: Money(1), period: .month))
+        model.migrateLegacyGoal(defaults: defaults)
+        XCTAssertEqual(model.goal?.amount, Money(1))
+    }
+
+    func testSwitchSuggestionShownOnce() {
+        let model = makeModel()
+        model.chooseFirm("migros_hemen", regionTier: "standard", seniorityYears: 0, vehicleType: nil, flags: [])
+        let scenario = DemoScenarioCatalog.scenario("tariffChanged")!
+        for version in scenario.userTariffs(today: model.today) { _ = model.saveUserTariff(version, activate: true) }
+        let workload = WorkloadSpec(packagesPerDay: 35, hoursPerDay: 9, kmPerPackage: 3, daysPerMonth: 26)
+        let suggestion = model.pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: 2)
+        XCTAssertEqual(suggestion?.platformCode, "trendyol_go")
+        if let suggestion { model.markSwitchSeen(suggestion) }
+        XCTAssertNil(model.pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: 2))
+    }
 }

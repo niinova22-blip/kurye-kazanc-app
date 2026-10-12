@@ -67,4 +67,11 @@ final class GoalModelsTests: XCTestCase {
         store.setDemoIDs(records: [UUID()], logs: [UUID()])
         XCTAssertEqual(store.state.demoLogIDs.count, 1)
     }
+
+    func testMarkEventsSeen() {
+        let store = PayrollStore(fileURL: nil)
+        store.markEventsSeen(["switch:a|b"])
+        store.markEventsSeen(["switch:a|b"])
+        XCTAssertEqual(store.state.seenEventIDs, ["switch:a|b"])
+    }
 }

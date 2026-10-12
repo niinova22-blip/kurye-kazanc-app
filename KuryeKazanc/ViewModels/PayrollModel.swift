@@ -254,6 +254,98 @@ final class PayrollModel {
         reload()
     }
 
+    // MARK: - 1.7 firma, hedef, yakit
+
+    var tariffProfile: CourierTariffProfile? { state.tariffProfile }
+    var goal: GoalSpec? { state.goal }
+
+    nonisolated static func platformName(_ code: String) -> String { PayPlatform.named(code)?.name ?? code }
+
+    func questions(for platform: String) -> TariffQuestions {
+        TariffQuestions.required(platform: platform, catalog: catalog, day: today)
+    }
+
+    /// Calisilan tek firmayi ve tarifesinin istedigi kisisel bilgileri kaydeder.
+    func chooseFirm(_ code: String, regionTier: String?, seniorityYears: Int?, vehicleType: String?, flags: [String]) {
+        store.select(platform: code, at: clock())
+        store.setPreferences(regionTier: regionTier, seniorityYears: seniorityYears, vehicleType: vehicleType)
+        store.setFlags(flags)
+        reload()
+    }
+
+    func setGoal(_ goal: GoalSpec?) {
+        store.setGoal(goal)
+        reload()
+    }
+
+    /// 1.6'daki haftalik/gunluk net hedef anahtarlarini bir kez yeni hedefe tasir.
+    func migrateLegacyGoal(defaults: UserDefaults) {
+        guard state.goal == nil else { return }
+        let weekly: Double = defaults.double(forKey: AppPreferences.weeklyGoalKey)
+        let daily: Double = defaults.double(forKey: AppPreferences.dailyGoalKey)
+        if weekly > 0 {
+            setGoal(GoalSpec(amount: Money(weekly), period: .week))
+        } else if daily > 0 {
+            setGoal(GoalSpec(amount: Money(daily), period: .day))
+        }
+    }
+
+    func addFuelPrice(_ price: Money, type: FuelType, on date: Date) {
+        store.addFuelPrice(FuelPriceEntry(day: day(date), pricePerUnit: price, type: type))
+        reload()
+    }
+
+    func deleteFuelPrice(_ id: UUID) {
+        store.deleteFuelPrice(id: id)
+        reload()
+    }
+
+    func setConsumption(_ value: Decimal?) {
+        store.setConsumption(value)
+        reload()
+    }
+
+    func fuelModel(fallbackCostPerKm: Double) -> FuelCostModel {
+        FuelCostModel(settings: state.fuel, vehicleType: state.vehicleType, fallbackCostPerKm: Money(fallbackCostPerKm))
+    }
+
+    func pace(entries: [EarningEntry]) -> PaceEstimate {
+        PaceEstimate.estimate(entries: entries, platform: state.activePlatform ?? "", now: clock())
+    }
+
+    /// Secili firmanin tarifesiyle hedef plani; firma ya da hedef yoksa nil.
+    func goalPlan(entries: [EarningEntry], fallbackCostPerKm: Double) -> Result<GoalPlan, PayError>? {
+        guard let profile = tariffProfile, let goal = state.goal else { return nil }
+        let planner = GoalPlanner(engine: engine, fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm))
+        return planner.plan(goal: goal, profile: profile, pace: pace(entries: entries), day: today)
+    }
+
+    func comparison(workload: WorkloadSpec, fallbackCostPerKm: Double) -> [FirmComparisonRow] {
+        guard let profile = tariffProfile else { return [] }
+        return TariffComparison.rows(workload: workload, profile: profile, catalog: catalog,
+                                     fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm), day: today)
+    }
+
+    func correlation(platform: String, fallbackCostPerKm: Double) -> TariffFuelCorrelation? {
+        TariffFuelCorrelation.evaluate(platform: platform, catalog: catalog,
+                                       fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm), today: today)
+    }
+
+    /// Henuz gosterilmemis gecis onerisi (ayni surum cifti icin bir kez).
+    func pendingSwitchSuggestion(workload: WorkloadSpec, fallbackCostPerKm: Double) -> SwitchSuggestion? {
+        let rows: [FirmComparisonRow] = comparison(workload: workload, fallbackCostPerKm: fallbackCostPerKm)
+        guard let suggestion = TariffComparison.switchSuggestion(rows: rows) else { return nil }
+        return state.seenEventIDs.contains("switch:" + suggestion.key) ? nil : suggestion
+    }
+
+    func markSwitchSeen(_ suggestion: SwitchSuggestion) {
+        store.markEventsSeen(["switch:" + suggestion.key])
+        reload()
+    }
+
+    /// Senaryo yukleyici gibi depoya dogrudan yazanlar icin.
+    func reloadState() { reload() }
+
     // MARK: - Bildirimler
 
     var unreadNoticeCount: Int {

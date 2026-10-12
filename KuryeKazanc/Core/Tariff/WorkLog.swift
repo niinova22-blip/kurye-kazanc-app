@@ -388,6 +388,12 @@ final class PayrollStore {
 
     var seenEventIDs: Set<String> { Set(state.seenEventIDs) }
 
+    /// Bir kez gosterilecek olaylar (or. firma gecis onerisi) goruldu olarak isaretlenir.
+    func markEventsSeen(_ ids: [String]) {
+        state.seenEventIDs = Array(Set(state.seenEventIDs).union(ids)).sorted()
+        persist()
+    }
+
     func markNoticesRead(platform: String) {
         for index in state.notices.indices where state.notices[index].platformCode == platform {
             state.notices[index].isRead = true
