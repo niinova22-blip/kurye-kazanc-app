@@ -36,4 +36,17 @@ enum Formatters {
     static func longDay(_ date: Date) -> String {
         date.formatted(Date.FormatStyle().locale(locale).day().month(.wide).weekday(.wide))
     }
+
+    /// Duzenlenebilir alan icin ondalik metin: binlik ayraci yok, ondalik virgul, en fazla 2 hane (yarim yukari).
+    static func decimalText(_ value: Decimal) -> String {
+        var source = value
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &source, 2, .plain)
+        let f = NumberFormatter()
+        f.locale = Locale(identifier: "tr_TR")
+        f.numberStyle = .decimal
+        f.usesGroupingSeparator = false
+        f.maximumFractionDigits = 2
+        return f.string(from: NSDecimalNumber(decimal: rounded)) ?? NSDecimalNumber(decimal: rounded).stringValue
+    }
 }

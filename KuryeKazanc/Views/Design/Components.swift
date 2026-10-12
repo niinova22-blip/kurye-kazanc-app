@@ -143,7 +143,7 @@ struct GoalRing: View {
     }
 }
 
-/// Tam genislikte ana eylem dugmesi (Vardiyayi baslat/bitir, onboarding Devam).
+/// Tam genislikte ana eylem dugmesi (kaydet, kurulum Devam). Basinca kuculur ve hafif titresir.
 struct PrimaryActionButtonStyle: ButtonStyle {
     var isDestructive = false
 
@@ -153,6 +153,12 @@ struct PrimaryActionButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity, minHeight: 50)
             .foregroundStyle(.white)
             .background(isDestructive ? Theme.negative : Theme.accent, in: RoundedRectangle(cornerRadius: Theme.cornerRadius))
-            .opacity(configuration.isPressed ? 0.85 : 1)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .shadow(color: (isDestructive ? Theme.negative : Theme.accent).opacity(configuration.isPressed ? 0.1 : 0.25),
+                    radius: configuration.isPressed ? 2 : 8, y: 3)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, pressed in
+                if pressed { Haptics.light() }
+            }
     }
 }
