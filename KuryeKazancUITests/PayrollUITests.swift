@@ -10,7 +10,7 @@ final class PayrollUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
-            "-hasCompletedOnboarding", "YES", "-autoEstimateExpenses", "YES", "-reset-defaults",
+            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV17", "YES", "-firm", "trendyol_go", "-autoEstimateExpenses", "YES", "-reset-defaults",
         ]
         app.launch()
         return app

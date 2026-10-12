@@ -60,13 +60,18 @@ struct LaunchOptions {
     var isUITesting: Bool
     var loadsSampleData: Bool
     var resetsDefaults: Bool
+    /// "-firm <kod>": UI testleri kurulumu atlayip bu firmayla baslar.
+    var firm: String? = nil
 
     static var current: LaunchOptions {
         let args = ProcessInfo.processInfo.arguments
+        var firm: String? = nil
+        if let index = args.firstIndex(of: "-firm"), index + 1 < args.count { firm = args[index + 1] }
         return LaunchOptions(
             isUITesting: args.contains("-ui-testing"),
             loadsSampleData: args.contains("-sample-data"),
-            resetsDefaults: args.contains("-reset-defaults")
+            resetsDefaults: args.contains("-reset-defaults"),
+            firm: firm
         )
     }
 }

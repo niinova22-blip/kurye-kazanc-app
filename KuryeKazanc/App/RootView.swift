@@ -3,18 +3,32 @@ import SwiftData
 
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(PayrollModel.self) private var payroll
     @AppStorage(AppPreferences.hasCompletedOnboardingKey) private var hasCompletedOnboarding = false
+    @AppStorage(AppPreferences.hasSeenIntroV17Key) private var hasSeenIntro = false
+    @State private var showsIntroReplay = false
 
+    /// Akis: tanitim (bir kez) -> firma ve hedef kurulumu -> arac/konum/paylasim -> sekmeler.
     var body: some View {
         Group {
-            if hasCompletedOnboarding {
-                MainTabView()
-            } else {
+            if !hasSeenIntro {
+                IntroView(mode: .firstRun) { hasSeenIntro = true }
+            } else if !payroll.state.hasChosenFirm {
+                SetupFlowView {}
+            } else if !hasCompletedOnboarding {
                 OnboardingView()
+            } else {
+                MainTabView()
             }
+        }
+        .animation(.easeInOut, value: hasSeenIntro)
+        .environment(\.showIntro, ShowIntroAction { showsIntroReplay = true })
+        .fullScreenCover(isPresented: $showsIntroReplay) {
+            IntroView(mode: .replay) { showsIntroReplay = false }
         }
         .task {
             DataSeeder.seedPlatformsIfNeeded(in: modelContext)
+            payroll.migrateLegacyGoal(defaults: .standard)
         }
     }
 }

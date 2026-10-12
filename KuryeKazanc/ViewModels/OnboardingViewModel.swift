@@ -12,6 +12,13 @@ final class OnboardingViewModel {
     var step: Step = .vehicle
     var vehicleType: VehicleType = .motorcycle
     var selectedPlatformCodes: Set<String> = []
+    /// 1.7: firma kurulumda secildiyse platform adimi atlanir.
+    private(set) var skipsPlatforms = false
+
+    func preselect(firm code: String) {
+        selectedPlatformCodes = [code]
+        skipsPlatforms = true
+    }
 
     var canContinue: Bool {
         step == .platforms ? !selectedPlatformCodes.isEmpty : true
@@ -20,12 +27,14 @@ final class OnboardingViewModel {
     var isLastStep: Bool { step == .sharing }
 
     func next() {
-        guard let next = Step(rawValue: step.rawValue + 1) else { return }
+        guard var next = Step(rawValue: step.rawValue + 1) else { return }
+        if next == .platforms, skipsPlatforms, let after = Step(rawValue: next.rawValue + 1) { next = after }
         step = next
     }
 
     func back() {
-        guard let previous = Step(rawValue: step.rawValue - 1) else { return }
+        guard var previous = Step(rawValue: step.rawValue - 1) else { return }
+        if previous == .platforms, skipsPlatforms, let before = Step(rawValue: previous.rawValue - 1) { previous = before }
         step = previous
     }
 
