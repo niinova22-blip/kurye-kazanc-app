@@ -60,8 +60,9 @@ sürümü ayrıntı ekranındaki (Gelişmiş) "Doğrulama durumu" alanı veri ol
 
 ## 3. Firma seçimi ve profil
 
-- Kurulumda (tanıtımdan sonra) **tek firma** seçilir: Getir, Trendyol GO, Yemeksepeti,
-  Paket Taxi / Migros Hemen. `PayrollModel.select(platform:)` ve mevcut hakediş platformu tercihi
+- Kurulumun ilk sorusu (tanıtımdan hemen sonra): **"Hangi firmayla çalışıyorsun?"** — dört
+  firmadan biri seçilir: Getir, Trendyol GO, Yemeksepeti, Paket Taxi / Migros Hemen. Seçim
+  kaydedilir; Bugün, Kazanç, Plan ve hedef hesapları yalnızca bu firmaya göre yapılır. `PayrollModel.select(platform:)` ve mevcut hakediş platformu tercihi
   bu seçimdir (tek kaynak).
 - Firmaya özel sorular, firmanın tarifesindeki koşullardan türetilir
   (`TariffQuestions.required(for: TariffVersion)`):
@@ -72,7 +73,10 @@ sürümü ayrıntı ekranındaki (Gelişmiş) "Doğrulama durumu" alanı veri ol
   - tarife araç türüne göre ayrıysa → araç türü.
 - Yanıtlar `CourierTariffProfile` (JSON, UserDefaults) olarak saklanır; `PayInput.regionTier`,
   `seniorityYears`, `vehicleType`, `flags` buradan doldurulur.
-- Firma Profil'den değiştirilebilir; tüm ekranlar yeniden hesaplanır.
+- Değiştirme: Profil > Ayarlar > **"Çalıştığım firma"** satırı (firma adı + logo yerine baş
+  harf simgesi). Dokununca aynı seçim ekranı ve firmaya özel sorular açılır; onaydan sonra tüm
+  ekranlar yeniden hesaplanır. Eski firmanın kayıtları silinmez (Kazanç'ta firma filtresiyle
+  görülebilir).
 
 ## 4. Hedef planlayıcı (Plan ekranı)
 
@@ -139,8 +143,10 @@ haftalık varsa haftalık hedef olur).
   kendi ortalamalarından, yoksa varsayılan; değiştirilebilir (premium sayı seçiciler).
 - `TariffComparison` (Core): her firmanın **güncel** tarifesiyle ayın hakedişi (`PayEngine`,
   span = ay), yakıt, net, net/saat. Kendi firman üstte sabit "Şu anki firman"; diğer üçü
-  net farkıyla ("+4.300 TL/ay") sıralı. Diğer firmalarda kullanıcıya özel bilinmeyen koşullar
-  (bölge, kıdem) için varsayılan en düşük kademe kullanılır ve satırda belirtilir.
+  net farkıyla ("+4.300 TL/ay") sıralı. Diğer firmalarda **en düşük kıdem** (yeni başlayan)
+  kullanılır — kurye o firmaya geçerse zaten bu kademeden başlar (kullanıcı kararı). Bölge
+  kademesi kullanıcının kendi seçtiği bölge kademesidir; o firmada karşılığı yoksa en düşük
+  bölge kademesi. Satırda "yeni başlayan kademesiyle" yazar.
 - Firma ayrıntısı: tarife tablosu (sabit, paket, km, kademeler, bonuslar), "Kampanyalar ve süreli
   bonuslar" (geçerlilik bitişi olan kalemler, bitiş tarihiyle), yürürlük ve son kontrol tarihi.
 - **Tarife ↔ yakıt ilişkisi** (`TariffFuelCorrelation`): her firmanın son iki yayımlanmış
@@ -177,7 +183,11 @@ haftalık varsa haftalık hedef olur).
 - İlk açılış: Tanıtım → Kurulum (firma, firma soruları, araç/yakıt, hedef) →
   `hasCompletedOnboarding`. Mevcut kullanıcılar (1.6'dan güncelleyen) tanıtımı bir kez görür
   (`hasSeenIntroV17`), kurulumu değil; firma seçili değilse kurulumun firma adımı açılır.
-- Profil > "Tanıtımı izle": yalnızca tanıtım, "Başla" yerine "Kapat".
+- Tekrar izleme: Bugün ekranının üst çubuğunda **soru balonu düğmesi**
+  (`questionmark.bubble`) → kısa menü: "Uygulamayı tanı (tanıtımı izle)" ve "Bu ekran ne
+  gösteriyor?" (ekrana özel 2–3 satırlık açıklama kartı). Aynı düğme Kazanç, Firmalar ve Plan
+  ekranlarında da var (ekrana özel açıklamayla). Ayrıca Profil > "Tanıtımı izle". Tekrar
+  izlemede yalnızca tanıtım açılır, "Başla" yerine "Kapat".
 
 ## 8. Premium giriş bileşenleri (`Views/Design/Input/`)
 
