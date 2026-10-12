@@ -16,16 +16,11 @@ final class PayrollUITests: XCTestCase {
         return app
     }
 
-    func testSelectPlatformQuickEstimateAndSave() {
+    func testQuickEstimateAndSave() {
         let app = launch()
-        XCTAssertTrue(app.tabBars.buttons["Hakediş"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Hakediş"].tap()
-
-        // Ilk acilis: dort platform karti
-        for code in ["trendyol_go", "getir", "yemeksepeti", "migros_hemen"] {
-            XCTAssertTrue(app.buttons["platform.\(code)"].waitForExistence(timeout: 5), code)
-        }
-        app.buttons["platform.trendyol_go"].tap()
+        // 1.7: firma kurulumda secilir (-firm trendyol_go); hakedis Kazanc sekmesinde
+        XCTAssertTrue(app.tabBars.buttons["Kazanç"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Kazanç"].tap()
         XCTAssertTrue(app.staticTexts["payroll.platformName"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["payroll.platformName"].label, "Trendyol GO")
 

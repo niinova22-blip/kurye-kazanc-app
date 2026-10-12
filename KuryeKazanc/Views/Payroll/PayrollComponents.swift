@@ -41,11 +41,14 @@ struct ConfidenceLabel: View {
     let status: ConfidenceStatus
     var compact: Bool = false
 
+    /// 1.7: "Dogrulama gerekli" satir satir gosterilmez; sayfanin altindaki tek `VerificationFootnote` toplar.
     var body: some View {
-        Label(compact ? shortName : status.displayName, systemImage: symbol)
-            .font(.caption2)
-            .foregroundStyle(color)
-            .accessibilityIdentifier("confidence.\(status.rawValue)")
+        if status != .needsVerification {
+            Label(compact ? shortName : status.displayName, systemImage: symbol)
+                .font(.caption2)
+                .foregroundStyle(color)
+                .accessibilityIdentifier("confidence.\(status.rawValue)")
+        }
     }
 
     private var shortName: String {
@@ -175,12 +178,13 @@ struct BreakdownSections: View {
         } header: {
             Text("Hesaplama")
         } footer: {
-            Text("Tarife \(breakdown.tariffVersionLabel) · \(breakdown.tariffVerification.displayName) · \(originText)")
+            Text("Tarife \(breakdown.tariffVersionLabel) · \(originText)")
         }
 
-        if !breakdown.notices.isEmpty {
+        let notices: [PayNotice] = breakdown.notices.filter { $0.kind != .needsVerification }
+        if !notices.isEmpty {
             Section("Kontrol edilmesi gerekenler") {
-                ForEach(Array(breakdown.notices.enumerated()), id: \.offset) { _, notice in
+                ForEach(Array(notices.enumerated()), id: \.offset) { _, notice in
                     NoticeRow(notice: notice)
                 }
             }

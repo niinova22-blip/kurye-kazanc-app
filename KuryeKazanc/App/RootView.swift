@@ -42,10 +42,10 @@ struct MainTabView: View {
             TodayView(day: today)
                 .id(today) // Gun degisince sorgular yeni gunle yeniden kurulur
                 .tabItem { Label("Bugün", systemImage: "sun.max") }
-            PayrollView()
-                .tabItem { Label("Hakediş", systemImage: "turkishlirasign.circle") }
-            AnalysisView()
-                .tabItem { Label("Analiz", systemImage: "chart.bar.xaxis") }
+            EarningsTabView()
+                .tabItem { Label("Kazanç", systemImage: "turkishlirasign.circle") }
+            FirmsView()
+                .tabItem { Label("Firmalar", systemImage: "building.2") }
             ProfileView()
                 .tabItem { Label("Profil", systemImage: "person.crop.circle") }
         }

@@ -133,9 +133,10 @@ final class DashboardUITests: XCTestCase {
 
     func testHistoryAndSettingsTabs() {
         let app = launch(sampleData: true)
-        XCTAssertTrue(app.tabBars.buttons["Analiz"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["Kazanç"].waitForExistence(timeout: 10))
 
-        app.tabBars.buttons["Analiz"].tap()
+        app.tabBars.buttons["Kazanç"].tap()
+        app.segmentedControls["earnings.mode"].buttons["Analiz"].tap()
         XCTAssertTrue(app.segmentedControls["history.periodPicker"].waitForExistence(timeout: 5))
         app.segmentedControls["history.periodPicker"].buttons["Gün"].tap()
         let net = app.staticTexts["history.netEarnings"]
@@ -154,8 +155,9 @@ final class DashboardUITests: XCTestCase {
 
     func testAnalysisShowsPlatformComparison() {
         let app = launch(sampleData: true)
-        XCTAssertTrue(app.tabBars.buttons["Analiz"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Analiz"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Kazanç"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Kazanç"].tap()
+        app.segmentedControls["earnings.mode"].buttons["Analiz"].tap()
         app.segmentedControls["history.periodPicker"].buttons["Gün"].tap()
         let platforms = app.staticTexts["analysis.platform.getir"]
         for _ in 0..<4 where !platforms.exists { app.swipeUp() }

@@ -1,23 +1,6 @@
 import SwiftUI
 import SwiftData
 
-/// "Hakediş" sekmesi: platform secilmediyse secim ekrani, sonra aylik hakedis panosu.
-struct PayrollView: View {
-    @Environment(PayrollModel.self) private var model
-
-    var body: some View {
-        NavigationStack {
-            Group {
-                if model.activePlatform == nil {
-                    PlatformPickerView(isFirstRun: true)
-                } else {
-                    PayrollDashboardView()
-                }
-            }
-        }
-    }
-}
-
 /// Dort platform karti. Secim uygulama genelinde tektir; eski kayitlar kendi platformlarinda kalir.
 struct PlatformPickerView: View {
     @Environment(PayrollModel.self) private var model
@@ -76,6 +59,12 @@ struct PayrollDashboardView: View {
     @Environment(PayrollModel.self) private var model
     @Query(sort: \ExpenseRecord.date, order: .reverse) private var expenseRecords: [ExpenseRecord]
 
+    /// Sayfa altindaki tek not: aktif tarifenin dogrulanmamis kalemleri.
+    private var unverifiedItems: [UnverifiedItem] {
+        guard let version = model.currentVersion() else { return [] }
+        return UnverifiedItems.from(version: version, platformName: PayrollModel.platformName(version.platformCode))
+    }
+
     var body: some View {
         let expenses: [DatedExpense] = expenseRecords.map(\.datedExpense)
         let dashboard: PayrollDashboard? = model.dashboard(expenses: expenses)
@@ -90,8 +79,8 @@ struct PayrollDashboardView: View {
             MethodsSection()
             RecentLogsSection()
             MoreSection()
+            VerificationFootnote(items: unverifiedItems)
         }
-        .navigationTitle("Hakediş")
         .refreshable {
             await model.tariffs.refreshIfNeeded(force: true)
             await model.refreshNotices()
@@ -110,19 +99,16 @@ private struct PlatformHeaderSection: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(platform.name).font(.headline).accessibilityIdentifier("payroll.platformName")
                     if let version = model.currentVersion() {
-                        Text("Tarife \(version.label) · \(version.verificationStatus.displayName)")
+                        Text("Tarife \(version.label) · yürürlük \(PayFormat.day(version.effectiveFrom))")
                             .font(.caption)
-                            .foregroundStyle(version.verificationStatus == .verified ? Color.secondary : Color.orange)
+                            .foregroundStyle(.secondary)
                     } else {
                         Text("Yayında tarife yok").font(.caption).foregroundStyle(Theme.negative)
                     }
                 }
-                Spacer()
-                NavigationLink("Değiştir") { PlatformPickerView() }
-                    .font(.subheadline)
-                    .fixedSize()
-                    .accessibilityIdentifier("payroll.changePlatform")
             }
+        } footer: {
+            Text("Firmanı Profil > Çalıştığım firma'dan değiştirebilirsin.")
         }
     }
 }
@@ -136,8 +122,7 @@ private struct DashboardCardsSection: View {
         Section {
             LazyVGrid(columns: columns, spacing: 10) {
                 PayMetricTile(title: "Bu ay tahmini brüt", value: PayFormat.tl(dashboard.estimatedGross),
-                              caption: dashboard.period.needsVerification ? "Doğrulanmamış kalem içerir" : nil,
-                              identifier: "dashboard.monthGross")
+                              caption: nil, identifier: "dashboard.monthGross")
                 PayMetricTile(title: "Tahmini net", value: PayFormat.tl(dashboard.estimatedNet), caption: "Brüt − gider",
                               identifier: "dashboard.monthNet")
                 PayMetricTile(title: "Paket", value: "\(dashboard.packages)", identifier: "dashboard.packages")
@@ -229,7 +214,7 @@ private struct PlatformSpecificSection: View {
 
     private var guaranteeStatus: String {
         guard let item = model.currentVersion()?.items.first(where: { $0.method == .guaranteeTopUp }) else { return "Tarifede yok" }
-        return item.confidence.isTrusted ? "\(PayFormat.tl(item.amount))/sa" : "Doğrulama gerekli"
+        return "\(PayFormat.tl(item.amount))/sa"
     }
 
     private var regionName: String {
@@ -319,9 +304,6 @@ private struct MoreSection: View {
             NavigationLink { PayrollHistoryView() } label: {
                 Label("Geçmiş ve platform karşılaştırma", systemImage: "clock.arrow.circlepath")
             }
-            NavigationLink { TariffInfoView() } label: {
-                Label("Tarife, kaynak ve kendi tarifem", systemImage: "doc.text.magnifyingglass")
-            }
             NavigationLink { TariffNoticesView() } label: {
                 HStack {
                     Label("Tarife bildirimleri", systemImage: "bell")
@@ -341,9 +323,6 @@ private struct MoreSection: View {
             }
             NavigationLink { ExpenseReportView() } label: {
                 Label("Gider ve net kazanç raporu", systemImage: "chart.bar.doc.horizontal")
-            }
-            NavigationLink { PayrollSettingsView() } label: {
-                Label("Hakediş ayarları", systemImage: "slider.horizontal.3")
             }
         }
     }

@@ -448,7 +448,7 @@ struct SideBenefitsView: View {
                     }
                 }
             } footer: {
-                Text("Yan haklar ve ayni destekler nakit hakedişe eklenmez; koşulları platformla doğrulanmalıdır.")
+                Text("Yan haklar ve ayni destekler nakit hakedişe eklenmez; koşula bağlı olanlar (örn. kadın istihdam desteği) kurulumda seçtiysen hedef planına eklenir.")
             }
         }
         .navigationTitle("Yan haklar ve destekler")

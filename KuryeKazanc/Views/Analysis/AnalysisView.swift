@@ -4,6 +4,7 @@ import Charts
 
 /// Analiz: gunluk / haftalik / aylik ozet, onceki doneme gore degisim, en karli saatler,
 /// isi haritasi, platform karsilastirmasi ve kayit listesi.
+/// 1.7: Kazanc sekmesinin "Analiz" gorunumu; kendi NavigationStack'i yok (EarningsTabView saglar).
 struct AnalysisView: View {
     @State private var kind: PeriodKind = .week
     @State private var anchor: Date = .now
@@ -11,16 +12,13 @@ struct AnalysisView: View {
     private let periods = PeriodRange()
 
     var body: some View {
-        NavigationStack {
-            let interval = periods.interval(of: kind, containing: anchor)
-            let previous = periods.interval(of: kind, containing: periods.shift(anchor, kind: kind, by: -1))
-            AnalysisContentView(interval: interval, previous: previous, kind: kind)
-                .id("\(kind.rawValue)-\(interval.start.timeIntervalSince1970)")
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    periodHeader(interval: interval)
-                }
-                .navigationTitle("Analiz")
-        }
+        let interval = periods.interval(of: kind, containing: anchor)
+        let previous = periods.interval(of: kind, containing: periods.shift(anchor, kind: kind, by: -1))
+        AnalysisContentView(interval: interval, previous: previous, kind: kind)
+            .id("\(kind.rawValue)-\(interval.start.timeIntervalSince1970)")
+            .safeAreaInset(edge: .top, spacing: 0) {
+                periodHeader(interval: interval)
+            }
     }
 
     private func periodHeader(interval: DateInterval) -> some View {
