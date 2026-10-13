@@ -8,6 +8,11 @@ enum Formatters {
         value.formatted(.currency(code: "TRY").locale(locale).precision(.fractionLength(0...2)))
     }
 
+    /// 1.700 (binlik ayracli tam sayi).
+    static func groupedInt(_ value: Int) -> String {
+        value.formatted(.number.locale(locale).grouping(.automatic))
+    }
+
     static func perHour(_ value: Double?) -> String {
         guard let value else { return "—" }
         return currency(value) + "/sa"

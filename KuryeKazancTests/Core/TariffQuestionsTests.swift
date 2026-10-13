@@ -6,7 +6,7 @@ import XCTest
 #endif
 
 final class TariffQuestionsTests: XCTestCase {
-    private let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [])
+    private let catalog = TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: [])
 
     func testPaketTaxiAsksRegionSeniorityAndWomanFlag() {
         let q = TariffQuestions.required(platform: "migros_hemen", catalog: catalog, day: "2026-10-13")

@@ -18,15 +18,9 @@ struct ProfileView: View {
 
     @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
-    @AppStorage(AppPreferences.dataSharingOptInKey) private var dataSharingOptIn = false
-    @AppStorage(AppPreferences.dataSharingConsentDateKey) private var consentTimestamp: Double = 0
-    @AppStorage(AppPreferences.locationSharingOptInKey) private var locationSharingOptIn = false
-    @AppStorage(AppPreferences.locationSharingConsentDateKey) private var locationConsentTimestamp: Double = 0
 
     @State private var costText = ""
     @State private var showsFirmSetup = false
-    @State private var showConsentSheet = false
-    @State private var showLocationConsentSheet = false
     @State private var showDeleteConfirmation = false
     @AppStorage("scanTestWindow") private var scanTestWindow = false
 
@@ -41,7 +35,6 @@ struct ProfileView: View {
                 locationSection
                 AutoShiftSection()
                 screenshotSection
-                sharingSection
                 AccountSection()
                 CalibrationSection()
                 if BuildEnvironment.showsTesterTools {
@@ -65,21 +58,6 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showsFirmSetup) {
                 SetupFlowView(firmOnly: true) { showsFirmSetup = false }
-            }
-            .sheet(isPresented: $showConsentSheet) {
-                DataSharingConsentView {
-                    dataSharingOptIn = true
-                    consentTimestamp = Date.now.timeIntervalSince1970
-                    // Konum yogunlugu, kazanc paylasimiyla birlikte acik gelir (riza ekraninda listelenir); ayri kapatilabilir
-                    locationSharingOptIn = true
-                    locationConsentTimestamp = Date.now.timeIntervalSince1970
-                }
-            }
-            .sheet(isPresented: $showLocationConsentSheet) {
-                LocationSharingConsentView {
-                    locationSharingOptIn = true
-                    locationConsentTimestamp = Date.now.timeIntervalSince1970
-                }
             }
             .confirmationDialog(
                 "Tüm kazanç ve gider kayıtları silinecek. Bu işlem geri alınamaz.",
@@ -186,7 +164,7 @@ struct ProfileView: View {
         } header: {
             Text("Gider hesaplama")
         } footer: {
-            Text("Net kazanç = brüt + bonus − giderler. Yakıt fiyatı girdiysen tahmin km × tüketim × fiyattır; girmediysen km × bu tutar. Bir gün için yakıt veya bakım gideri girersen o günün tahmini kullanılmaz.")
+            Text("Yakıt fiyatı girdiysen gider km × tüketim × fiyattır; girmediysen km × bu tutar.")
         }
     }
 
@@ -237,7 +215,7 @@ struct ProfileView: View {
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text("Kazanç taraması")
-                Text("Platform uygulamalarında günlük kazanç ekranının görüntüsünü al, sonra Bugün sekmesindeki “Kazanç taraması” düğmesine bas; son 24 saatin ekran görüntüleri okunur, bulunanları onaylayıp kaydedersin.")
+                Text("Firma uygulamasında kazanç ekranının görüntüsünü al; Bugün > “Kazanç taraması” son 24 saatin görüntülerini okur.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -254,7 +232,7 @@ struct ProfileView: View {
         } header: {
             Text("Ekran görüntüleri")
         } footer: {
-            Text("Açıksa uygulama açıldığında son 48 saatin kazanç ekranı görüntüleri öneri olarak gösterilir. Görüntüler yalnızca cihazında işlenir.")
+            Text("Görüntüler yalnızca telefonunda işlenir.")
         }
     }
 
@@ -272,57 +250,6 @@ struct ProfileView: View {
         )
     }
 
-    // MARK: - Paylasim
-
-    private var sharingSection: some View {
-        Section {
-            Toggle("Kazançlarımı anonim paylaş", isOn: Binding(
-                get: { dataSharingOptIn },
-                set: { newValue in
-                    if newValue {
-                        showConsentSheet = true // Acik onay olmadan acilmaz
-                    } else {
-                        // Riza anahtari ONCE yazilir; koordinator bekleyen vardiyalari buna gore siler
-                        dataSharingOptIn = false
-                        consentTimestamp = 0
-                        locationSharingOptIn = false
-                        locationConsentTimestamp = 0
-                        sync.sharingConsentChanged(enabled: false)
-                    }
-                }
-            ))
-            .accessibilityIdentifier("settings.dataSharing")
-
-            Toggle("Konum yoğunluğunu paylaş", isOn: Binding(
-                get: { locationSharingOptIn },
-                set: { newValue in
-                    if newValue {
-                        showLocationConsentSheet = true
-                    } else {
-                        locationSharingOptIn = false
-                        locationConsentTimestamp = 0
-                    }
-                }
-            ))
-            .disabled(!dataSharingOptIn)
-            .accessibilityIdentifier("profile.locationSharing")
-
-            if dataSharingOptIn {
-                LabeledContent("Son gönderim", value: lastSyncText)
-                    .accessibilityIdentifier("profile.lastSync")
-            }
-        } header: {
-            Text("Paylaşım")
-        } footer: {
-            Text("Açıkken, ekran görüntüsünden okunup değiştirilmeyen kazançlarının anonim vardiya özeti gönderilir; görselin kendisi, elle girilen ve düzeltilen kayıtlar gönderilmez. Kapatınca bekleyen gönderimler silinir. Konum yoğunluğu bu sürümde henüz gönderilmiyor; açarsan tercihin kaydedilir.")
-        }
-    }
-
-    private var lastSyncText: String {
-        guard let date = sync.lastSyncDate else { return "Henüz yok" }
-        return date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Formatters.locale))
-    }
-
     // MARK: - Veri
 
     private var dataSection: some View {
@@ -330,7 +257,7 @@ struct ProfileView: View {
             Button("Tüm kayıtları sil", role: .destructive) { showDeleteConfirmation = true }
                 .accessibilityIdentifier("settings.deleteAll")
         } footer: {
-            Text("Kayıtların telefonunda saklanır; Apple ile giriş yaparsan sunucuya da yedeklenir. Bu düğme yalnızca telefondaki kayıtları siler; sunucudaki veriler için Hesap ve yedek > “Verilerimi sil”i kullan.")
+            Text("Yalnızca telefondaki kayıtları siler. Sunucudaki yedek için Hesap ve yedek > “Verilerimi sil”.")
         }
     }
 

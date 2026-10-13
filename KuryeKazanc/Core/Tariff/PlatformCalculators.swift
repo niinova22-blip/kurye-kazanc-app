@@ -228,7 +228,8 @@ struct YemeksepetiCalculator: PayCalculator {
 
 // MARK: - Paket Taxi / Migros Hemen
 
-/// Aylik sabit ucret (bolge ya da kidem; otomatik toplanmaz) + aylik paket kademesine gore paket basi performans ucreti.
+/// Aylik sabit ucret (bolge ya da kidem; otomatik toplanmaz) + aylik paket kademesine gore paket basi performans ucreti
+/// (eski tarife) ya da aylik paket bonusu (ortak kademe kurali) + teslimat basi mesafe ek odemesi.
 /// Sabit ucretin kapsadigi paketler varsa tekrar ucretlendirilmez.
 struct PaketTaxiCalculator: PayCalculator {
     let platformCode = "migros_hemen"
@@ -236,6 +237,7 @@ struct PaketTaxiCalculator: PayCalculator {
     func apply(_ b: inout PayBuilder) {
         applyFixed(&b)
         applyPerformance(&b)
+        DeliveryBands.apply(&b)
     }
 
     private func applyFixed(_ b: inout PayBuilder) {
@@ -281,8 +283,9 @@ struct PaketTaxiCalculator: PayCalculator {
         let tiers: [TariffItem] = b.items(method: .tierRate).sorted { ($0.lowerThreshold ?? 0) < ($1.lowerThreshold ?? 0) }
         b.consume(tiers)
         guard let base = tiers.first else {
-            PackagePay.singles(&b)
-            PackagePay.combined(&b)
+            // 2026 tarifesinde ayri paket basi ucret yok (sabit ucret + aylik bonus); varsa tekli/birlesen ucret islenir.
+            if !b.items(.singlePackage).isEmpty { PackagePay.singles(&b) }
+            if !b.items(.combinedPackage).isEmpty { PackagePay.combined(&b) }
             return
         }
         let isMonth: Bool = b.input.span == .month
@@ -357,6 +360,47 @@ struct PaketTaxiCalculator: PayCalculator {
                 }
             }
             return total
+        }
+    }
+}
+
+// MARK: - Teslimat basi mesafe ek odemesi
+
+/// `delivery_band` kalemleri: mesafesi bandin [alt, ust] araligina dusen her teslimat icin sabit ek odeme.
+/// Teslimat bazli mesafe yoksa toplam km paket sayisina bolunur (ortalama); uzun teslimatlarin payi boylece eksik kalabilir.
+enum DeliveryBands {
+    static func apply(_ b: inout PayBuilder) {
+        let bands: [TariffItem] = b.items(method: .deliveryBand).sorted { ($0.lowerThreshold ?? 0) < ($1.lowerThreshold ?? 0) }
+        b.consume(bands)
+        guard !bands.isEmpty else { return }
+        var counts: [Int] = Array(repeating: 0, count: bands.count)
+        let input: PayInput = b.input
+        if !input.deliveryDistancesKm.isEmpty {
+            for distance in input.deliveryDistancesKm {
+                if let index = band(for: distance, in: bands) { counts[index] += 1 }
+            }
+        } else if let total = input.totalKm, total > 0, input.totalPackages > 0 {
+            let trips: Int = input.totalPackages
+            let average: Decimal = Money.round(total / Decimal(trips), scale: 2)
+            if let index = band(for: average, in: bands) { counts[index] = trips }
+            b.note(.estimate, "Mesafe ek ödemesi teslimat başına ortalama \(Formatters.decimalText(average)) km ile hesaplandı; uzun teslimatların ek ödemesi gerçek mesafeyle değişir.")
+        } else {
+            return
+        }
+        for (index, item) in bands.enumerated() where counts[index] > 0 {
+            b.add(PayLine(id: item.key, itemID: item.id, itemKey: item.key, type: item.type, label: item.label,
+                          quantity: Decimal(counts[index]), unit: .package, rate: item.amount, amount: item.amount * counts[index],
+                          amountUpper: item.amountUpper.map { $0 * counts[index] }, confidence: item.confidence, isCash: item.isCash))
+        }
+    }
+
+    /// Alt esik dahil, ust esik dahil; birden cok band uyarsa ilk (alt esigi kucuk) band. Alt esigi olmayan band 0 km'den.
+    static func band(for distance: Decimal, in bands: [TariffItem]) -> Int? {
+        bands.firstIndex { band in
+            let lower: Decimal = band.lowerThreshold ?? 0
+            guard distance >= lower, distance > 0 else { return false }
+            if let upper = band.upperThreshold { return distance <= upper }
+            return distance > lower || lower == 0
         }
     }
 }

@@ -94,6 +94,9 @@ enum CalculationMethod: String, Codable {
     case multiplier
     /// Saatlik garanti: garanti × saat − garantiye tabi gelir (fark odemesi).
     case guaranteeTopUp = "guarantee_top_up"
+    /// Teslimat mesafesi [alt, ust] km araligindaysa teslimat basina sabit ek odeme (Paket Taxi 4–6 km +25 TL).
+    /// Bir teslimat birden cok banda uyarsa alt esigi kucuk olan band gecerlidir (6 km tam: 4–6 km bandi).
+    case deliveryBand = "delivery_band"
 
     init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
@@ -632,12 +635,12 @@ struct PayPlatform: Codable, Equatable, Identifiable {
         ),
         PayPlatform(
             code: "yemeksepeti", name: "Yemeksepeti Express", isActive: true, supportedWorkModels: ["esnaf"],
-            modelSummary: "Paket başı + birleşen paket; saatlik garanti (doğrulanırsa), bahşiş ayrı.",
+            modelSummary: "Saate ve güne göre paket ücreti, km ücreti, günlük paket bonusu; bahşiş ayrı.",
             symbol: "fork.knife", monogram: "YS"
         ),
         PayPlatform(
             code: "migros_hemen", name: "Paket Taxi / Migros Hemen", isActive: true, supportedWorkModels: ["esnaf"],
-            modelSummary: "Aylık sabit ücret (bölge veya kıdem) + aylık paket kademesine göre paket başı ücret.",
+            modelSummary: "Bölgeye göre aylık sabit ücret, aylık paket bonusu, uzun teslimat ek ödemesi.",
             symbol: "calendar", monogram: "PT"
         ),
     ]

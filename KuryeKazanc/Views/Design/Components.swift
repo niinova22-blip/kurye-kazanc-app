@@ -130,10 +130,12 @@ struct GoalRing: View {
 
     var body: some View {
         ZStack {
-            Circle().stroke(Theme.accent.opacity(0.18), lineWidth: lineWidth)
+            Circle().stroke(Theme.accent.opacity(0.15), lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: progress.fraction)
-                .stroke(Theme.accent, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(AngularGradient(colors: [Theme.accent, Color(hex: 0x8E3BFF), Theme.positive, Theme.accent],
+                                        center: .center),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.smooth, value: progress.fraction)
         }
@@ -150,15 +152,20 @@ struct PrimaryActionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .frame(maxWidth: .infinity, minHeight: 54)
             .foregroundStyle(.white)
-            .background(isDestructive ? Theme.negative : Theme.accent, in: RoundedRectangle(cornerRadius: Theme.cornerRadius))
+            .background(background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.15), lineWidth: 1))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .shadow(color: (isDestructive ? Theme.negative : Theme.accent).opacity(configuration.isPressed ? 0.1 : 0.25),
-                    radius: configuration.isPressed ? 2 : 8, y: 3)
+            .shadow(color: (isDestructive ? Theme.negative : Color(hex: 0x3B2BD9)).opacity(configuration.isPressed ? 0.1 : 0.3),
+                    radius: configuration.isPressed ? 3 : 12, y: configuration.isPressed ? 2 : 6)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
             .onChange(of: configuration.isPressed) { _, pressed in
                 if pressed { Haptics.light() }
             }
+    }
+
+    private var background: AnyShapeStyle {
+        isDestructive ? AnyShapeStyle(Theme.negative) : AnyShapeStyle(Theme.brandGradient)
     }
 }

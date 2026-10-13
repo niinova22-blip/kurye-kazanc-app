@@ -19,6 +19,10 @@ enum AppPreferences {
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
     /// 1.7 tanitimi bir kez gosterildi (1.6'dan gelenler de bir kez gorur).
     static let hasSeenIntroV17Key = "hasSeenIntroV17"
+    /// 1.8 yenilenen tanitim (herkes bir kez gorur).
+    static let hasSeenIntroV18Key = "hasSeenIntroV18"
+    /// Ilk acilista karsilama ekraninda secilen firma (kurulum bitene kadar).
+    static let startFirmKey = "setup.startFirm"
     /// Haftalik / gunluk net kazanc hedefi (TL). 0 = ayarlanmadi.
     static let weeklyGoalKey = "weeklyNetGoal"
     static let dailyGoalKey = "dailyNetGoal"

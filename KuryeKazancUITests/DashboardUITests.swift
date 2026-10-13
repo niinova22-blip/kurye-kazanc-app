@@ -14,7 +14,7 @@ final class DashboardUITests: XCTestCase {
         // -key value: UserDefaults arguman alani; testleri onceki durumdan bagimsiz kilar.
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
-            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV17", "YES", "-firm", "trendyol_go", "-autoEstimateExpenses", "YES",
+            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV18", "YES", "-firm", "trendyol_go", "-autoEstimateExpenses", "YES",
             // Paylasim tercihleri testler arasinda tasinmasin. "-anahtar NO" argumani KULLANILMAZ: argumanla
             // verilen deger UserDefaults'ta en ust katmandir; uygulamanin yazdigi "acik" degeri okunamaz olur
             // (paylasim onayindan sonra anahtar ara sira kapali kaliyordu). Bunun yerine kayitli tercihler silinir.
@@ -123,7 +123,14 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
         // Ornek veride bir elle, bir ekran goruntusu kaydi var. Satir bir dugme oldugundan
         // rozet metni dugmenin etiketine katilir (ic kimlikler XCUITest'te gorunmez).
-        let labels = app.buttons.matching(identifier: "dashboard.earningRow").allElementsBoundByIndex.map(\.label)
+        // 1.8: buyuk ana kart yuzunden ikinci satir ekran disinda kalabilir (liste tembel): kaydirarak topla
+        var found: Set<String> = []
+        for _ in 0..<4 {
+            found.formUnion(app.buttons.matching(identifier: "dashboard.earningRow").allElementsBoundByIndex.map(\.label))
+            if found.count >= 2 { break }
+            app.swipeUp()
+        }
+        let labels = Array(found)
         XCTAssertEqual(labels.count, 2)
         XCTAssertTrue(labels.contains { $0.contains("Elle girildi") }, "\(labels)")
         XCTAssertTrue(labels.contains { $0.contains("Ekran görüntüsü") }, "\(labels)")
@@ -146,11 +153,11 @@ final class DashboardUITests: XCTestCase {
         app.tabBars.buttons["Profil"].tap()
         XCTAssertTrue(app.switches["settings.autoEstimate"].waitForExistence(timeout: 5))
         // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
-        let sharing = app.switches["settings.dataSharing"]
-        for _ in 0..<6 where !sharing.exists {
+        let autoScan = app.switches["profile.autoScan"]
+        for _ in 0..<6 where !autoScan.exists {
             app.swipeUp()
         }
-        XCTAssertTrue(sharing.exists)
+        XCTAssertTrue(autoScan.exists)
     }
 
     func testAnalysisShowsPlatformComparison() {
@@ -162,58 +169,6 @@ final class DashboardUITests: XCTestCase {
         let platforms = app.staticTexts["analysis.platform.getir"]
         for _ in 0..<4 where !platforms.exists { app.swipeUp() }
         XCTAssertTrue(platforms.exists)
-    }
-
-    func testDataSharingRequiresExplicitConsent() {
-        let app = launch(sampleData: false)
-        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Profil"].tap()
-
-        // Ekran goruntusu bolumu eklendi: paylasim satiri ilk ekranda olmayabilir
-        XCTAssertTrue(app.switches["settings.autoEstimate"].waitForExistence(timeout: 5))
-        let toggle = app.switches["settings.dataSharing"]
-        for _ in 0..<6 where !(toggle.exists && toggle.isHittable) { app.swipeUp() }
-        XCTAssertTrue(toggle.exists)
-        XCTAssertEqual(toggle.value as? String, "0", "Varsayilan kapali olmali (opt-in)")
-
-        toggle.switches.firstMatch.tap()
-        // Onay ekrani acilmali; vazgecilirse kapali kalmali
-        XCTAssertTrue(app.buttons["consent.accept"].waitForExistence(timeout: 5))
-        app.buttons["Vazgeç"].tap()
-        XCTAssertEqual(toggle.value as? String, "0")
-    }
-
-    func testAcceptingEarningsSharingAlsoTurnsOnLocationDensity() {
-        let app = launch(sampleData: false)
-        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Profil"].tap()
-        let toggle = app.switches["settings.dataSharing"]
-        for _ in 0..<6 where !(toggle.exists && toggle.isHittable) { app.swipeUp() }
-        toggle.switches.firstMatch.tap()
-        XCTAssertTrue(app.buttons["consent.accept"].waitForExistence(timeout: 5))
-        app.buttons["consent.accept"].tap()
-
-        let location = app.switches["profile.locationSharing"]
-        XCTAssertTrue(location.waitForExistence(timeout: 5))
-        // Onay sayfasi kapanirken anahtar degeri bir an gecikebiliyor (Codemagic'te 0 okundu): degeri bekle
-        XCTAssertTrue(waitForValue("1", of: toggle), "Kazanc paylasimi acilmadi")
-        XCTAssertTrue(waitForValue("1", of: location), "Konum yogunlugu kazanc paylasimiyla birlikte acik gelir")
-    }
-
-    private func waitForValue(_ value: String, of element: XCUIElement, timeout: TimeInterval = 5) -> Bool {
-        let predicate = NSPredicate(format: "value == %@", value)
-        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
-    }
-
-    func testLocationSharingRequiresEarningsSharingAndOwnConsent() {
-        let app = launch(sampleData: false)
-        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Profil"].tap()
-        let location = app.switches["profile.locationSharing"]
-        for _ in 0..<7 where !location.exists { app.swipeUp() }
-        XCTAssertTrue(location.exists)
-        XCTAssertFalse(location.isEnabled, "Kazanc paylasimi kapaliyken konum paylasimi acilamamali")
     }
 
     func testProfileOffersAutoScanToggle() {
@@ -272,26 +227,22 @@ final class OnboardingUITests: XCTestCase {
         app.launchArguments = ["-ui-testing", "-reset-defaults"]
         app.launch()
 
-        // Tanitim gecilir, firma kurulumu (Getir: arac sorusu), sonra arac/konum/paylasim
+        // Ilk ekran firma secimi, sonra tanitim (gecilir), firma sorulari (Getir: arac), yakit, hedef, konum
+        XCTAssertTrue(app.buttons["firm.getir"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["welcome.next"].isEnabled, "Firma secmeden devam edilmemeli")
+        app.buttons["firm.getir"].tap()
+        app.buttons["welcome.next"].tap()
         XCTAssertTrue(app.buttons["intro.skip"].waitForExistence(timeout: 10))
         app.buttons["intro.skip"].tap()
-        XCTAssertTrue(app.buttons["firm.getir"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["setup.next"].isEnabled, "Firma secmeden devam edilmemeli")
-        app.buttons["firm.getir"].tap()
-        app.buttons["setup.next"].tap()              // -> arac sorusu
+        XCTAssertTrue(app.buttons["setup.next"].waitForExistence(timeout: 5)) // arac sorusu
         app.buttons["setup.next"].tap()              // -> yakit
         app.buttons["setup.next"].tap()              // -> hedef
         app.buttons["setup.finish"].tap()
 
-        let next = app.buttons["onboarding.next"]
-        XCTAssertTrue(app.buttons["onboarding.vehicle.scooter"].waitForExistence(timeout: 10))
-        app.buttons["onboarding.vehicle.scooter"].tap()
-        next.tap()                                   // platform adimi atlanir -> konum
-
-        XCTAssertTrue(app.staticTexts["Konum yalnızca vardiyada"].waitForExistence(timeout: 5))
-        next.tap()                                   // -> paylasim
-        XCTAssertTrue(app.staticTexts["Bölgendeki kuryelerle karşılaştır"].waitForExistence(timeout: 5))
-        next.tap()                                   // Basla (paylasim acilmadan)
+        // Arac kurulumda secildi: yalnizca konum adimi kalir
+        XCTAssertTrue(app.staticTexts["Konum yalnızca vardiyada"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Bölgendeki kuryelerle karşılaştır"].exists)
+        app.buttons["onboarding.next"].tap()         // Basla
 
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
     }

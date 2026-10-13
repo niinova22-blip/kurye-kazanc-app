@@ -48,6 +48,7 @@ final class PayrollModel {
     @ObservationIgnored private var catalogCache: (key: String, catalog: TariffCatalog)?
     @ObservationIgnored private var planCache: (key: PlanCacheKey, result: Result<GoalPlan, PayError>)?
     @ObservationIgnored private var comparisonCache: (key: PlanCacheKey, rows: [FirmComparisonRow])?
+    @ObservationIgnored private var alternativesCache: (key: PlanCacheKey, items: [GoalAlternative])?
 
     private var catalogKey: String {
         let versions: [TariffVersion] = tariffs.remoteVersions + state.userTariffs
@@ -355,6 +356,21 @@ final class PayrollModel {
         let result: Result<GoalPlan, PayError> = planner.plan(goal: goal, profile: profile, pace: currentPace, day: today)
         planCache = (key, result)
         return result
+    }
+
+    /// Kayitli hedefe giden alternatif yollar (daha az saat / bonus esigi / sonraki kademe / aksam bandi).
+    func goalAlternatives(entries: [EarningEntry], fallbackCostPerKm: Double) -> [GoalAlternative] {
+        guard let profile = tariffProfile, let goal = state.goal,
+              case let .success(plan)? = goalPlan(entries: entries, fallbackCostPerKm: fallbackCostPerKm) else { return [] }
+        let currentPace: PaceEstimate = pace(entries: entries)
+        let key = PlanCacheKey(catalog: catalogKey, profile: profile, goal: goal, fuel: state.fuel, pace: currentPace,
+                               workload: nil, day: today, fallback: fallbackCostPerKm)
+        if let cached = alternativesCache, cached.key == key { return cached.items }
+        let planner = GoalPlanner(engine: engine, fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm))
+        let items: [GoalAlternative] = GoalAlternatives.suggest(base: plan, planner: planner, profile: profile,
+                                                                pace: currentPace, day: today)
+        alternativesCache = (key, items)
+        return items
     }
 
     func comparison(workload: WorkloadSpec, fallbackCostPerKm: Double) -> [FirmComparisonRow] {

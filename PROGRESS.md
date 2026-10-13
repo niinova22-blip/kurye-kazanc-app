@@ -401,3 +401,18 @@ Dal: `feature/surum-1-7` (main 1.6.0 üzerinden). Tasarım `docs/superpowers/spe
 - Sunucudan otomatik yakıt fiyatı (economic_indicators.fuel_price) sonraki sürüm.
 - Bölge kademesinin ilçe listesi resmî kaynakta yok; kullanıcı seçer.
 - Lansman öncesi: sentetik Topluluk verisi temizliği ve Topluluk RPC'lerinin kaldırılması (uygulama artık çağırmıyor).
+
+## Oturum 10 — 2026-10-13: 1.8.0 firma önce, yeni tasarım, güncel tarifeler, plan alternatifleri
+
+Dal: `feature/surum-1-8`. Kullanıcının 7 maddesi:
+1. Firma ilk ekranda (`FirmWelcomeView`, `AppPreferences.startFirmKey`); kurulum seçilen firmayla sorulardan başlar.
+2. Tanıtım yenilendi (`IntroView`, `IntroPages`; `AnimatedBrandBackground`, 6 sayfa, yeni "Daha iyi yollar"). Anahtar `hasSeenIntroV18` (herkes bir kez görür).
+3. Plan klavyesi: `dismissesKeyboard()` + kaydedince `resignFirstResponder`; `HeroAmountField` dış değer eşitlemesi.
+4. Tarifeler: internet araştırması (resmi tablo yalnız pakettaxi.com). Gömülü v2: `migros_hemen-esnaf-v2` (resmi, partial), `yemeksepeti-esnaf-v2` (eleman.net 13.01.2026). Yeni hesap yöntemi `delivery_band` (teslimat başı mesafe ek ödemesi). `TariffQuestions` yalnızca en yeni sürümü sorar. CANLI SUNUCUYA TOHUMLANDI (7 sürüm, 83 kalem, 9 kaynak) — sunucu bir firmada sürüm yayımlıyorsa gömülü sürüm kullanılmaz.
+   Plan araması: sabit + kademe bonusunda net, kademeler arasında yakıtla azaldığı için ikili arama yerine kademe sınırlarına göre bölümlü arama (`GoalPlanner.breakpoints`).
+5. Kaldırılanlar: onboarding paylaşım adımı ve Profil paylaşım bölümü (açık olanlar bir kez kapatılır: `RootView.retireAnonymousSharing`), tekrar eden araç adımı, uzun açıklamalar.
+6. Tasarım: `Theme` (indigo→mor marka geçişi, `positive`, `highlight`, `brandCard`, `surfaceCard`), AccentColor #5A3FF5/#8D7DFF, yuvarlak yazı tipi, yeni ikon (paket + ₺ rozeti).
+7. Plan: dönem seçimine göre alanlar, `WeekdayPicker` (`GoalSpec.workWeekdays`), sade Türkçe sonuç kartı, `GoalAlternatives` (gün sayısı, bonus eşiği, sonraki aylık kademe, akşam bandı) + "Bu planı uygula".
+
+Core testleri: 351. Sunucu testleri (PGlite): 34.
+

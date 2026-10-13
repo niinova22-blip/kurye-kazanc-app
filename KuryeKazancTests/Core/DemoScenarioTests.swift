@@ -36,7 +36,7 @@ final class DemoScenarioTests: XCTestCase {
         let s = try XCTUnwrap(DemoScenarioCatalog.scenario("paketTaxi30"))
         XCTAssertEqual(s.profile?.platformCode, "migros_hemen")
         XCTAssertEqual(s.profile?.flags, ["woman_employment"])
-        XCTAssertEqual(s.goal?.amount, Money(100_000))
+        XCTAssertEqual(s.goal?.amount, Money(75_000))
         XCTAssertEqual(s.fuelPrices.count, 4)
         XCTAssertEqual(s.workDays.count, 26)
         XCTAssertTrue(s.workDays.allSatisfy { (30...45).contains($0.packages) && $0.dayOffset <= 0 && $0.dayOffset > -31 })
@@ -47,6 +47,7 @@ final class DemoScenarioTests: XCTestCase {
         let pace = PaceEstimate.estimate(entries: entries(s, platform: "migros_hemen"), platform: "migros_hemen",
                                          now: Date(timeIntervalSince1970: 1_791_000_000 + 86_400))
         XCTAssertFalse(pace.isAssumed)
+        // Uygulamadaki gercek katalog (guncel tarifeler) ile
         let planner = GoalPlanner(engine: PayEngine(catalog: TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [])),
                                   fuel: fuel(s))
         guard case let .success(plan) = planner.plan(goal: try XCTUnwrap(s.goal), profile: try XCTUnwrap(s.profile), pace: pace,
@@ -60,7 +61,7 @@ final class DemoScenarioTests: XCTestCase {
         XCTAssertEqual(s.workDays.count, 14)
         let pace = PaceEstimate.estimate(entries: entries(s, platform: "getir"), platform: "getir",
                                          now: Date(timeIntervalSince1970: 1_791_000_000 + 86_400))
-        let planner = GoalPlanner(engine: PayEngine(catalog: TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [])),
+        let planner = GoalPlanner(engine: PayEngine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: [])),
                                   fuel: fuel(s))
         guard case let .success(plan) = planner.plan(goal: try XCTUnwrap(s.goal), profile: try XCTUnwrap(s.profile), pace: pace,
                                                      day: today) else { return XCTFail() }
@@ -72,7 +73,7 @@ final class DemoScenarioTests: XCTestCase {
         let versions = s.userTariffs(today: today)
         XCTAssertEqual(versions.count, 2)
         XCTAssertTrue(versions.allSatisfy { $0.origin == .user && $0.platformCode == "trendyol_go" })
-        let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: versions)
+        let catalog = TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: versions)
         XCTAssertEqual(TariffFuelCorrelation.evaluate(platform: "trendyol_go", catalog: catalog, fuel: fuel(s), today: today)?.verdict,
                        .consistent)
         let rows = TariffComparison.rows(workload: WorkloadSpec(packagesPerDay: 32, hoursPerDay: 8, kmPerPackage: 3, daysPerMonth: 26),
@@ -94,7 +95,7 @@ final class DemoScenarioTests: XCTestCase {
     /// Uygulamada kayit yokken varsayilan is yuku (2,5 paket/sa × 8 sa = 20 paket/gun) ile de oneri cikmali.
     func testTariffChangedSuggestionWithDefaultWorkload() throws {
         let s = try XCTUnwrap(DemoScenarioCatalog.scenario("tariffChanged"))
-        let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: s.userTariffs(today: today))
+        let catalog = TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: s.userTariffs(today: today))
         let pace = PaceEstimate.estimate(entries: [], platform: "migros_hemen", now: Date())
         let workload = WorkloadSpec.from(pace: pace, goal: s.goal)
         let rows = TariffComparison.rows(workload: workload, profile: try XCTUnwrap(s.profile), catalog: catalog,

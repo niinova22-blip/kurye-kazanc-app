@@ -15,7 +15,7 @@ final class GoalPlannerReviewFixTests: XCTestCase {
     private let pace = PaceEstimate(packagesPerHour: 5, kmPerPackage: 3, isAssumed: false, sampleCount: 20)
 
     private func engine(user: [TariffVersion] = []) -> PayEngine {
-        PayEngine(catalog: TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: user))
+        PayEngine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: user))
     }
 
     func testMidMonthTariffIsUsed() throws {
@@ -69,7 +69,7 @@ final class GoalPlannerReviewFixTests: XCTestCase {
     }
 
     func testOnlyProfileFlagsAreAsked() {
-        let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [])
+        let catalog = TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: [])
         XCTAssertTrue(TariffQuestions.required(platform: "trendyol_go", catalog: catalog, day: day).flags.isEmpty)
         XCTAssertTrue(TariffQuestions.required(platform: "yemeksepeti", catalog: catalog, day: day).flags.isEmpty)
         XCTAssertEqual(TariffQuestions.required(platform: "migros_hemen", catalog: catalog, day: day).flags, ["woman_employment"])

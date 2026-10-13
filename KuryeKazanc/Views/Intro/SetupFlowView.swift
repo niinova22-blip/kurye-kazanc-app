@@ -9,6 +9,8 @@ enum SetupStep: Int, CaseIterable {
 struct SetupFlowView: View {
     @Environment(PayrollModel.self) private var payroll
     var firmOnly: Bool = false
+    /// Karsilama ekraninda secilen firma: kurulum firma adimini atlayarak sorularla baslar (Geri ile degistirilebilir).
+    var initialFirm: String? = nil
     let onFinish: () -> Void
 
     @State private var step: SetupStep = .firm
@@ -22,13 +24,14 @@ struct SetupFlowView: View {
     @State private var consumption: Decimal = 3
     @State private var goalAmount: Decimal?
     @State private var goalPeriod: GoalPeriod = .month
-    @State private var daysPerWeek = 6
+    @State private var weekdays: Set<Int> = Set(GoalSpec.defaultWeekdays(count: 6))
     @State private var maxHours = 10
     @State private var loaded = false
 
     var body: some View {
         NavigationStack {
             Form { content }
+                .dismissesKeyboard()
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
                 .safeAreaInset(edge: .bottom) {
@@ -106,15 +109,18 @@ struct SetupFlowView: View {
 
     private var goalSection: some View {
         Section {
-            Picker("Dönem", selection: $goalPeriod) {
+            Picker("Dönem", selection: $goalPeriod.animation(.snappy)) {
                 ForEach(GoalPeriod.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.segmented)
-            HeroAmountField(title: "Net hedef (yakıt düşülmüş)", value: $goalAmount, identifier: "goal.amount")
-            CountStepper(title: "Haftada", value: $daysPerWeek, range: 1...7, unit: "gün", identifier: "goal.days")
+            HeroAmountField(title: "Cebine kalmasını istediğin tutar (yakıt düşülmüş)", value: $goalAmount,
+                            identifier: "goal.amount")
+            if goalPeriod != .day {
+                WeekdayPicker(selection: $weekdays, identifier: "goal.days")
+            }
             CountStepper(title: "Günde en fazla", value: $maxHours, range: 2...16, unit: "saat", identifier: "goal.hours")
         } footer: {
-            Text("Örnek: aylık 100.000 TL. Hedefi sonra Plan ekranından değiştirebilirsin.")
+            Text("İstersen boş bırak; hedefini sonra Plan ekranından da koyabilirsin.")
         }
     }
 
@@ -174,7 +180,10 @@ struct SetupFlowView: View {
         guard !loaded else { return }
         loaded = true
         let profile: CourierTariffProfile? = payroll.tariffProfile
-        firm = profile?.platformCode
+        firm = profile?.platformCode ?? initialFirm
+        if profile == nil, initialFirm != nil, !firmOnly {
+            step = questions.isEmpty ? .fuel : .questions
+        }
         regionTier = profile?.regionTier
         seniority = profile?.seniorityYears ?? 0
         vehicle = profile?.vehicleType ?? "motorcycle"
@@ -182,7 +191,7 @@ struct SetupFlowView: View {
         if let goal = payroll.goal {
             goalAmount = goal.amount.value
             goalPeriod = goal.period
-            daysPerWeek = goal.daysPerWeek
+            weekdays = Set(goal.workWeekdays ?? GoalSpec.defaultWeekdays(count: goal.daysPerWeek))
             maxHours = NSDecimalNumber(decimal: goal.maxHoursPerDay).intValue
         }
         consumption = payroll.state.fuel.consumptionPer100Km ?? FuelCostModel.defaultConsumption(vehicleType: vehicle)
@@ -202,8 +211,9 @@ struct SetupFlowView: View {
                 payroll.addFuelPrice(Money(fuelPrice), type: fuelType, on: Date())
             }
             if let goalAmount, goalAmount > 0 {
-                payroll.setGoal(GoalSpec(amount: Money(goalAmount), period: goalPeriod, daysPerWeek: daysPerWeek,
-                                         maxHoursPerDay: Decimal(maxHours)))
+                let days: [Int]? = goalPeriod == .day ? nil : weekdays.sorted()
+                payroll.setGoal(GoalSpec(amount: Money(goalAmount), period: goalPeriod, daysPerWeek: days?.count ?? 6,
+                                         maxHoursPerDay: Decimal(maxHours), workWeekdays: days))
             }
         }
         Haptics.success()

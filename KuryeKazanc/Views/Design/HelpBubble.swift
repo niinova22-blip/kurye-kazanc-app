@@ -27,8 +27,10 @@ enum HelpScreen {
              "Diğer firmalar yeni başlayan kademesiyle hesaplanır.",
              "Tarife değişiklikleri yakıt fiyatıyla karşılaştırılır."]
         case .plan:
-            ["Hedefini gir; firmanın tarifesine göre gereken paket, saat ve bölgeyi görürsün.",
-             "Hız kendi kayıtlarından hesaplanır; az kayıt varsa varsayım kullanılır."]
+            ["Hedefini gir; firmanın tarifesine göre günde kaç paket ve kaç saat gerektiğini görürsün.",
+             "Günlük hedefte gün seçilmez; haftalık ve aylıkta çalışacağın günleri seçersin.",
+             "\"Daha iyi yollar\" aynı paraya daha az saatle ulaşmanın yollarını gösterir.",
+             "Hız kendi kayıtlarından hesaplanır; az kayıt varsa tahmin kullanılır."]
         }
     }
 }

@@ -3,6 +3,26 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.8.0
+
+Yeni:
+- İlk ekran: "Hangi firmayla çalışıyorsun?" — firma tanıtımdan önce seçilir; tanıtım ve tüm hesaplar o firmaya göre.
+- Yeni tanıtım: hareketli marka zemini, cam kartlar, her sayfaya yeni animasyon, "Daha iyi yollar" sayfası.
+- Yeni tasarım ve renkler (indigo/mor marka, nane yeşili para), yeni uygulama ikonu, Bugün ekranında yeni ana kart.
+- Tarifeler internetten araştırılıp güncellendi:
+  - Paket Taxi: firmanın kendi sitesindeki 2026 ücretleri — sabit ücret İstanbul/Ankara Plus 65.223 TL, diğer bölgeler 53.223 TL; aylık paket bonusu (700 → 12.000 … 1.700 → 55.600, 1.800+ → 66.870 TL); 4–6 km teslimata +25 TL, 6 km üzerine +35 TL. Paket başı ayrı ücret ve kıdem tarifesi kalktı.
+  - Yemeksepeti: 2026 tablosu — saate/güne göre paket ücreti (59–78,5 TL), km 3,7 TL, günlük 17–60+ paket bonusu, Ankara/İzmir haftalık bonusu (kurulumda sorulur).
+  - Getir ve Trendyol GO: güncel kaynaklarla karşılaştırıldı, değerler aynı.
+- Plan ekranı: tutar girince klavye "Bitti" ile ve kaydedince kapanır; günlük hedefte gün seçimi yok; haftalık/aylıkta çalışacağın günleri (Pzt–Paz) seçersin (hafta sonu bonusu buna göre).
+- Plan sonucu sade Türkçe: "Hedefine ulaşmak için günde X paket, Y saat", "Paket yapmasan da alacakların", "Firmadan alacağın − yakıt = cebine kalan".
+- "Daha iyi yollar": aynı paraya daha az saatle (gün sayısı, bonus eşiği, akşam saatleri) ya da sonraki aylık kademeyle daha çok net; "Bu planı uygula".
+- Kaldırıldı: kurulumdaki "bölgendeki kuryelerle karşılaştır" (anonim paylaşım) adımı ve Profil'deki paylaşım bölümü; kurulumda tekrar eden araç sorusu; uzun açıklamalar kısaltıldı.
+
+Lütfen test et:
+- Uygulamayı silip kur: firma seç → tanıtım → sorular → yakıt → hedef.
+- Plan: Günlük/Haftalık/Aylık geçişi, gün çipleri, klavye kapanması, "Daha iyi yollar" ve "Bu planı uygula".
+- Paket Taxi seçip aylık 70.000 TL hedef: 700 paket civarı ve "Ayda 1.700 pakete çık" önerisi.
+
 ## 1.7.0
 
 Yeni:

@@ -7,7 +7,9 @@ import XCTest
 
 /// Kontrollu ornek tarifeler: gercek sirket verisine bagli degil; gomulu ornek JSON ve elle kurulan surumler.
 enum TariffFixtures {
-    static var bundled: [TariffVersion] { BundledTariffs.all }
+    /// Hesap mekanigi testleri icin ilk (v1) ornek surumler: kademeli paket ucreti, kidem, garanti gibi kurallari
+    /// kapsar. Guncel tarifeler (v2) `BundledTariffs.all` ile ayri testlerde.
+    static var bundled: [TariffVersion] { BundledTariffs.all.filter { $0.versionNumber == 1 } }
 
     static func bundled(_ id: String) -> TariffVersion {
         guard let version = BundledTariffs.all.first(where: { $0.id == id }) else {

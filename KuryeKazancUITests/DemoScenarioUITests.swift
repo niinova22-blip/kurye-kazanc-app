@@ -9,7 +9,7 @@ final class DemoScenarioUITests: XCTestCase {
     func testLoadScenarioShowsRowsInDatabase() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing", "-reset-defaults", "-hasCompletedOnboarding", "YES",
-                               "-hasSeenIntroV17", "YES", "-firm", "getir"]
+                               "-hasSeenIntroV18", "YES", "-firm", "getir"]
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Profil"].tap()
