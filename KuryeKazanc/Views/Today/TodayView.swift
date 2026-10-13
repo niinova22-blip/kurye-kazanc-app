@@ -303,17 +303,40 @@ struct TodayView: View {
 
     private func heroSection(_ summary: EarningsSummary) -> some View {
         Section {
-            VStack(alignment: .leading, spacing: 4) {
-                HeroAmount(title: "Net kazanç", value: summary.netEarnings, identifier: "dashboard.netEarnings")
-                NetBreakdownLine(gross: summary.totalEarnings, expenses: summary.totalExpenses)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Label(PayrollModel.platformName(payroll.tariffProfile?.platformCode ?? ""), systemImage: "sun.max.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer()
+                    if workSession.isWorking {
+                        Label("Vardiyada", systemImage: "dot.radiowaves.left.and.right")
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Theme.positive.opacity(0.35), in: Capsule())
+                            .symbolEffect(.pulse)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    HeroAmount(title: "Bugün cebine kalan", value: summary.netEarnings, identifier: "dashboard.netEarnings")
+                    NetBreakdownLine(gross: summary.totalEarnings, expenses: summary.totalExpenses)
+                }
+                MetricStrip(metricItems(summary))
+                    .padding(12)
+                    .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                if summary.usesEstimatedExpenses {
+                    Text("Yakıt (km × tüketim × fiyat): \(Formatters.currency(summary.estimatedExpenses))")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
-            MetricStrip(metricItems(summary))
-            if summary.usesEstimatedExpenses {
-                Text("Yakıt (km × tüketim × fiyat): \(Formatters.currency(summary.estimatedExpenses))")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+            .brandCard()
+            .environment(\.colorScheme, .dark)
+            .padding(.vertical, 4)
         }
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
     }
 

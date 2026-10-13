@@ -4,6 +4,7 @@ import SwiftData
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(PayrollModel.self) private var payroll
+    @Environment(SyncCoordinator.self) private var sync
     @AppStorage(AppPreferences.hasCompletedOnboardingKey) private var hasCompletedOnboarding = false
     @AppStorage(AppPreferences.hasSeenIntroV18Key) private var hasSeenIntro = false
     @AppStorage(AppPreferences.startFirmKey) private var startFirm = ""
@@ -36,7 +37,22 @@ struct RootView: View {
         .task {
             DataSeeder.seedPlatformsIfNeeded(in: modelContext)
             payroll.migrateLegacyGoal(defaults: .standard)
+            retireAnonymousSharing(defaults: .standard)
         }
+    }
+}
+
+extension RootView {
+    /// 1.8: anonim kazanc / konum paylasimi (topluluk ortalamalari icindi) kaldirildi. Acik birakanlarin rizasi bir kez
+    /// geri alinir ve bekleyen gonderimler silinir; uygulama artik kurye ortalamasi kullanmiyor.
+    func retireAnonymousSharing(defaults: UserDefaults) {
+        guard defaults.bool(forKey: AppPreferences.dataSharingOptInKey)
+            || defaults.bool(forKey: AppPreferences.locationSharingOptInKey) else { return }
+        defaults.set(false, forKey: AppPreferences.dataSharingOptInKey)
+        defaults.set(0.0, forKey: AppPreferences.dataSharingConsentDateKey)
+        defaults.set(false, forKey: AppPreferences.locationSharingOptInKey)
+        defaults.set(0.0, forKey: AppPreferences.locationSharingConsentDateKey)
+        sync.sharingConsentChanged(enabled: false)
     }
 }
 
