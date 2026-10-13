@@ -36,8 +36,36 @@ final class PayrollModel {
 
     // MARK: - Katalog ve motor
 
+    /// Katalog yalnizca uzak / kullanici surumleri degisince yeniden kurulur (gorunum govdeleri sik okur).
     var catalog: TariffCatalog {
-        TariffCatalog.merged(bundled: BundledTariffs.all, remote: tariffs.remoteVersions, user: state.userTariffs)
+        let key: String = catalogKey
+        if let cached = catalogCache, cached.key == key { return cached.catalog }
+        let merged = TariffCatalog.merged(bundled: BundledTariffs.all, remote: tariffs.remoteVersions, user: state.userTariffs)
+        catalogCache = (key, merged)
+        return merged
+    }
+
+    @ObservationIgnored private var catalogCache: (key: String, catalog: TariffCatalog)?
+    @ObservationIgnored private var planCache: (key: PlanCacheKey, result: Result<GoalPlan, PayError>)?
+    @ObservationIgnored private var comparisonCache: (key: PlanCacheKey, rows: [FirmComparisonRow])?
+
+    private var catalogKey: String {
+        let versions: [TariffVersion] = tariffs.remoteVersions + state.userTariffs
+        return versions.map { v in
+            "\(v.id).\(v.revision).\(v.approvalStatus.rawValue).\(v.effectiveFrom).\(v.effectiveUntil ?? "").\(v.items.count)"
+        }.joined(separator: ",")
+    }
+
+    /// Plan ve karsilastirma onbellek anahtari: girdilerden biri degismedikce motor yeniden calismaz.
+    private struct PlanCacheKey: Equatable {
+        var catalog: String
+        var profile: CourierTariffProfile?
+        var goal: GoalSpec?
+        var fuel: FuelSettings
+        var pace: PaceEstimate?
+        var workload: WorkloadSpec?
+        var day: String
+        var fallback: Double
     }
 
     var engine: PayEngine { PayEngine(catalog: catalog) }
@@ -253,6 +281,134 @@ final class PayrollModel {
         store.deleteUserTariff(id: version.id)
         reload()
     }
+
+    // MARK: - 1.7 firma, hedef, yakit
+
+    var tariffProfile: CourierTariffProfile? { state.tariffProfile }
+    var goal: GoalSpec? { state.goal }
+
+    nonisolated static func platformName(_ code: String) -> String { PayPlatform.named(code)?.name ?? code }
+
+    func questions(for platform: String) -> TariffQuestions {
+        TariffQuestions.required(platform: platform, catalog: catalog, day: today)
+    }
+
+    /// Calisilan tek firmayi ve tarifesinin istedigi kisisel bilgileri kaydeder.
+    func chooseFirm(_ code: String, regionTier: String?, seniorityYears: Int?, vehicleType: String?, flags: [String]) {
+        store.select(platform: code, at: clock())
+        store.setPreferences(regionTier: regionTier, seniorityYears: seniorityYears, vehicleType: vehicleType)
+        store.setFlags(flags)
+        reload()
+    }
+
+    func setGoal(_ goal: GoalSpec?) {
+        store.setGoal(goal)
+        reload()
+    }
+
+    /// 1.6'daki haftalik/gunluk net hedef anahtarlarini bir kez yeni hedefe tasir.
+    func migrateLegacyGoal(defaults: UserDefaults) {
+        guard state.goal == nil else { return }
+        let weekly: Double = defaults.double(forKey: AppPreferences.weeklyGoalKey)
+        let daily: Double = defaults.double(forKey: AppPreferences.dailyGoalKey)
+        if weekly > 0 {
+            setGoal(GoalSpec(amount: Money(double: weekly), period: .week))
+        } else if daily > 0 {
+            setGoal(GoalSpec(amount: Money(double: daily), period: .day))
+        }
+        // Bir kerelik: eski anahtarlar silinir (hedef sonradan kaldirilirsa geri gelmesin)
+        defaults.removeObject(forKey: AppPreferences.weeklyGoalKey)
+        defaults.removeObject(forKey: AppPreferences.dailyGoalKey)
+    }
+
+    func addFuelPrice(_ price: Money, type: FuelType, on date: Date) {
+        store.addFuelPrice(FuelPriceEntry(day: day(date), pricePerUnit: price, type: type))
+        reload()
+    }
+
+    func deleteFuelPrice(_ id: UUID) {
+        store.deleteFuelPrice(id: id)
+        reload()
+    }
+
+    func setConsumption(_ value: Decimal?) {
+        store.setConsumption(value)
+        reload()
+    }
+
+    func fuelModel(fallbackCostPerKm: Double) -> FuelCostModel {
+        FuelCostModel(settings: state.fuel, vehicleType: state.vehicleType, fallbackCostPerKm: Money(double: fallbackCostPerKm))
+    }
+
+    func pace(entries: [EarningEntry]) -> PaceEstimate {
+        PaceEstimate.estimate(entries: entries, platform: state.activePlatform ?? "", now: clock())
+    }
+
+    /// Secili firmanin tarifesiyle hedef plani; firma ya da hedef yoksa nil.
+    func goalPlan(entries: [EarningEntry], fallbackCostPerKm: Double) -> Result<GoalPlan, PayError>? {
+        guard let profile = tariffProfile, let goal = state.goal else { return nil }
+        let currentPace: PaceEstimate = pace(entries: entries)
+        let key = PlanCacheKey(catalog: catalogKey, profile: profile, goal: goal, fuel: state.fuel, pace: currentPace,
+                               workload: nil, day: today, fallback: fallbackCostPerKm)
+        if let cached = planCache, cached.key == key { return cached.result }
+        let planner = GoalPlanner(engine: engine, fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm))
+        let result: Result<GoalPlan, PayError> = planner.plan(goal: goal, profile: profile, pace: currentPace, day: today)
+        planCache = (key, result)
+        return result
+    }
+
+    func comparison(workload: WorkloadSpec, fallbackCostPerKm: Double) -> [FirmComparisonRow] {
+        guard let profile = tariffProfile else { return [] }
+        let key = PlanCacheKey(catalog: catalogKey, profile: profile, goal: nil, fuel: state.fuel, pace: nil,
+                               workload: workload, day: today, fallback: fallbackCostPerKm)
+        if let cached = comparisonCache, cached.key == key { return cached.rows }
+        let rows: [FirmComparisonRow] = TariffComparison.rows(workload: workload, profile: profile, catalog: catalog,
+                                                              fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm), day: today)
+        comparisonCache = (key, rows)
+        return rows
+    }
+
+    func correlation(platform: String, fallbackCostPerKm: Double) -> TariffFuelCorrelation? {
+        TariffFuelCorrelation.evaluate(platform: platform, catalog: catalog,
+                                       fuel: fuelModel(fallbackCostPerKm: fallbackCostPerKm), today: today)
+    }
+
+    /// Henuz gosterilmemis gecis onerisi (ayni surum cifti icin bir kez).
+    func pendingSwitchSuggestion(workload: WorkloadSpec, fallbackCostPerKm: Double) -> SwitchSuggestion? {
+        let rows: [FirmComparisonRow] = comparison(workload: workload, fallbackCostPerKm: fallbackCostPerKm)
+        guard let suggestion = TariffComparison.switchSuggestion(rows: rows) else { return nil }
+        return state.seenEventIDs.contains("switch:" + suggestion.key) ? nil : suggestion
+    }
+
+    func markSwitchSeen(_ suggestion: SwitchSuggestion) {
+        store.markEventsSeen(["switch:" + suggestion.key])
+        reload()
+    }
+
+    /// Tarife esitlemesinden sonra: yeni bir gecis onerisi varsa bir kez bildirilmek uzere dondurur
+    /// (bildirim kaydi ayri tutulur; Firmalar ekranindaki serit "Anladim"a kadar kalir).
+    func switchSuggestionToNotify(entries: [EarningEntry], fallbackCostPerKm: Double) -> SwitchSuggestion? {
+        let workload = WorkloadSpec.from(pace: pace(entries: entries), goal: state.goal)
+        // Yalnizca tarife surumleri degistiyse: ilk degerlendirme (kurulum / guncelleme) sessizce taban olur
+        let rows: [FirmComparisonRow] = comparison(workload: workload, fallbackCostPerKm: fallbackCostPerKm)
+        guard !rows.isEmpty else { return nil }
+        let baseline: String = rows.map(\.versionID).sorted().joined(separator: "|")
+        let previous: String? = state.switchBaseline
+        if previous != baseline {
+            store.setSwitchBaseline(baseline)
+            reload()
+        }
+        guard let previous, previous != baseline else { return nil }
+        guard let suggestion = pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: fallbackCostPerKm) else { return nil }
+        let key: String = "notified:" + suggestion.key
+        guard !state.seenEventIDs.contains(key) else { return nil }
+        store.markEventsSeen([key])
+        reload()
+        return suggestion
+    }
+
+    /// Senaryo yukleyici gibi depoya dogrudan yazanlar icin.
+    func reloadState() { reload() }
 
     // MARK: - Bildirimler
 

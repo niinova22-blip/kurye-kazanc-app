@@ -51,7 +51,21 @@ struct KuryeKazancApp: App {
         // Tarifeler: basarisizlikta son bilinen / gomulu tarife kullanilir; hesaplama aga bagli degil
         await environment.tariffs.refreshIfNeeded()
         await environment.payroll.refreshNotices()
+        await notifyTariffSwitchIfNeeded()
         await sync.flush()
+    }
+}
+
+extension KuryeKazancApp {
+    /// Tarife esitlemesinden sonra baska bir firma belirgin sekilde daha kazancli hale geldiyse bir kez bildirir.
+    @MainActor
+    private func notifyTariffSwitchIfNeeded() async {
+        let records: [EarningRecord] = (try? environment.container.mainContext.fetch(FetchDescriptor<EarningRecord>())) ?? []
+        let costPerKm: Double = UserDefaults.standard.object(forKey: AppPreferences.costPerKmKey) as? Double
+            ?? AppPreferences.defaultCostPerKm
+        guard let suggestion = environment.payroll.switchSuggestionToNotify(entries: records.map(\.entry),
+                                                                             fallbackCostPerKm: costPerKm) else { return }
+        await TariffSwitchNotifier.notify(suggestion)
     }
 }
 
@@ -60,13 +74,18 @@ struct LaunchOptions {
     var isUITesting: Bool
     var loadsSampleData: Bool
     var resetsDefaults: Bool
+    /// "-firm <kod>": UI testleri kurulumu atlayip bu firmayla baslar.
+    var firm: String? = nil
 
     static var current: LaunchOptions {
         let args = ProcessInfo.processInfo.arguments
+        var firm: String? = nil
+        if let index = args.firstIndex(of: "-firm"), index + 1 < args.count { firm = args[index + 1] }
         return LaunchOptions(
             isUITesting: args.contains("-ui-testing"),
             loadsSampleData: args.contains("-sample-data"),
-            resetsDefaults: args.contains("-reset-defaults")
+            resetsDefaults: args.contains("-reset-defaults"),
+            firm: firm
         )
     }
 }

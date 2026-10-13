@@ -326,6 +326,7 @@ struct WorkLogDetailView: View {
                         dismiss()
                     }
                 }
+                VerificationFootnote(items: UnverifiedItems.from(log.result, platformName: PayrollModel.platformName(log.platformCode)))
             }
             .navigationTitle("Kayıt")
             .navigationBarTitleDisplayMode(.inline)

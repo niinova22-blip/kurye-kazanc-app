@@ -15,6 +15,11 @@ struct Money: Hashable, Comparable, Codable, CustomStringConvertible {
         self.init(Decimal(int))
     }
 
+    /// Arayuzdeki Double tutarlar (AppStorage, SwiftData) icin; ikili gosterim kalintisi metin uzerinden temizlenir.
+    init(double: Double) {
+        self.init(Money.parse(String(format: "%.4f", double)) ?? Decimal(double))
+    }
+
     /// "64.50" / "64,50" / "1.610" / "1610". Gecersizse nil.
     init?(text: String) {
         guard let decimal = Money.parse(text) else { return nil }

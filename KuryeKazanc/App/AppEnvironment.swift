@@ -52,6 +52,11 @@ final class AppEnvironment {
         let payrollStore = PayrollStore(fileURL: launch.isUITesting ? nil : PayrollModel.defaultFileURL(),
                                         writeOptions: OutboxQueue.writeOptions)
         payroll = PayrollModel(store: payrollStore, tariffs: tariffs)
+        if launch.isUITesting, let firm = launch.firm {
+            payroll.chooseFirm(firm, regionTier: firm == "migros_hemen" ? "plus" : nil, seniorityYears: nil,
+                               vehicleType: firm == "getir" ? "motorcycle" : nil, flags: [])
+            if launch.loadsSampleData { payroll.setGoal(GoalSpec(amount: Money(100_000), period: .month)) }
+        }
         let templates: @MainActor () -> [OCRTemplate] = { sync.mergedTemplates() }
         if let testDefaults {
             scanner = ScreenshotScanner(defaults: testDefaults, templates: templates)

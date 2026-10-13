@@ -7,6 +7,7 @@ struct ExpenseFormView: View {
 
     @State private var viewModel: ExpenseFormViewModel
     @State private var saveError: String?
+    @State private var saved = false
 
     init(record: ExpenseRecord? = nil) {
         _viewModel = State(initialValue: ExpenseFormViewModel(record: record))
@@ -30,7 +31,7 @@ struct ExpenseFormView: View {
                     DatePicker("Tarih", selection: $vm.date, displayedComponents: .date)
                         .environment(\.locale, Formatters.locale)
 
-                    TextField("Not (isteğe bağlı)", text: $vm.note)
+                    FloatingTextField(title: "Not (isteğe bağlı)", text: $vm.note, identifier: "expenseForm.note")
                 } footer: {
                     if vm.replacesEstimate {
                         Text("Bu gün için yakıt/bakım gideri girdiğinde km başına otomatik tahmin o gün kullanılmaz (çift sayılmaz).")
@@ -38,6 +39,7 @@ struct ExpenseFormView: View {
                 }
             }
             .dismissesKeyboard()
+            .saveConfirmation(isPresented: $saved)
             .navigationTitle(vm.isEditing ? "Gideri düzenle" : "Gider ekle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -47,9 +49,11 @@ struct ExpenseFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Kaydet") {
+                        guard !saved else { return }
                         do {
                             try viewModel.save(in: modelContext)
-                            dismiss()
+                            withAnimation { saved = true }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
                         } catch {
                             saveError = error.localizedDescription
                         }

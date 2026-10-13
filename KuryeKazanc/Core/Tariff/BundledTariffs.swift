@@ -8,7 +8,8 @@ import Foundation
 /// Eksik ara kademeler uydurulmadi: Trendyol GO 3–6 km araligi tanimsiz, Yemeksepeti haftalik bonus kademesi yok,
 /// Getir ekipman destegi / saglik sigortasi tutari yok.
 enum BundledTariffs {
-    static var all: [TariffVersion] {
+    /// Bir kez cozulur (her erisimde JSON cozmek gorunum govdelerinde pahaliydi).
+    static let all: [TariffVersion] = {
         guard let data = json.data(using: .utf8),
               let versions = try? JSONDecoder().decode([TariffVersion].self, from: data) else { return [] }
         return versions.map { version in
@@ -16,7 +17,7 @@ enum BundledTariffs {
             copy.origin = .bundled
             return copy
         }
-    }
+    }()
 
     static let json: String = #"""
     [

@@ -1,12 +1,13 @@
 import SwiftUI
 import SwiftData
 
-/// Ilk acilis: arac tipi -> sik kullanilan platformlar -> konum bilgisi -> istege bagli anonim paylasim.
+/// Kurulumun son kismi: arac tipi -> (firma secildiyse atlanan) platformlar -> konum bilgisi -> istege bagli paylasim.
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(LocationService.self) private var location
     @Environment(AutoShiftCoordinator.self) private var autoShift
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
+    @Environment(PayrollModel.self) private var payroll
 
     @State private var viewModel = OnboardingViewModel()
     @State private var errorMessage: String?
@@ -31,6 +32,10 @@ struct OnboardingView: View {
 
             bottomButtons
                 .padding(24)
+        }
+        .onAppear {
+            if let firm = payroll.tariffProfile?.platformCode { viewModel.preselect(firm: firm) }
+            if payroll.tariffProfile?.vehicleType == "car" { viewModel.vehicleType = .car }
         }
         .sheet(isPresented: $showConsent) {
             DataSharingConsentView {
@@ -160,7 +165,7 @@ struct OnboardingView: View {
                 .accessibilityHidden(true)
             Text("Konum yalnızca vardiyada")
                 .font(.title.bold())
-            Text("Vardiyayı başlattığında mesafeni ölçer, bitirince durur. Kayıtlara yalnızca ilçe eklenir.")
+            Text("Otomatik vardiya açıksa sürüşünü algılar, mesafeni ölçer; bitince durur. Kayıtlara yalnızca ilçe eklenir.")
                 .foregroundStyle(.secondary)
 
             if location.isAuthorized {

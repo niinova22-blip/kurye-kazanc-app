@@ -448,7 +448,7 @@ struct SideBenefitsView: View {
                     }
                 }
             } footer: {
-                Text("Yan haklar ve ayni destekler nakit hakedişe eklenmez; koşulları platformla doğrulanmalıdır.")
+                Text("Yan haklar ve ayni destekler nakit hakedişe eklenmez; koşula bağlı olanlar (örn. kadın istihdam desteği) kurulumda seçtiysen hedef planına eklenir.")
             }
         }
         .navigationTitle("Yan haklar ve destekler")
@@ -562,7 +562,9 @@ struct PayrollSettingsView: View {
                 Text("Yalnızca yayımlanmış tarife tabloları indirilir; cihazından veri gönderilmez. Kapalıysa son bilinen tarife kullanılır.")
             }
             Section {
-                NavigationLink("Platformu değiştir") { PlatformPickerView() }
+                Text("Firmanı Profil > Ayarlar > Çalıştığım firma'dan değiştirebilirsin; tarifenin istediği bilgiler de orada sorulur.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Hakediş ayarları")

@@ -17,6 +17,8 @@ enum AppPreferences {
     static let locationSharingOptInKey = "locationSharingOptIn"
     static let locationSharingConsentDateKey = "locationSharingConsentDate"
     static let hasCompletedOnboardingKey = "hasCompletedOnboarding"
+    /// 1.7 tanitimi bir kez gosterildi (1.6'dan gelenler de bir kez gorur).
+    static let hasSeenIntroV17Key = "hasSeenIntroV17"
     /// Haftalik / gunluk net kazanc hedefi (TL). 0 = ayarlanmadi.
     static let weeklyGoalKey = "weeklyNetGoal"
     static let dailyGoalKey = "dailyNetGoal"

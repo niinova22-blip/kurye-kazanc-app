@@ -71,14 +71,10 @@ struct CalculationSections: View {
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
                         .accessibilityIdentifier("estimate.gross")
-                    if breakdown.needsVerification {
-                        Label("Doğrulanmamış tarife kalemi içerir; sonuç tahminidir.", systemImage: "exclamationmark.triangle")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
                 }
             }
             BreakdownSections(breakdown: breakdown)
+            VerificationFootnote(items: UnverifiedItems.from(breakdown, platformName: PayrollModel.platformName(breakdown.platformCode)))
         case let .failure(error):
             Section {
                 Label(error.message, systemImage: "xmark.octagon").foregroundStyle(Theme.negative)

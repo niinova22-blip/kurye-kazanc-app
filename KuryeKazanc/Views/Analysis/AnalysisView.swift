@@ -4,6 +4,7 @@ import Charts
 
 /// Analiz: gunluk / haftalik / aylik ozet, onceki doneme gore degisim, en karli saatler,
 /// isi haritasi, platform karsilastirmasi ve kayit listesi.
+/// 1.7: Kazanc sekmesinin "Analiz" gorunumu; kendi NavigationStack'i yok (EarningsTabView saglar).
 struct AnalysisView: View {
     @State private var kind: PeriodKind = .week
     @State private var anchor: Date = .now
@@ -11,16 +12,13 @@ struct AnalysisView: View {
     private let periods = PeriodRange()
 
     var body: some View {
-        NavigationStack {
-            let interval = periods.interval(of: kind, containing: anchor)
-            let previous = periods.interval(of: kind, containing: periods.shift(anchor, kind: kind, by: -1))
-            AnalysisContentView(interval: interval, previous: previous, kind: kind)
-                .id("\(kind.rawValue)-\(interval.start.timeIntervalSince1970)")
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    periodHeader(interval: interval)
-                }
-                .navigationTitle("Analiz")
-        }
+        let interval = periods.interval(of: kind, containing: anchor)
+        let previous = periods.interval(of: kind, containing: periods.shift(anchor, kind: kind, by: -1))
+        AnalysisContentView(interval: interval, previous: previous, kind: kind)
+            .id("\(kind.rawValue)-\(interval.start.timeIntervalSince1970)")
+            .safeAreaInset(edge: .top, spacing: 0) {
+                periodHeader(interval: interval)
+            }
     }
 
     private func periodHeader(interval: DateInterval) -> some View {
@@ -77,6 +75,12 @@ private struct AnalysisContentView: View {
 
     @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
+    @Environment(PayrollModel.self) private var payroll
+
+    /// Bugun ekraniyla ayni: yakit fiyati girildiyse km × tuketim × fiyat, yoksa km basi maliyet.
+    private var effectiveCostPerKm: Double {
+        payroll.fuelModel(fallbackCostPerKm: costPerKm).costPerKm(on: payroll.today).doubleValue
+    }
 
     @State private var editingEarning: EarningRecord?
     @State private var editingExpense: ExpenseRecord?
@@ -110,11 +114,11 @@ private struct AnalysisContentView: View {
     }
 
     private var calculator: EarningsCalculator {
-        EarningsCalculator(costPerKm: costPerKm, autoEstimateEnabled: autoEstimate)
+        EarningsCalculator(costPerKm: effectiveCostPerKm, autoEstimateEnabled: autoEstimate)
     }
 
     private var analytics: EarningsAnalytics {
-        EarningsAnalytics(calendar: .current, costPerKm: costPerKm)
+        EarningsAnalytics(calendar: .current, costPerKm: effectiveCostPerKm)
     }
 
     private var platformNames: [String: String] {

@@ -14,7 +14,7 @@ final class DashboardUITests: XCTestCase {
         // -key value: UserDefaults arguman alani; testleri onceki durumdan bagimsiz kilar.
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
-            "-hasCompletedOnboarding", "YES", "-autoEstimateExpenses", "YES",
+            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV17", "YES", "-firm", "trendyol_go", "-autoEstimateExpenses", "YES",
             // Paylasim tercihleri testler arasinda tasinmasin. "-anahtar NO" argumani KULLANILMAZ: argumanla
             // verilen deger UserDefaults'ta en ust katmandir; uygulamanin yazdigi "acik" degeri okunamaz olur
             // (paylasim onayindan sonra anahtar ara sira kapali kaliyordu). Bunun yerine kayitli tercihler silinir.
@@ -133,9 +133,10 @@ final class DashboardUITests: XCTestCase {
 
     func testHistoryAndSettingsTabs() {
         let app = launch(sampleData: true)
-        XCTAssertTrue(app.tabBars.buttons["Analiz"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["Kazanç"].waitForExistence(timeout: 10))
 
-        app.tabBars.buttons["Analiz"].tap()
+        app.tabBars.buttons["Kazanç"].tap()
+        app.segmentedControls["earnings.mode"].buttons["Analiz"].tap()
         XCTAssertTrue(app.segmentedControls["history.periodPicker"].waitForExistence(timeout: 5))
         app.segmentedControls["history.periodPicker"].buttons["Gün"].tap()
         let net = app.staticTexts["history.netEarnings"]
@@ -154,8 +155,9 @@ final class DashboardUITests: XCTestCase {
 
     func testAnalysisShowsPlatformComparison() {
         let app = launch(sampleData: true)
-        XCTAssertTrue(app.tabBars.buttons["Analiz"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Analiz"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Kazanç"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Kazanç"].tap()
+        app.segmentedControls["earnings.mode"].buttons["Analiz"].tap()
         app.segmentedControls["history.periodPicker"].buttons["Gün"].tap()
         let platforms = app.staticTexts["analysis.platform.getir"]
         for _ in 0..<4 where !platforms.exists { app.swipeUp() }
@@ -258,13 +260,6 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(breakdown.label.contains("1.050"), "Beklenen brut 1.050, gelen: \(breakdown.label)")
         XCTAssertTrue(breakdown.label.contains("200"), "Beklenen gider 200, gelen: \(breakdown.label)")
     }
-
-    func testCommunityTabExists() {
-        let app = launch(sampleData: false)
-        XCTAssertTrue(app.tabBars.buttons["Topluluk"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Topluluk"].tap()
-        XCTAssertTrue(app.staticTexts["Bölgendeki kuryelerle karşılaştır"].waitForExistence(timeout: 5))
-    }
 }
 
 final class OnboardingUITests: XCTestCase {
@@ -277,23 +272,28 @@ final class OnboardingUITests: XCTestCase {
         app.launchArguments = ["-ui-testing", "-reset-defaults"]
         app.launch()
 
+        // Tanitim gecilir, firma kurulumu (Getir: arac sorusu), sonra arac/konum/paylasim
+        XCTAssertTrue(app.buttons["intro.skip"].waitForExistence(timeout: 10))
+        app.buttons["intro.skip"].tap()
+        XCTAssertTrue(app.buttons["firm.getir"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["setup.next"].isEnabled, "Firma secmeden devam edilmemeli")
+        app.buttons["firm.getir"].tap()
+        app.buttons["setup.next"].tap()              // -> arac sorusu
+        app.buttons["setup.next"].tap()              // -> yakit
+        app.buttons["setup.next"].tap()              // -> hedef
+        app.buttons["setup.finish"].tap()
+
         let next = app.buttons["onboarding.next"]
         XCTAssertTrue(app.buttons["onboarding.vehicle.scooter"].waitForExistence(timeout: 10))
         app.buttons["onboarding.vehicle.scooter"].tap()
-        next.tap()                                   // -> platformlar
-
-        XCTAssertTrue(app.buttons["onboarding.platform.getir"].waitForExistence(timeout: 5))
-        XCTAssertFalse(next.isEnabled, "Platform secmeden devam edilmemeli")
-        app.buttons["onboarding.platform.getir"].tap()
-        XCTAssertTrue(next.isEnabled)
-        next.tap()                                   // -> konum
+        next.tap()                                   // platform adimi atlanir -> konum
 
         XCTAssertTrue(app.staticTexts["Konum yalnızca vardiyada"].waitForExistence(timeout: 5))
         next.tap()                                   // -> paylasim
-
         XCTAssertTrue(app.staticTexts["Bölgendeki kuryelerle karşılaştır"].waitForExistence(timeout: 5))
         next.tap()                                   // Basla (paylasim acilmadan)
 
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
     }
+
 }

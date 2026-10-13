@@ -11,11 +11,11 @@ struct TodayView: View {
     @Environment(SyncCoordinator.self) private var sync
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
+    @Environment(PayrollModel.self) private var payroll
+    @Environment(\.showIntro) private var showIntro
 
     @Query private var todaysEarnings: [EarningRecord]
     @Query private var todaysExpenses: [ExpenseRecord]
-    @Query private var weekEarnings: [EarningRecord]
-    @Query private var weekExpenses: [ExpenseRecord]
     @Query private var couriers: [Courier]
     /// Tekrar tarama kontrolu icin tum kazanc kayitlari.
     @Query private var allEarnings: [EarningRecord]
@@ -24,10 +24,9 @@ struct TodayView: View {
 
     @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
-    @AppStorage(AppPreferences.weeklyGoalKey) private var weeklyGoal = 0.0
-    @AppStorage(AppPreferences.dailyGoalKey) private var dailyGoal = 0.0
 
     @State private var activeSheet: Sheet?
+    @State private var showsHelp = false
     /// Paylas eklentisinden / coklu secimden gelen, sirada bekleyen ekran goruntuleri.
     @State private var inboxQueue: [ImportedScreenshot] = []
     @State private var isProcessingInbox = false
@@ -77,11 +76,6 @@ struct TodayView: View {
             filter: #Predicate<ExpenseRecord> { $0.date == start },
             sort: \ExpenseRecord.createdAt
         )
-        let week = PeriodRange().interval(of: .week, containing: start)
-        let weekStart = week.start
-        let weekEnd = week.end
-        _weekEarnings = Query(filter: #Predicate<EarningRecord> { $0.date >= weekStart && $0.date < weekEnd })
-        _weekExpenses = Query(filter: #Predicate<ExpenseRecord> { $0.date >= weekStart && $0.date < weekEnd })
     }
 
     /// Kazanc formunda onceden secili platform: profildeki ilk platform.
@@ -89,21 +83,24 @@ struct TodayView: View {
         couriers.first?.defaultPlatforms.sorted { $0.sortOrder < $1.sortOrder }.first
     }
 
-    private var calculator: EarningsCalculator {
-        EarningsCalculator(costPerKm: costPerKm, autoEstimateEnabled: autoEstimate)
+    /// 1.7: km basi gider yakit fiyatindan (km × tuketim × fiyat); fiyat girilmemisse eski km basi maliyet.
+    private var effectiveCostPerKm: Double {
+        payroll.fuelModel(fallbackCostPerKm: costPerKm).costPerKm(on: payroll.today).doubleValue
     }
 
-    private var weekGoal: GoalProgress {
-        TodayViewModel.weekGoal(
-            target: weeklyGoal, earnings: weekEarnings, expenses: weekExpenses, calculator: calculator
-        )
+    private var dailyProgress: DailyGoalProgress? {
+        let entries: [EarningEntry] = allEarnings.map(\.entry)
+        guard case let .success(plan)? = payroll.goalPlan(entries: entries, fallbackCostPerKm: costPerKm),
+              let code = payroll.tariffProfile?.platformCode else { return nil }
+        return DailyGoalProgress.today(plan: plan, entries: entries, platform: code, day: payroll.today,
+                                       fuel: payroll.fuelModel(fallbackCostPerKm: costPerKm), calendar: .current, now: .now)
     }
 
     var body: some View {
         let summary: EarningsSummary = TodayViewModel.summary(
             earnings: todaysEarnings,
             expenses: todaysExpenses,
-            costPerKm: costPerKm,
+            costPerKm: effectiveCostPerKm,
             autoEstimate: autoEstimate
         )
 
@@ -118,6 +115,7 @@ struct TodayView: View {
                         Task { await refreshImports() }
                     }
                 }
+                .sheet(isPresented: $showsHelp) { ScreenHelpSheet(screen: .today) }
                 .sheet(item: $activeSheet, onDismiss: sheetDismissed) { sheet in
                     sheetContent(sheet)
                 }
@@ -147,22 +145,20 @@ struct TodayView: View {
             noticesSection
             autoShiftSections
             heroSection(summary)
-
             Section {
-                shiftPanel(summary)
+                TodayGoalCard(progress: dailyProgress, hasGoal: payroll.goal != nil)
             }
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
+            fuelReminderSection
+
+            if workSession.isWorking {
+                Section {
+                    shiftPanel(summary)
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
 
             Section { ScanButton() }
-            Section {
-                NavigationLink {
-                    PlannerView()
-                } label: {
-                    Label("Plan öner", systemImage: "calendar.badge.clock")
-                }
-                .accessibilityIdentifier("planner.open")
-            }
             earningsSection
             if !todaysExpenses.isEmpty {
                 expensesSection
@@ -241,6 +237,7 @@ struct TodayView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        HelpBubble(screen: .today, showsScreenHelp: $showsHelp, showIntro: showIntro)
         ToolbarItem(placement: .topBarLeading) {
             Text(Formatters.longDay(day))
                 .font(.subheadline)
@@ -305,29 +302,34 @@ struct TodayView: View {
     }
 
     private func heroSection(_ summary: EarningsSummary) -> some View {
-        let goal: GoalProgress = weekGoal
-        let dayGoal = GoalProgress(target: dailyGoal, achieved: summary.netEarnings)
-        return Section {
-            HStack(alignment: .center, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HeroAmount(title: "Net kazanç", value: summary.netEarnings, identifier: "dashboard.netEarnings")
-                    NetBreakdownLine(gross: summary.totalEarnings, expenses: summary.totalExpenses)
-                }
-                if goal.isSet {
-                    weekGoalRing(goal)
-                }
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                HeroAmount(title: "Net kazanç", value: summary.netEarnings, identifier: "dashboard.netEarnings")
+                NetBreakdownLine(gross: summary.totalEarnings, expenses: summary.totalExpenses)
             }
             MetricStrip(metricItems(summary))
             if summary.usesEstimatedExpenses {
-                Text("Yakıt ve bakım km başına tahmini: \(Formatters.currency(summary.estimatedExpenses))")
+                Text("Yakıt (km × tüketim × fiyat): \(Formatters.currency(summary.estimatedExpenses))")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            if dayGoal.isSet {
-                dailyGoalLine(dayGoal)
-            }
         }
         .listRowSeparator(.hidden)
+    }
+
+    /// Yakit fiyati 7 gunden eskiyse (ya da hic girilmediyse) guncelleme satiri.
+    @ViewBuilder
+    private var fuelReminderSection: some View {
+        if payroll.fuelModel(fallbackCostPerKm: costPerKm).isStale(today: payroll.today) {
+            Section {
+                NavigationLink {
+                    FuelSettingsView()
+                } label: {
+                    Label("Yakıt fiyatını güncelle", systemImage: "fuelpump")
+                }
+                .accessibilityIdentifier("today.fuelReminder")
+            }
+        }
     }
 
     private func metricItems(_ summary: EarningsSummary) -> [MetricStrip.Item] {
@@ -341,37 +343,6 @@ struct TodayView: View {
             title: "Mesafe", value: Formatters.distance(summary.distanceKm), identifier: "dashboard.distance"
         )
         return [perHour, duration, distance]
-    }
-
-    private func weekGoalRing(_ goal: GoalProgress) -> some View {
-        VStack(spacing: 4) {
-            GoalRing(progress: goal).frame(width: 56, height: 56)
-            Text("Hafta %\(Int(goal.fraction * 100))")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder
-    private func dailyGoalLine(_ progress: GoalProgress) -> some View {
-        if progress.isReached {
-            Label("Günlük hedefe ulaştın", systemImage: "checkmark.circle.fill")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Theme.accent)
-                .accessibilityIdentifier("dashboard.dailyGoal")
-        } else {
-            Text(dailyGoalText(progress))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .accessibilityIdentifier("dashboard.dailyGoal")
-        }
-    }
-
-    private func dailyGoalText(_ progress: GoalProgress) -> String {
-        let target = Formatters.currency(progress.target)
-        let remaining = Formatters.currency(progress.remaining)
-        return "Günlük hedef: \(target) · kalan \(remaining)"
     }
 
     private func suggestionSection(_ suggestion: ImportedScreenshot) -> some View {
@@ -438,15 +409,6 @@ struct TodayView: View {
                 }
                 .accessibilityIdentifier("today.photoPermission")
             }
-        } else if !scanner.isEnabled {
-            Section {
-                Button(action: enableScan) {
-                    Label("Ekran görüntülerini otomatik bul", systemImage: "text.viewfinder")
-                }
-                .accessibilityIdentifier("today.enableScan")
-            } footer: {
-                Text("Son 48 saatin kazanç ekranları öneri olarak gösterilir. Görüntüler cihazında işlenir.")
-            }
         }
     }
 
@@ -468,12 +430,10 @@ struct TodayView: View {
         .accessibilityIdentifier("dashboard.addMenu")
     }
 
+    /// Yalnizca otomatik vardiya surerken: sure/mesafe ve "Vardiyayi bitir" (baslatma dugmesi 1.7'de kaldirildi).
     private func shiftPanel(_ summary: EarningsSummary) -> some View {
         VStack(spacing: 8) {
-            Button(workSession.isWorking ? "Vardiyayı bitir" : "Vardiyayı başlat", action: toggleWork)
-                .buttonStyle(PrimaryActionButtonStyle(isDestructive: workSession.isWorking))
-                .accessibilityIdentifier("dashboard.workToggle")
-            if workSession.isWorking, let start = workSession.sessionStart {
+            if let start = workSession.sessionStart {
                 TimelineView(.periodic(from: start, by: 30)) { context in
                     Text(shiftStatus(elapsed: context.date.timeIntervalSince(start), summary: summary))
                         .font(.footnote)
@@ -482,12 +442,10 @@ struct TodayView: View {
                         .multilineTextAlignment(.center)
                         .accessibilityIdentifier("dashboard.shiftStatus")
                 }
-            } else {
-                Text("Süre ve mesafe ölçülür; konum yalnızca vardiya boyunca kullanılır.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
             }
+            Button("Vardiyayı bitir", action: endShift)
+                .buttonStyle(PrimaryActionButtonStyle(isDestructive: true))
+                .accessibilityIdentifier("dashboard.endShift")
         }
     }
 
@@ -641,15 +599,11 @@ struct TodayView: View {
         return parts.joined(separator: " · ")
     }
 
-    private func toggleWork() {
+    private func endShift() {
         Haptics.impact()
-        if workSession.isWorking {
-            // Vardiya bitince kazanc formu sure + mesafe + bolgeyle on doldurulmus acilir
-            if let summary = autoShift.endShift() {
-                activeSheet = .addEarning(session: summary)
-            }
-        } else {
-            autoShift.startManualShift()
+        // Vardiya bitince kazanc formu sure + mesafe + bolgeyle on doldurulmus acilir
+        if let summary = autoShift.endShift() {
+            activeSheet = .addEarning(session: summary)
         }
     }
 

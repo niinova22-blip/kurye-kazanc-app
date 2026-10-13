@@ -320,6 +320,16 @@ final class FormViewModelTests: XCTestCase {
         XCTAssertEqual(defaults.double(forKey: AppPreferences.costPerKmKey), VehicleType.car.defaultCostPerKm)
     }
 
+    func testOnboardingSkipsPlatformStepWhenFirmChosen() {
+        let vm = OnboardingViewModel()
+        vm.preselect(firm: "migros_hemen")
+        vm.next()
+        XCTAssertEqual(vm.step, .location)
+        vm.back()
+        XCTAssertEqual(vm.step, .vehicle)
+        XCTAssertEqual(vm.selectedPlatformCodes, ["migros_hemen"])
+    }
+
     // MARK: - Calisiyorum modu
 
     func testWorkSessionPersistsAndProducesSummary() {
