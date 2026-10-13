@@ -1,144 +1,191 @@
 import SwiftUI
 
-/// Hedef sonucu: zaten alacaklarin, bolge, paket, sure, brut-yakit-net ve kademe ipucu. Tek firma.
+/// Hedef sonucu: once tek cumlelik cevap (gunde kac paket, kac saat), sonra paketsiz gelen ucretler, para dokumu ve ipucu.
 struct GoalResultCard: View {
     let plan: GoalPlan
     let platformName: String
 
     var body: some View {
         Section {
-            header
-            if !plan.guaranteed.isEmpty { GuaranteedBlock(plan: plan) }
-            if plan.reachability != .alreadyMet { requirementBlock }
-            totalsBlock
-            if let hint = plan.nextTier { hintRow(hint) }
+            hero
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             ReachabilityNote(plan: plan)
+            if !plan.guaranteed.isEmpty { GuaranteedBlock(plan: plan) }
+            MoneyBlock(plan: plan)
+            if let hint = plan.nextTier { hintRow(hint) }
+        } header: {
+            Text("Planın")
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("goal.result")
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(platformName)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.accent)
-            Text("\(plan.goal.period.displayName) \(PayFormat.tl(plan.goal.amount)) net hedef")
-                .font(.title3.bold())
-        }
-    }
+    // MARK: - Ust kart
 
-    private var requirementBlock: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let tier = plan.regionTier {
-                GoalRequirementRow(symbol: "mappin.and.ellipse", title: "Bölge",
-                                   value: TariffQuestions.regionName(tier) + tierDeltaText)
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(platformName.uppercased())
+                    .font(.caption.weight(.bold))
+                    .tracking(1.2)
+                    .opacity(0.8)
+                Spacer()
+                Text(goalText)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(.white.opacity(0.18), in: Capsule())
             }
-            GoalRequirementRow(symbol: "shippingbox.fill", title: "Paket", value: packageText)
-                .accessibilityIdentifier("goal.packages")
-            GoalRequirementRow(symbol: "clock.fill", title: "Süre", value: hoursText)
-                .accessibilityIdentifier("goal.hours")
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var totalsBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label {
-                Text("Brüt \(PayFormat.tl(plan.gross + plan.sideIncome)) − yakıt \(PayFormat.tl(plan.fuel))")
+            if plan.reachability == .alreadyMet {
+                Text("Paket yapmasan da hedefe ulaşıyorsun")
+                    .font(.title2.bold())
+            } else {
+                Text("Hedefine ulaşmak için")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } icon: {
-                Image(systemName: "banknote.fill").foregroundStyle(Theme.accent)
+                    .opacity(0.85)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(plan.packagesPerDay)")
+                        .font(.system(size: 54, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .contentTransition(.numericText(value: Double(plan.packagesPerDay)))
+                        .accessibilityIdentifier("goal.packages")
+                    Text("paket / gün")
+                        .font(.title3.weight(.semibold))
+                        .opacity(0.9)
+                }
+                HStack(spacing: 16) {
+                    stat("clock.fill", "\(Formatters.decimalText(plan.hoursPerDay)) saat / gün")
+                        .accessibilityIdentifier("goal.hours")
+                    stat("calendar", daysText)
+                }
+                Text(periodPackagesText)
+                    .font(.footnote)
+                    .opacity(0.85)
+                if let tier = plan.regionTier {
+                    stat("mappin.and.ellipse", TariffQuestions.regionName(tier))
+                }
             }
-            Text(netText)
-                .font(.title2.bold())
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .accessibilityIdentifier("goal.net")
         }
+        .brandCard()
+        .padding(.vertical, 6)
     }
 
-    private var netText: String {
+    private func stat(_ symbol: String, _ text: String) -> some View {
+        Label(text, systemImage: symbol)
+            .font(.subheadline.weight(.semibold))
+    }
+
+    private var goalText: String {
+        let suffix: String
         switch plan.goal.period {
-        case .month: "Net \(PayFormat.tl(plan.net)) / ay"
-        case .week: "Net ≈ \(PayFormat.tl(plan.periodNet())) / hafta (\(PayFormat.tl(plan.net)) / ay)"
-        case .day: "Net ≈ \(PayFormat.tl(plan.periodNet())) / gün (\(PayFormat.tl(plan.net)) / ay)"
+        case .day: suffix = "günde"
+        case .week: suffix = "haftada"
+        case .month: suffix = "ayda"
+        }
+        return "Hedef: \(suffix) \(PayFormat.tl(plan.goal.amount)) net"
+    }
+
+    private var daysText: String {
+        if let days = plan.goal.workWeekdays, plan.goal.period != .day {
+            return days.count == 7 ? "Her gün" : GoalSpec.weekdayOrder.filter { days.contains($0) }
+                .map(GoalSpec.weekdayShortName).joined(separator: " ")
+        }
+        return "Haftada \(plan.goal.daysPerWeek) gün"
+    }
+
+    private var periodPackagesText: String {
+        let pace: String = Formatters.decimalText(plan.pace.packagesPerHour)
+        let source: String = plan.pace.isAssumed ? "tahmini hız" : "senin hızın"
+        switch plan.goal.period {
+        case .day:
+            return "Saatte \(pace) paket (\(source)) ile hesaplandı."
+        case .week:
+            return "Haftada toplam \(Formatters.groupedInt(plan.periodPackages())) paket · saatte \(pace) paket (\(source))"
+        case .month:
+            return "Ayda toplam \(Formatters.groupedInt(plan.monthlyPackages)) paket, \(plan.workDays) iş günü · saatte \(pace) paket (\(source))"
         }
     }
 
     private func hintRow(_ hint: NextTierHint) -> some View {
-        Label("\(hint.threshold) pakete ulaşırsan paket başı \(PayFormat.tl(hint.newRate)): +\(hint.extraPackages) paketle +\(PayFormat.tl(hint.extraNet)) net.",
-              systemImage: "lightbulb.fill")
-            .font(.subheadline)
-            .foregroundStyle(.orange)
-    }
-
-    private var packageText: String {
-        let period: String
-        switch plan.goal.period {
-        case .day: period = "Bugün"
-        case .week: period = "Haftada"
-        case .month: period = "Ayda"
+        let reward: String = hint.isBonus
+            ? "\(PayFormat.tl(hint.newRate)) bonus kazanırsın"
+            : "paket başı ücretin \(PayFormat.tl(hint.newRate)) olur"
+        return Label {
+            Text("Ayda \(Formatters.groupedInt(hint.threshold)) pakete ulaşırsan \(reward). Bunun için \(Formatters.groupedInt(hint.extraPackages)) paket daha gerekir; ayda \(PayFormat.tl(hint.extraNet)) daha fazla net kalır.")
+                .font(.subheadline)
+        } icon: {
+            Image(systemName: "lightbulb.fill").foregroundStyle(Theme.highlight)
         }
-        return "\(period) \(plan.periodPackages()) → günde \(plan.packagesPerDay) paket (\(plan.goal.periodWorkDays()) iş günü)"
-    }
-
-    private var hoursText: String {
-        let pace: String = Formatters.decimalText(plan.pace.packagesPerHour)
-        let assumed: String = plan.pace.isAssumed ? ", varsayım" : ""
-        return "Günde en az \(Formatters.decimalText(plan.hoursPerDay)) saat (hızın: \(pace) paket/saat\(assumed))"
-    }
-
-    private var tierDeltaText: String {
-        guard let delta = plan.otherTierDelta, delta.value != 0 else { return "" }
-        let word: String = delta.value > 0 ? "fazla" : "az"
-        return " — diğer kademeye göre \(PayFormat.tl(Money(abs(delta.value)))) \(word) sabit ücret"
+        .accessibilityIdentifier("goal.hint")
     }
 }
 
+/// Paketten bagimsiz gelirler (sabit ucret, destekler).
 private struct GuaranteedBlock: View {
     let plan: GoalPlan
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Zaten alacakların")
+            Text("Paket yapmasan da alacakların")
                 .font(.subheadline.weight(.semibold))
             ForEach(plan.guaranteed) { line in
                 HStack {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.positive)
                     Text(line.label).font(.subheadline)
                     Spacer()
                     Text((line.isSideBenefit ? "+" : "") + PayFormat.tl(line.amount))
                         .font(.subheadline.monospacedDigit())
                 }
             }
-            HStack {
-                Text("Toplam").font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(PayFormat.tl(plan.guaranteedTotal)).font(.subheadline.weight(.semibold).monospacedDigit())
-            }
         }
         .padding(.vertical, 4)
     }
 }
 
-private struct GoalRequirementRow: View {
-    let symbol: String
-    let title: String
-    let value: String
+/// Firmadan alinacak (brut) − yakit = cebe kalan (net).
+private struct MoneyBlock: View {
+    let plan: GoalPlan
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: symbol)
-                .foregroundStyle(Theme.accent)
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.caption).foregroundStyle(.secondary)
-                Text(value).font(.subheadline.weight(.medium))
+        VStack(spacing: 8) {
+            row("Firmadan alacağın", PayFormat.tl(plan.gross + plan.sideIncome), color: .primary)
+            row("Yakıt gideri", "−" + PayFormat.tl(plan.fuel), color: Theme.negative)
+            Divider()
+            HStack(alignment: .firstTextBaseline) {
+                Text("Cebine kalan").font(.headline)
+                Spacer()
+                Text(netText)
+                    .font(.title3.bold())
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.positive)
+                    .contentTransition(.numericText())
+                    .accessibilityIdentifier("goal.net")
+            }
+            if plan.goal.period != .month {
+                Text("Aylık karşılığı: \(PayFormat.tl(plan.net)) net")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
-        .accessibilityElement(children: .combine)
+        .padding(.vertical, 4)
+    }
+
+    private func row(_ title: String, _ value: String, color: Color) -> some View {
+        HStack {
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Spacer()
+            Text(value).font(.subheadline.monospacedDigit()).foregroundStyle(color)
+        }
+    }
+
+    private var netText: String {
+        switch plan.goal.period {
+        case .month: "\(PayFormat.tl(plan.net)) / ay"
+        case .week: "≈ \(PayFormat.tl(plan.periodNet())) / hafta"
+        case .day: "≈ \(PayFormat.tl(plan.periodNet())) / gün"
+        }
     }
 }
 
@@ -148,18 +195,18 @@ private struct ReachabilityNote: View {
     var body: some View {
         switch plan.reachability {
         case .alreadyMet:
-            Label("Sabit ücretin ve desteklerin hedefi zaten karşılıyor.", systemImage: "checkmark.seal.fill")
-                .foregroundStyle(Theme.accent)
+            Label("Sabit ücretin ve desteklerin hedefini zaten karşılıyor.", systemImage: "checkmark.seal.fill")
+                .foregroundStyle(Theme.positive)
         case .reachable:
             EmptyView()
         case let .needsMoreDays(days):
-            Label("Günde \(Formatters.decimalText(plan.goal.maxHoursPerDay)) saatle bu hedefe yetmiyor; haftada \(days) gün çalışırsan ulaşırsın.",
+            Label("Günde en fazla \(Formatters.decimalText(plan.goal.maxHoursPerDay)) saatle bu hedefe yetişmiyor. Haftada \(days) gün çalışırsan ulaşırsın.",
                   systemImage: "calendar.badge.plus")
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.highlight)
         case let .unreachable(maxNet):
-            Label("Bu saat ve gün sınırıyla en fazla \(PayFormat.tl(maxNet)) net/ay. Hedefi ya da süreyi değiştir.",
+            Label("Bu gün ve saat sınırıyla en fazla ayda \(PayFormat.tl(maxNet)) net kalıyor. Hedefi düşür ya da aşağıdaki yollara bak.",
                   systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.highlight)
         }
     }
 }

@@ -635,12 +635,12 @@ struct PayPlatform: Codable, Equatable, Identifiable {
         ),
         PayPlatform(
             code: "yemeksepeti", name: "Yemeksepeti Express", isActive: true, supportedWorkModels: ["esnaf"],
-            modelSummary: "Paket başı + birleşen paket; saatlik garanti (doğrulanırsa), bahşiş ayrı.",
+            modelSummary: "Saate ve güne göre paket ücreti, km ücreti, günlük paket bonusu; bahşiş ayrı.",
             symbol: "fork.knife", monogram: "YS"
         ),
         PayPlatform(
             code: "migros_hemen", name: "Paket Taxi / Migros Hemen", isActive: true, supportedWorkModels: ["esnaf"],
-            modelSummary: "Aylık sabit ücret (bölge veya kıdem) + aylık paket kademesine göre paket başı ücret.",
+            modelSummary: "Bölgeye göre aylık sabit ücret, aylık paket bonusu, uzun teslimat ek ödemesi.",
             symbol: "calendar", monogram: "PT"
         ),
     ]

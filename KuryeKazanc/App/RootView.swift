@@ -5,16 +5,22 @@ struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(PayrollModel.self) private var payroll
     @AppStorage(AppPreferences.hasCompletedOnboardingKey) private var hasCompletedOnboarding = false
-    @AppStorage(AppPreferences.hasSeenIntroV17Key) private var hasSeenIntro = false
+    @AppStorage(AppPreferences.hasSeenIntroV18Key) private var hasSeenIntro = false
+    @AppStorage(AppPreferences.startFirmKey) private var startFirm = ""
     @State private var showsIntroReplay = false
 
-    /// Akis: tanitim (bir kez) -> firma ve hedef kurulumu -> arac/konum/paylasim -> sekmeler.
+    /// Akis: firma secimi (ilk ekran) -> tanitim (bir kez, firmaya gore) -> tarife sorulari, yakit, hedef ->
+    /// konum -> sekmeler. Daha once firma secmis kullanici yeni tanitimi bir kez gorur.
     var body: some View {
         Group {
-            if !hasSeenIntro {
-                IntroView(mode: .firstRun) { hasSeenIntro = true }
+            if !payroll.state.hasChosenFirm && startFirm.isEmpty {
+                FirmWelcomeView { startFirm = $0 }
+                    .transition(.opacity)
+            } else if !hasSeenIntro {
+                IntroView(mode: .firstRun, firmCode: payroll.tariffProfile?.platformCode ?? startFirm) { hasSeenIntro = true }
+                    .transition(.opacity)
             } else if !payroll.state.hasChosenFirm {
-                SetupFlowView {}
+                SetupFlowView(initialFirm: startFirm.isEmpty ? nil : startFirm) {}
             } else if !hasCompletedOnboarding {
                 OnboardingView()
             } else {
@@ -22,9 +28,10 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut, value: hasSeenIntro)
+        .animation(.easeInOut, value: startFirm)
         .environment(\.showIntro, ShowIntroAction { showsIntroReplay = true })
         .fullScreenCover(isPresented: $showsIntroReplay) {
-            IntroView(mode: .replay) { showsIntroReplay = false }
+            IntroView(mode: .replay, firmCode: payroll.tariffProfile?.platformCode) { showsIntroReplay = false }
         }
         .task {
             DataSeeder.seedPlatformsIfNeeded(in: modelContext)

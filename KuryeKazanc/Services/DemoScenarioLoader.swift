@@ -49,6 +49,8 @@ struct DemoScenarioLoader {
         payroll.reloadState()
         if scenario.resetsOnboarding {
             defaults.set(false, forKey: AppPreferences.hasSeenIntroV17Key)
+            defaults.set(false, forKey: AppPreferences.hasSeenIntroV18Key)
+            defaults.removeObject(forKey: AppPreferences.startFirmKey)
             defaults.set(false, forKey: AppPreferences.hasCompletedOnboardingKey)
         }
     }

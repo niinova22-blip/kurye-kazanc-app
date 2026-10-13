@@ -23,6 +23,12 @@ struct HeroAmountField: View {
             if isFocused { Haptics.selection() }
         }
         .onChange(of: text) { _, newText in parse(newText) }
+        .onChange(of: value) { _, newValue in
+            // Disaridan gelen deger (kayitli hedef yuklendi) odak disindayken metne yansir
+            guard !focused else { return }
+            let formatted: String = newValue.map { Formatters.decimalText($0) } ?? ""
+            if Money.parse(text) != newValue { text = formatted }
+        }
     }
 
     private var field: some View {
@@ -32,6 +38,8 @@ struct HeroAmountField: View {
                 .font(.system(size: 36, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .focused($focused)
+                .submitLabel(.done)
+                .onSubmit { focused = false }
                 .accessibilityLabel(title)
                 .accessibilityIdentifier(identifier)
             Text(unit)

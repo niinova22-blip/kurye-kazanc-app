@@ -305,8 +305,8 @@ final class FormViewModelTests: XCTestCase {
         vm.togglePlatform("getir")
         XCTAssertTrue(vm.canContinue)
         vm.vehicleType = .car
-        vm.next(); vm.next()
-        XCTAssertEqual(vm.step, .sharing)
+        vm.next()
+        XCTAssertEqual(vm.step, .location)
         XCTAssertTrue(vm.isLastStep)
 
         try vm.complete(in: context, platforms: platforms, defaults: defaults)
@@ -328,6 +328,16 @@ final class FormViewModelTests: XCTestCase {
         vm.back()
         XCTAssertEqual(vm.step, .vehicle)
         XCTAssertEqual(vm.selectedPlatformCodes, ["migros_hemen"])
+    }
+
+    func testOnboardingOnlyAsksLocationWhenFirmAndVehicleChosen() {
+        let vm = OnboardingViewModel()
+        vm.preselect(firm: "getir", vehicle: .car)
+        XCTAssertEqual(vm.step, .location)
+        XCTAssertTrue(vm.isFirstStep)
+        XCTAssertTrue(vm.isLastStep)
+        XCTAssertEqual(vm.visibleSteps, [.location])
+        XCTAssertEqual(vm.vehicleType, .car)
     }
 
     // MARK: - Calisiyorum modu

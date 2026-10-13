@@ -9,6 +9,8 @@ enum SetupStep: Int, CaseIterable {
 struct SetupFlowView: View {
     @Environment(PayrollModel.self) private var payroll
     var firmOnly: Bool = false
+    /// Karsilama ekraninda secilen firma: kurulum firma adimini atlayarak sorularla baslar (Geri ile degistirilebilir).
+    var initialFirm: String? = nil
     let onFinish: () -> Void
 
     @State private var step: SetupStep = .firm
@@ -174,7 +176,10 @@ struct SetupFlowView: View {
         guard !loaded else { return }
         loaded = true
         let profile: CourierTariffProfile? = payroll.tariffProfile
-        firm = profile?.platformCode
+        firm = profile?.platformCode ?? initialFirm
+        if profile == nil, initialFirm != nil, !firmOnly {
+            step = questions.isEmpty ? .fuel : .questions
+        }
         regionTier = profile?.regionTier
         seniority = profile?.seniorityYears ?? 0
         vehicle = profile?.vehicleType ?? "motorcycle"

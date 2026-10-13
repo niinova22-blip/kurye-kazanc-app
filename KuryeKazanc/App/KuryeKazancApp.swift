@@ -15,6 +15,8 @@ struct KuryeKazancApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .fontDesign(.rounded)
+                .tint(Theme.accent)
                 .environment(environment.location)
                 .environment(environment.workSession)
                 .environment(environment.scanner)

@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Kurulumun son kismi: arac tipi -> (firma secildiyse atlanan) platformlar -> konum bilgisi -> istege bagli paylasim.
+/// Kurulumun son kismi: (kurulumda secildiyse atlanan) arac tipi ve platformlar -> konum bilgisi.
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(LocationService.self) private var location
@@ -11,18 +11,15 @@ struct OnboardingView: View {
 
     @State private var viewModel = OnboardingViewModel()
     @State private var errorMessage: String?
-    @State private var showConsent = false
     @State private var showAutoShiftIntro = false
-    @AppStorage(AppPreferences.dataSharingOptInKey) private var dataSharingOptIn = false
-    @AppStorage(AppPreferences.dataSharingConsentDateKey) private var consentTimestamp: Double = 0
-    @AppStorage(AppPreferences.locationSharingOptInKey) private var locationSharingOptIn = false
-    @AppStorage(AppPreferences.locationSharingConsentDateKey) private var locationConsentTimestamp: Double = 0
 
     // Derleyicinin tip denetimi zaman asimina ugramasin diye govde kucuk parcalara bolundu.
     var body: some View {
         VStack(spacing: 0) {
-            stepDots(current: viewModel.step)
-                .padding(.top, 16)
+            if viewModel.visibleSteps.count > 1 {
+                stepDots(current: viewModel.step)
+                    .padding(.top, 16)
+            }
 
             ScrollView {
                 stepContent
@@ -34,17 +31,13 @@ struct OnboardingView: View {
                 .padding(24)
         }
         .onAppear {
-            if let firm = payroll.tariffProfile?.platformCode { viewModel.preselect(firm: firm) }
-            if payroll.tariffProfile?.vehicleType == "car" { viewModel.vehicleType = .car }
-        }
-        .sheet(isPresented: $showConsent) {
-            DataSharingConsentView {
-                dataSharingOptIn = true
-                consentTimestamp = Date.now.timeIntervalSince1970
-                // Konum yogunlugu kazanc paylasimiyla birlikte acik gelir (Profil'den ayri kapatilabilir)
-                locationSharingOptIn = true
-                locationConsentTimestamp = Date.now.timeIntervalSince1970
+            guard let profile = payroll.tariffProfile else { return }
+            let vehicle: VehicleType? = switch profile.vehicleType {
+            case "car": .car
+            case "motorcycle": .motorcycle
+            default: nil
             }
+            viewModel.preselect(firm: profile.platformCode, vehicle: vehicle)
         }
         .sheet(isPresented: $showAutoShiftIntro) {
             AutoShiftIntroView {
@@ -69,7 +62,6 @@ struct OnboardingView: View {
             case .vehicle: vehicleStep
             case .platforms: platformsStep
             case .location: locationStep
-            case .sharing: sharingStep
             }
         }
     }
@@ -85,7 +77,7 @@ struct OnboardingView: View {
             .opacity(viewModel.canContinue ? 1 : 0.5)
             .accessibilityIdentifier("onboarding.next")
 
-            if viewModel.step != .vehicle {
+            if !viewModel.isFirstStep {
                 Button("Geri") { withAnimation { viewModel.back() } }
                     .accessibilityIdentifier("onboarding.back")
             }
@@ -104,14 +96,14 @@ struct OnboardingView: View {
 
     private func stepDots(current: OnboardingViewModel.Step) -> some View {
         HStack(spacing: 8) {
-            ForEach(OnboardingViewModel.Step.allCases, id: \.self) { step in
+            ForEach(viewModel.visibleSteps, id: \.self) { step in
                 Circle()
                     .fill(step == current ? Theme.accent : Color(.tertiaryLabel))
                     .frame(width: 8, height: 8)
             }
         }
         .accessibilityElement()
-        .accessibilityLabel("Adım \(current.rawValue + 1) / \(OnboardingViewModel.Step.allCases.count)")
+        .accessibilityLabel("Adım \((viewModel.visibleSteps.firstIndex(of: current) ?? 0) + 1) / \(viewModel.visibleSteps.count)")
     }
 
     private var vehicleStep: some View {
@@ -202,31 +194,6 @@ struct OnboardingView: View {
             }
             .buttonStyle(.bordered)
             .accessibilityIdentifier("onboarding.autoShift")
-        }
-    }
-
-    private var sharingStep: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Image(systemName: "person.3")
-                .font(.largeTitle)
-                .imageScale(.large)
-                .foregroundStyle(Theme.accent)
-                .accessibilityHidden(true)
-            Text("Bölgendeki kuryelerle karşılaştır")
-                .font(.title.bold())
-            Text("Anonim paylaşıma katılırsan, topluluk özellikleri açıldığında ilçendeki saat başı ortalama net kazancı ve en yoğun saatleri görürsün. Yalnızca ekran görüntüsünden okunan kazançların anonim özeti gönderilir; adın, ekran görüntülerin ve tam konumun asla paylaşılmaz.")
-                .foregroundStyle(.secondary)
-            if dataSharingOptIn {
-                Label("Katıldın — Profil'den istediğin an kapatabilirsin.", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(Theme.accent)
-            } else {
-                Button("Anonim paylaşıma katıl") { showConsent = true }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("onboarding.sharing")
-                Text("İstersen geçebilirsin; uygulama paylaşım olmadan da tam çalışır.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
