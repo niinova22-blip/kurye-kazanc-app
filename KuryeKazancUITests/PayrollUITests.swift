@@ -41,9 +41,11 @@ final class PayrollUITests: XCTestCase {
         let save = app.buttons["manual.save"]
         if !save.isHittable { app.swipeUp() }
         save.tap()
-        // Kayit sonrasi Kazanc ekranina donulur, pano bu ayin brutunu gosterir
+        // Kayit sonrasi Kazanc ekranina donulur (liste asagi kaydirilmis kalabilir), pano bu ayin brutunu gosterir
+        XCTAssertTrue(app.buttons["payroll.manual"].waitForExistence(timeout: 8))
         let monthGross = app.staticTexts["dashboard.monthGross"]
-        XCTAssertTrue(monthGross.waitForExistence(timeout: 8))
+        if !monthGross.exists { app.swipeDown() }
+        XCTAssertTrue(monthGross.waitForExistence(timeout: 5))
         XCTAssertTrue(monthGross.label.contains("4.512"), "gelen: \(monthGross.label)")
     }
 
@@ -61,8 +63,9 @@ final class PayrollUITests: XCTestCase {
         packages.tap()
         packages.typeText("270")
         XCTAssertTrue(app.staticTexts["manual.net"].waitForExistence(timeout: 5))
-        let detail = app.descendants(matching: .any)["manual.detail"].firstMatch
-        if !detail.exists { app.swipeUp() }
+        // Klavye kapanir (kaydirinca), dokum basligina kadar inilir
+        let detail = app.staticTexts["Ayrıntılı döküm"].firstMatch
+        for _ in 0..<4 where !(detail.exists && detail.isHittable) { app.swipeUp() }
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
     }
 }

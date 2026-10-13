@@ -46,7 +46,7 @@ final class LiveShiftUITests: XCTestCase {
         XCTAssertEqual(count.label, "2 paket")
 
         app.buttons["shift.finish"].tap()
-        let confirm = app.buttons["Bitir ve hesapla"]
+        let confirm = app.buttons["Bitir ve hesapla"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
 
@@ -87,7 +87,7 @@ final class LiveShiftUITests: XCTestCase {
         // Paketsiz bitirmeyle ayni: kapat ve yeniden baslat -> tanitim tekrar gelmez
         app.buttons["shift.undo"].tap()
         app.buttons["shift.finish"].tap()
-        let close = app.buttons["Paket yok, kapat"]
+        let close = app.buttons["Paket yok, kapat"].firstMatch
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         close.tap()
         XCTAssertTrue(app.buttons["today.startShift"].waitForExistence(timeout: 8))
