@@ -11,10 +11,16 @@ struct TariffQuestions: Equatable {
 
     /// Kisinin kendisine ait (donemden donem degismeyen) isaretler. "weekly_performance", "referral" gibi
     /// donemlik basari kosullari kurulumda sorulmaz ve plana girmez.
-    static let profileFlags: Set<String> = ["woman_employment"]
+    static let profileFlags: Set<String> = ["woman_employment", "ys_ankara_izmir"]
 
+    /// Yalnizca hesapta kullanilacak (en yeni) surumlerin kosullari sorulur; eski surumdeki kidem gibi kalkmis
+    /// kosullar sorulmaz. Arac tipine gore ayrilan surumlerde her arac icin gecerli surum.
     static func required(platform: String, catalog: TariffCatalog, day: String) -> TariffQuestions {
-        let versions: [TariffVersion] = catalog.usable(platform: platform, day: day)
+        let usable: [TariffVersion] = catalog.usable(platform: platform, day: day)
+        let vehicleTypes: [String] = Array(Set(usable.compactMap(\.vehicleType))).sorted()
+        let versions: [TariffVersion] = vehicleTypes.isEmpty
+            ? [catalog.current(platform: platform, day: day)].compactMap { $0 }
+            : vehicleTypes.compactMap { catalog.current(platform: platform, day: day, vehicleType: $0) }
         var tiers: Set<String> = []
         var flags: Set<String> = []
         var seniority = false
@@ -43,6 +49,7 @@ struct TariffQuestions: Equatable {
     static func flagName(_ flag: String) -> String {
         switch flag {
         case "woman_employment": "Kadın istihdam desteğinden yararlanıyorum"
+        case "ys_ankara_izmir": "Ankara ya da İzmir'de çalışıyorum (haftalık paket bonusu)"
         default: flag
         }
     }

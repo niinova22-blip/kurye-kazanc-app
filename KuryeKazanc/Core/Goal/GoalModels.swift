@@ -19,12 +19,42 @@ struct GoalSpec: Codable, Equatable {
     var period: GoalPeriod
     var daysPerWeek: Int = 6
     var maxHoursPerDay: Decimal = 10
+    /// Secilen calisma gunleri (Takvim: 1 = Pazar ... 7 = Cumartesi). Verilirse `daysPerWeek` bunlarin sayisidir ve
+    /// hafta sonu bonusu yalnizca secili hafta sonu gunleriyle hesaplanir. nil: yalnizca gun sayisi bilinir.
+    var workWeekdays: [Int]? = nil
 
-    init(amount: Money, period: GoalPeriod, daysPerWeek: Int = 6, maxHoursPerDay: Decimal = 10) {
+    init(amount: Money, period: GoalPeriod, daysPerWeek: Int = 6, maxHoursPerDay: Decimal = 10, workWeekdays: [Int]? = nil) {
         self.amount = amount
         self.period = period
-        self.daysPerWeek = min(7, max(1, daysPerWeek))
+        let days: [Int] = Array(Set((workWeekdays ?? []).filter { (1...7).contains($0) })).sorted()
+        if days.isEmpty {
+            self.daysPerWeek = min(7, max(1, daysPerWeek))
+        } else {
+            self.workWeekdays = days
+            self.daysPerWeek = days.count
+        }
         self.maxHoursPerDay = maxHoursPerDay
+    }
+
+    /// Haftanin gunleri Pazartesi'den baslayarak (Takvim gun numaralari).
+    static let weekdayOrder: [Int] = [2, 3, 4, 5, 6, 7, 1]
+
+    static func weekdayShortName(_ day: Int) -> String {
+        switch day {
+        case 1: "Paz"
+        case 2: "Pzt"
+        case 3: "Sal"
+        case 4: "Çar"
+        case 5: "Per"
+        case 6: "Cum"
+        case 7: "Cmt"
+        default: "?"
+        }
+    }
+
+    /// Varsayilan calisma gunleri: Pazartesi'den baslayarak `count` gun (6 -> Pzt–Cmt).
+    static func defaultWeekdays(count: Int) -> [Int] {
+        Array(weekdayOrder.prefix(min(7, max(1, count)))).sorted()
     }
 
     /// Ileri uyumluluk: eksik alanlar varsayilanla okunur (yeni surumde eklenen alan eski dosyayi bozmasin).
@@ -33,7 +63,8 @@ struct GoalSpec: Codable, Equatable {
         self.init(amount: try c.decode(Money.self, forKey: .amount),
                   period: try c.decodeIfPresent(GoalPeriod.self, forKey: .period) ?? .month,
                   daysPerWeek: try c.decodeIfPresent(Int.self, forKey: .daysPerWeek) ?? 6,
-                  maxHoursPerDay: try c.decodeIfPresent(Decimal.self, forKey: .maxHoursPerDay) ?? 10)
+                  maxHoursPerDay: try c.decodeIfPresent(Decimal.self, forKey: .maxHoursPerDay) ?? 10,
+                  workWeekdays: try c.decodeIfPresent([Int].self, forKey: .workWeekdays))
     }
 
     /// Ayda calisilan gun: haftalik gun × 52 / 12, en yakin tam sayi (6 -> 26).

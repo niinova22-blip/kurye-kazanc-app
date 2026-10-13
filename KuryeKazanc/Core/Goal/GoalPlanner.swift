@@ -22,7 +22,9 @@ struct NextTierHint: Equatable {
     var threshold: Int
     var extraPackages: Int
     var extraNet: Money
+    /// Paket basi yeni ucret (kademeli ucret) ya da kademe bonusu tutari (`isBonus`).
     var newRate: Money
+    var isBonus: Bool = false
 }
 
 /// Hedef plani: secili firmanin tarifesi tersine calistirilarak bulunan en az paket / saat.
@@ -72,6 +74,10 @@ struct GoalPlan: Equatable {
 struct GoalPlanner {
     var engine: PayEngine
     var fuel: FuelCostModel
+    /// Paketlerin gece bandinda (tarifede gece ucreti varsa) yapilan payi, 0...1. Senaryolarda "aksam/gece calis" icin.
+    var nightShare: Decimal = 0
+    /// Planlanan calisma gunleri (hedefteki secim); hafta sonu bonusunda kullanilir. `plan` hedefe gore ayarlar.
+    var workWeekdays: [Int]? = nil
     static let maxPackages = 20_000
 
     struct Evaluation: Equatable {
@@ -116,7 +122,10 @@ struct GoalPlanner {
     func input(packages: Int, profile: CourierTariffProfile, pace: PaceEstimate, day: String) -> PayInput {
         let bounds = GoalPlanner.monthBounds(of: day)
         var input = PayInput(platformCode: profile.platformCode, span: .month, startDay: bounds.start, endDay: bounds.end)
-        input.dayPackages = packages
+        let share: Decimal = min(1, max(0, nightShare))
+        let night: Int = NSDecimalNumber(decimal: Money.round(Decimal(packages) * share, scale: 0)).intValue
+        input.dayPackages = packages - night
+        input.nightPackages = night
         input.periodPackages = packages
         input.totalKm = Decimal(packages) * pace.kmPerPackage
         input.hours = pace.packagesPerHour > 0 ? Money.round(Decimal(packages) / pace.packagesPerHour) : 0
@@ -136,7 +145,7 @@ struct GoalPlanner {
     }
 
     func evaluate(packages: Int, profile: CourierTariffProfile, pace: PaceEstimate, day: String,
-                  daysPerWeek: Int = 6) -> Result<Evaluation, PayError> {
+                  daysPerWeek: Int = 6, weekdays: [Int]? = nil) -> Result<Evaluation, PayError> {
         var payInput: PayInput = input(packages: packages, profile: profile, pace: pace, day: day)
         let version: TariffVersion
         switch self.version(for: payInput, day: day) {
@@ -148,7 +157,7 @@ struct GoalPlanner {
         let perDay: Int = workDays > 0 ? packages / workDays : 0
         let items: [TariffItem] = version.activeItems(on: day)
         // Gunluk kademe (or. Trendyol 42 / 82 paket): esit dagilimda her is gunu esik asilir ya da hic asilmaz
-        for item in items where GoalPlanner.isPlannableTier(item, unit: .day) {
+        for item in items where GoalPlanner.isPlannableTier(item, unit: .day, flags: profile.flags) {
             if PayEngine.decimalInt(item.lowerThreshold) <= perDay { payInput.bonusTierDays[item.key] = workDays }
         }
         var breakdown: PayBreakdown
@@ -156,7 +165,8 @@ struct GoalPlanner {
         case let .success(value): breakdown = value
         case let .failure(error): return .failure(error)
         }
-        let weekly: [PayLine] = GoalPlanner.weeklyBonus(items: items, perDay: perDay, daysPerWeek: week, workDays: workDays)
+        let weekly: [PayLine] = GoalPlanner.weeklyBonus(items: items, perDay: perDay, daysPerWeek: week, workDays: workDays,
+                                                        flags: profile.flags, weekdays: weekdays ?? workWeekdays)
         breakdown.lines += weekly
         let side: [PayLine] = GoalPlanner.flaggedSideIncome(breakdown, version: version, flags: profile.flags)
         let sideIncome: Money = side.map(\.amount).sum()
@@ -166,15 +176,19 @@ struct GoalPlanner {
                                    fuel: fuelCost, net: net, hours: payInput.hours, weeklyBonus: weekly))
     }
 
-    /// Planlamada sayilan kademe: nakit, kosul isareti olmayan, belirtilen birimdeki kademe kalemi.
-    static func isPlannableTier(_ item: TariffItem, unit: TariffUnit) -> Bool {
-        item.isCash && item.method == .tier && item.unit == unit && item.conditions.requiresFlag == nil
+    /// Planlamada sayilan kademe: nakit, belirtilen birimdeki kademe kalemi; kosul isareti varsa kullanicida olmali.
+    static func isPlannableTier(_ item: TariffItem, unit: TariffUnit, flags: [String] = []) -> Bool {
+        guard item.isCash, item.method == .tier, item.unit == unit else { return false }
+        guard let flag = item.conditions.requiresFlag else { return true }
+        return flags.contains(flag)
     }
 
     /// Aylik hesapta motorun donem ozetine biraktigi haftalik kademeler (or. Getir hafta sonu 40–60 paket):
     /// her grupta ulasilan en yuksek kademe × ayin hafta sayisi (is gunu / haftalik gun).
-    static func weeklyBonus(items: [TariffItem], perDay: Int, daysPerWeek: Int, workDays: Int) -> [PayLine] {
-        let tiers: [TariffItem] = items.filter { isPlannableTier($0, unit: .week) }
+    /// `weekdays` (Takvim: 1 = Pazar ... 7 = Cumartesi) verilirse hafta sonu kademesinde yalnizca secili gunler sayilir.
+    static func weeklyBonus(items: [TariffItem], perDay: Int, daysPerWeek: Int, workDays: Int,
+                            flags: [String] = [], weekdays: [Int]? = nil) -> [PayLine] {
+        let tiers: [TariffItem] = items.filter { isPlannableTier($0, unit: .week, flags: flags) }
         var groups: [String: [TariffItem]] = [:]
         for item in tiers { groups[item.group ?? item.key, default: []].append(item) }
         let days: Int = max(1, daysPerWeek)
@@ -182,8 +196,14 @@ struct GoalPlanner {
         var lines: [PayLine] = []
         for key in groups.keys.sorted() {
             let group: [TariffItem] = groups[key] ?? []
-            let weekendDays: Int? = group.first?.conditions.weekdays?.count
-            let count: Int = perDay * min(weekendDays ?? days, days)
+            let bonusDays: [Int]? = group.first?.conditions.weekdays
+            let counted: Int
+            if let bonusDays, let weekdays {
+                counted = Set(bonusDays).intersection(weekdays).count
+            } else {
+                counted = min(bonusDays?.count ?? days, days)
+            }
+            let count: Int = perDay * counted
             let reached: [TariffItem] = group.filter { tier in
                 guard PayEngine.decimalInt(tier.lowerThreshold) <= count else { return false }
                 if let upper = tier.upperThreshold { return count <= PayEngine.decimalInt(upper) }
@@ -206,20 +226,74 @@ struct GoalPlanner {
         return nil
     }
 
-    /// net(N) >= target olan en kucuk N (yoksa nil). net(N) dort hesaplayicida da N ile azalmaz (kademeler yalnizca artar).
+    /// Kademe sinirlari: aylik paket esikleri ve esit dagilimda gunluk / haftalik esiklerin asildigi aylik paket sayilari
+    /// (ust esik + 1 dahil; ust esikli kademe asilinca bonus duser). 0 ve `limit + 1` daima vardir.
+    func breakpoints(upTo limit: Int, _ profile: CourierTariffProfile, _ day: String, _ daysPerWeek: Int) -> [Int] {
+        var points: Set<Int> = [0, limit + 1]
+        let probe: PayInput = input(packages: 0, profile: profile, pace: PaceEstimate(packagesPerHour: 1, kmPerPackage: 0,
+                                                                                         isAssumed: true, sampleCount: 0), day: day)
+        guard case let .success(version) = version(for: probe, day: day) else { return points.sorted() }
+        let workDays: Int = max(1, GoalSpec.monthWorkDays(daysPerWeek: min(7, max(1, daysPerWeek))))
+        for item in version.activeItems(on: day) where item.lowerThreshold != nil || item.upperThreshold != nil {
+            var thresholds: [Int] = []
+            if let lower = item.lowerThreshold { thresholds.append(PayEngine.decimalInt(lower)) }
+            if let upper = item.upperThreshold { thresholds.append(PayEngine.decimalInt(upper) + 1) }
+            for threshold in thresholds where threshold > 0 {
+                switch item.unit {
+                case .day:
+                    points.insert(threshold * workDays)
+                case .week:
+                    for counted in 1...7 {
+                        points.insert(Int((Double(threshold) / Double(counted)).rounded(.up)) * workDays)
+                    }
+                default:
+                    points.insert(threshold)
+                }
+            }
+        }
+        return points.filter { $0 <= limit + 1 }.sorted()
+    }
+
+    /// net(N) >= target olan en kucuk N (yoksa nil). Net kademe sinirlarinda sicrar; iki sinir arasinda paket basi ucret
+    /// varsa artar, yoksa (sabit ucret + kademe bonusu) yakit yuzunden azalir. Bu yuzden her bolum ayri aranir:
+    /// bolum basi hedefi karsiliyorsa o, bolum sonu karsiliyorsa bolum icinde ikili arama.
     private func smallestPackages(target: Money, upTo limit: Int, _ profile: CourierTariffProfile, _ pace: PaceEstimate,
                                   _ day: String, _ daysPerWeek: Int) -> Int? {
-        guard let top = net(limit, profile, pace, day, daysPerWeek), !(top < target) else { return nil }
-        var low = 0
-        var high = limit
-        while low < high {
-            let mid: Int = (low + high) / 2
-            if let value = net(mid, profile, pace, day, daysPerWeek), !(value < target) { high = mid } else { low = mid + 1 }
+        let points: [Int] = breakpoints(upTo: limit, profile, day, daysPerWeek)
+        for index in 0..<(points.count - 1) {
+            let start: Int = points[index]
+            let end: Int = min(limit, points[index + 1] - 1)
+            guard start <= end else { continue }
+            if let value = net(start, profile, pace, day, daysPerWeek), !(value < target) { return start }
+            guard let last = net(end, profile, pace, day, daysPerWeek), !(last < target) else { continue }
+            var low: Int = start + 1
+            var high: Int = end
+            while low < high {
+                let mid: Int = (low + high) / 2
+                if let value = net(mid, profile, pace, day, daysPerWeek), !(value < target) { high = mid } else { low = mid + 1 }
+            }
+            return low
         }
-        return low
+        return nil
+    }
+
+    /// `limit` pakete kadar ulasilabilecek en yuksek aylik net (kademe sinirlarinda ve sinirdan hemen once).
+    private func bestNet(upTo limit: Int, _ profile: CourierTariffProfile, _ pace: PaceEstimate, _ day: String,
+                         _ daysPerWeek: Int) -> Money? {
+        var candidates: Set<Int> = [limit]
+        for point in breakpoints(upTo: limit, profile, day, daysPerWeek) where point <= limit {
+            candidates.insert(point)
+            if point > 0 { candidates.insert(point - 1) }
+        }
+        return candidates.compactMap { net($0, profile, pace, day, daysPerWeek) }.max()
     }
 
     func plan(goal: GoalSpec, profile: CourierTariffProfile, pace: PaceEstimate, day: String) -> Result<GoalPlan, PayError> {
+        if goal.workWeekdays != workWeekdays {
+            var planner = self
+            planner.workWeekdays = goal.workWeekdays
+            return planner.plan(goal: goal, profile: profile, pace: pace, day: day)
+        }
         let week: Int = goal.daysPerWeek
         let zero: Evaluation
         switch evaluate(packages: 0, profile: profile, pace: pace, day: day, daysPerWeek: week) {
@@ -236,17 +310,16 @@ struct GoalPlanner {
         if !(zero.net < target) {
             packages = 0
             reachability = .alreadyMet
-        } else if let needed = smallestPackages(target: target, upTo: GoalPlanner.maxPackages, profile, pace, day, week),
-                  needed <= capacity {
+        } else if let needed = smallestPackages(target: target, upTo: min(capacity, GoalPlanner.maxPackages), profile, pace, day, week) {
             packages = needed
             reachability = .reachable
         } else {
             packages = capacity
-            reachability = .unreachable(maxNet: net(capacity, profile, pace, day, week) ?? zero.net)
+            reachability = .unreachable(maxNet: bestNet(upTo: capacity, profile, pace, day, week) ?? zero.net)
             if goal.period != .day, goal.daysPerWeek < 7 {
                 for days in (goal.daysPerWeek + 1)...7 {
                     let more: Int = maxPerDay * GoalSpec.monthWorkDays(daysPerWeek: days)
-                    if let value = net(more, profile, pace, day, days), !(value < target) {
+                    if smallestPackages(target: target, upTo: more, profile, pace, day, days) != nil {
                         reachability = .needsMoreDays(days)
                         break
                     }
@@ -318,7 +391,9 @@ struct GoalPlanner {
               progress.target - packages <= window,
               case let .success(at) = evaluate(packages: progress.target, profile: profile, pace: pace, day: day, daysPerWeek: week)
         else { return nil }
+        let item: TariffItem? = engine.catalog.versions.first { $0.id == result.breakdown.tariffVersionID }?
+            .items.first { $0.key == progress.itemKey }
         return NextTierHint(threshold: progress.target, extraPackages: progress.target - packages,
-                            extraNet: at.net - result.net, newRate: progress.reward)
+                            extraNet: at.net - result.net, newRate: progress.reward, isBonus: item?.method == .tier)
     }
 }

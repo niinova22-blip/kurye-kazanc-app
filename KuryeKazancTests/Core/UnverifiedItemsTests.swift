@@ -7,7 +7,7 @@ import XCTest
 
 final class UnverifiedItemsTests: XCTestCase {
     func testCollectsNeedsVerificationLinesOnce() {
-        let engine = PayEngine(catalog: TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: []))
+        let engine = PayEngine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: []))
         var input = PayInput(platformCode: "migros_hemen", span: .month, startDay: "2026-10-01", endDay: "2026-10-31")
         input.dayPackages = 900
         input.periodPackages = 900

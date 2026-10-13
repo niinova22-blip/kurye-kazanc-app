@@ -7,7 +7,7 @@ import XCTest
 
 final class GoalPlannerTests: XCTestCase {
     private let day = "2026-10-13"
-    private let engine = PayEngine(catalog: TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: []))
+    private let engine = PayEngine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: []))
     private let fuel = FuelCostModel(
         settings: FuelSettings(entries: [FuelPriceEntry(day: "2026-10-01", pricePerUnit: Money(45), type: .gasoline)],
                                consumptionPer100Km: 3),

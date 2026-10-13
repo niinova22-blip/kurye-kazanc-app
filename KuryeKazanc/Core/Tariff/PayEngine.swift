@@ -437,6 +437,7 @@ struct PayEngine {
         case "weekly_performance": "haftalık performans hedefi"
         case "woman_employment": "kadın istihdam desteği koşulları"
         case "referral": "referans koşulları"
+        case "ys_ankara_izmir": "Ankara ya da İzmir'de çalışmak"
         default: flag
         }
     }

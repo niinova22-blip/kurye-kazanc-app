@@ -94,6 +94,9 @@ enum CalculationMethod: String, Codable {
     case multiplier
     /// Saatlik garanti: garanti × saat − garantiye tabi gelir (fark odemesi).
     case guaranteeTopUp = "guarantee_top_up"
+    /// Teslimat mesafesi [alt, ust] km araligindaysa teslimat basina sabit ek odeme (Paket Taxi 4–6 km +25 TL).
+    /// Bir teslimat birden cok banda uyarsa alt esigi kucuk olan band gecerlidir (6 km tam: 4–6 km bandi).
+    case deliveryBand = "delivery_band"
 
     init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)

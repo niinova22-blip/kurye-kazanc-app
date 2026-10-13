@@ -16,11 +16,16 @@ final class TariffCatalogTests: XCTestCase {
 
     func testBundledSeedDecodesAllFourPlatforms() {
         let versions = BundledTariffs.all
-        XCTAssertEqual(versions.count, 5)
+        XCTAssertEqual(versions.count, 7)
         XCTAssertEqual(Set(versions.map(\.platformCode)), ["trendyol_go", "getir", "yemeksepeti", "migros_hemen"])
         for version in versions {
-            XCTAssertEqual(version.verificationStatus, .unverified, "ornek tarife dogrulanmis gosterilmemeli")
-            XCTAssertTrue(version.items.allSatisfy { $0.confidence == .needsVerification }, version.id)
+            // Dogrulanmis kalem yalnizca firmanin kendi yayinina dayanan surumde olabilir; o surum de tam dogrulanmis sayilmaz
+            if version.sourceType == .officialAnnouncement {
+                XCTAssertEqual(version.verificationStatus, .partial, version.id)
+            } else {
+                XCTAssertEqual(version.verificationStatus, .unverified, "ornek tarife dogrulanmis gosterilmemeli")
+                XCTAssertTrue(version.items.allSatisfy { $0.confidence == .needsVerification }, version.id)
+            }
         }
         XCTAssertEqual(PayPlatform.all.map(\.code), ["trendyol_go", "getir", "yemeksepeti", "migros_hemen"])
     }
