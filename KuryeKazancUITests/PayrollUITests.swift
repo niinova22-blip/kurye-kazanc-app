@@ -64,7 +64,9 @@ final class PayrollUITests: XCTestCase {
         packages.typeText("270")
         XCTAssertTrue(app.staticTexts["manual.net"].waitForExistence(timeout: 5))
         // Klavye kapanir (kaydirinca), dokum basligina kadar inilir
-        let detail = app.staticTexts["Ayrıntılı döküm"].firstMatch
+        // DisclosureGroup basligi Form'da dugme olarak gorunur: etiketle aranir
+        let detail = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Ayrıntılı döküm")).firstMatch
         for _ in 0..<4 where !(detail.exists && detail.isHittable) { app.swipeUp() }
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
     }
