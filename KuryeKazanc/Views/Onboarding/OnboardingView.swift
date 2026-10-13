@@ -32,7 +32,7 @@ struct OnboardingView: View {
         }
         .onAppear {
             guard let profile = payroll.tariffProfile else { return }
-            let vehicle: VehicleType? = switch profile.vehicleType {
+            let vehicle: VehicleType? = switch profile.vehicleType ?? "" {
             case "car": .car
             case "motorcycle": .motorcycle
             default: nil
