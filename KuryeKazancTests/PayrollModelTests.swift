@@ -133,7 +133,7 @@ final class PayrollModelTests: XCTestCase {
         var input = try XCTUnwrap(model.baseInput(day: "2026-10-07"))
         input.dayPackages = 4
         guard case let .success(breakdown) = model.calculate(input) else { return XCTFail("gomulu tarifeyle hesaplanmali") }
-        XCTAssertEqual(breakdown.gross, Money(300))
+        XCTAssertEqual(breakdown.gross, Money(236)) // 2026 tarifesi: 4 × 59 TL (gunduz paket)
         XCTAssertEqual(breakdown.tariffOrigin, .bundled)
     }
 
