@@ -416,3 +416,13 @@ Dal: `feature/surum-1-8`. Kullanıcının 7 maddesi:
 
 Core testleri: 351. Sunucu testleri (PGlite): 34.
 
+
+## Oturum 11 — 2026-10-14: 1.9.0 canlı vardiya, elle hesapla, ayrıntılı döküm
+
+- Canlı vardiya (`Core/Shift/LiveShift.swift`, `Services/Shift/LiveShiftController.swift`, `Views/Shift/*`): Bugün > "Vardiya başlat"; her teslimde dokunma; `ShiftClock` (YS 18:00 sonrası akşam, TY 00–08 gece, doğrulanmadı), `ShiftZones` (mesafe bandı / zaman bandı etiketi), `ShiftPayInput` (bant sayımı, teslimat mesafesi = çıkış noktasına kuş uçuşu × 1,3; GPS km yakıt için). Bitince `EntryMethod.shift` kaydı + EarningRecord (km = GPS). Süren vardiya UserDefaults `liveShift.v1`.
+- `RegionResolver`: il → YS `ys_ankara_izmir`, Paket Taxi İstanbul/Ankara dışı `standard`; İstanbul/Ankara'da Plus/standart kullanıcıya sorulur (firma ilçe listesi yayımlamıyor).
+- `PayDetailBuilder`: kalem kalem döküm + günlük pay; günlük/haftalık hesapta aylık sabit ücretin payı tahmini satır. Plan, vardiya özeti, Elle hesapla'da `PayDetailDisclosure`.
+- `ManualEntry` + `ManualCalcView` (gün/hafta/ay); hızlı tahmin / detaylı kayıt ekranları silindi.
+- `GoalAlternatives.applied`: tüm öneriler uygulanır; `GoalSpec.nightShare` (akşam önerisi).
+- Bugün: hedef çubuğu canlı paketlerle, sabit ücret günlük payı hero'da. Konum izni kurulumda doğrudan istenir.
+- Premium ileride: `LiveShiftFeature.requiresPremium = false`.

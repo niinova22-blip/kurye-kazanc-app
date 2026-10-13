@@ -3,6 +3,23 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.9.0
+
+Yeni:
+- Canlı vardiya: Bugün > "Vardiya başlat". Her paketi bırakınca ekrana bir kez dokun; tüm ekran marka rengine döner, her dokunuşta paketin tarifedeki yeri yazar (ör. "4–6 km bandı · 1 paket eklendi", "Akşam bandı · paket başı 67,50–78,50 TL"). Yanlış dokunuşta "Geri al".
+- İlk "Vardiya başlat"ta kısa tanıtım filmi; sonra Bugün'deki "Nasıl çalışır?", vardiya ekranındaki "?" ya da Profil > "Vardiya tanıtımını izle" ile tekrar.
+- Konumdan bölge: vardiya başlayınca il bulunur. Yemeksepeti'nde Ankara/İzmir haftalık bonusu, Paket Taxi'de İstanbul/Ankara dışında standart bölge kendiliğinden seçilir; İstanbul/Ankara'da Plus mı standart mı bir kez sorulur.
+- Vardiyayı bitir: hesap kendiliğinden yapılır ve kaydedilir (paketler, km, saat, sabit ücretin günlük payı, yakıt, cebine kalan). Bugün'deki hedef çubuğu her dokunuşta dolar.
+- Kazanç: "Hızlı tahmin" ve "Detaylı kayıt" kalktı. Vardiyalar kendiliğinden düşer; unuttuğun günler için "Elle hesapla" (paket, km, süre; günlük, haftalık ya da aylık).
+- Ayrıntılı döküm: Plan, vardiya özeti ve Elle hesapla'da açılır bölüm; paketlerden, km'den, bonuslardan ve aylık sabit ücretin güne düşen payından ayrı ayrı.
+- "Daha iyi yollar": tüm öneriler dokununca uygulanır ("Hedefimi buna yükselt", "Akşam saatleriyle planla").
+- Konum izni kurulumda doğrudan sorulur.
+
+Lütfen test et:
+- Bugün > Vardiya başlat: tanıtım filmi → vardiya ekranı. Birkaç paket dokun (farklı yerlerde), Geri al, küçült (Bugün'de "Vardiya sürüyor" kartı), tekrar aç, bitir → özet ve "Ayrıntılı döküm".
+- Kazanç > Elle hesapla: günlük, haftalık, aylık.
+- Plan > Daha iyi yollar: bir öneriye dokun, hedefin değiştiğini gör.
+
 ## 1.8.0
 
 Yeni:
