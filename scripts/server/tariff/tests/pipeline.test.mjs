@@ -19,7 +19,7 @@ const ptItem = async (repo, key, day) => (await repo.activeItems(PT_VERSION, day
 
 test('RLS: istemci yalnizca yayindaki tarifeyi okur, yazamaz, yonetim fonksiyonlarini calistiramaz', async () => {
   const { db } = await freshDb();
-  assert.equal((await asRole(db, 'anon', 'select count(*)::int n from public.tariff_versions'))[0].n, 5);
+  assert.equal((await asRole(db, 'anon', 'select count(*)::int n from public.tariff_versions'))[0].n, 7);
   for (const table of ['tariff_candidates', 'tariff_sources', 'tariff_audit_log', 'tariff_source_checks', 'tariff_config']) {
     await assert.rejects(asRole(db, 'anon', `select * from public.${table}`), /permission denied/, table);
   }
@@ -295,7 +295,7 @@ test('gunluk bakim: karar bekleyen eski adaylarin suresi dolar; ekonomik gosterg
   assert.deepEqual(out.expired, [created.candidate_id]);
   assert.equal((await sql(`select count(*)::int n from public.tariff_candidates`))[0].n, 1, 'gosterge aday olusturmadi');
   const items = await sql(`select count(*)::int n from public.tariff_items`);
-  assert.equal(items[0].n, 48);
+  assert.equal(items[0].n, 83);
 });
 
 test('Tarife Merkezi genel bakis: dort platform karti', async () => {

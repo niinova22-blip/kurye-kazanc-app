@@ -32,7 +32,7 @@
     "priority": 4,
     "check_interval_minutes": 1440,
     "reliability": "low",
-    "summary": "İkincil kaynak (iş ilanı sitesi rehberi). Tek başına tarife değiştirmez.",
+    "summary": "İkincil kaynak (30.09.2026): motorlu ilk paket 110, birleşen 72,5; araçlı 115 / 92,5; km 5,75; saatlik 50 / 120 TL; hafta sonu 40–60: 800 … 101+: 1.700 TL. Gömülü değerlerle aynı.",
     "extraction_profile": []
   },
   {
@@ -45,6 +45,66 @@
     "check_interval_minutes": 1440,
     "reliability": "low",
     "summary": "İkincil kaynak (kurye firması blog yazısı). Tek başına tarife değiştirmez.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "pakettaxi-migros-ucret-2026",
+    "platform_id": "migros_hemen",
+    "tariff_version_id": "migros_hemen-esnaf-v2",
+    "url": "https://www.pakettaxi.com/migros-kurye-nasil-olunur-guncel-migros-kurye-ucretleri-nedir/",
+    "source_type": "official_announcement",
+    "priority": 1,
+    "check_interval_minutes": 1440,
+    "reliability": "high",
+    "summary": "Paket Taxi'nin kendi sitesi (2026): bölgeye göre sabit ücret 65.223 / 53.223 TL, aylık paket bonusu (700 → 12.000 … 1.800+ → 66.870 TL), 4–6 km +25 TL, 6 km üzeri +35 TL. Ara bonus kademeleri yayımlanmadı.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "eleman-paket-taxi-2026",
+    "platform_id": "migros_hemen",
+    "tariff_version_id": "migros_hemen-esnaf-v2",
+    "url": "https://www.eleman.net/is-rehberi/maaslar-ve-ucretler/paket-taxi-ne-kadar-kazaniyor-2024-ucretler-ne-kadar-oldu-h2763",
+    "source_type": "news",
+    "priority": 4,
+    "check_interval_minutes": 1440,
+    "reliability": "low",
+    "summary": "İkincil kaynak (26.01.2026): kadın istihdam desteği 2.000 TL; paket başı 38–46 TL kademeli eski model. Tek başına tarife değiştirmez.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "eleman-yemeksepeti-2026",
+    "platform_id": "yemeksepeti",
+    "tariff_version_id": "yemeksepeti-esnaf-v2",
+    "url": "https://www.eleman.net/is-rehberi/maaslar-ve-ucretler/yemeksepeti-kuryesi-ne-kadar-kazaniyor-2024-yeni-ucretler-h2667",
+    "source_type": "news",
+    "priority": 3,
+    "check_interval_minutes": 1440,
+    "reliability": "medium",
+    "summary": "13.01.2026: saat/gün paket ücreti tablosu (Ankara/İzmir), km 3,7 TL, günlük 17–60+ paket bonusu, haftalık 160–420+ (Ankara/İzmir), arkadaşını öner. Firmanın resmi tablosu değil.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "bianet-yemeksepeti-zam-2026",
+    "platform_id": "yemeksepeti",
+    "tariff_version_id": "yemeksepeti-esnaf-v2",
+    "url": "https://bianet.org/haber/yemeksepeti-zam-acikladi-kuryeler-hakediste-artisi-goremedi-kontaklar-kapandi-315865",
+    "source_type": "news",
+    "priority": 4,
+    "check_interval_minutes": 1440,
+    "reliability": "medium",
+    "summary": "21.01.2026 haber: 12 Ocak'ta %32 zam; alt bonus kademeleri kaldırıldı, günlük bonusun haftalığa dönüştüğü bildirildi. Kademe yapısını doğrulamak için izlenir.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "eleman-trendyol-go-2026",
+    "platform_id": "trendyol_go",
+    "tariff_version_id": "trendyol_go-esnaf-v1",
+    "url": "https://www.eleman.net/is-rehberi/guncel/trendyol-go-kuryesi-ne-kadar-kazaniyor-2024-yeni-ucretler-h2092",
+    "source_type": "news",
+    "priority": 3,
+    "check_interval_minutes": 1440,
+    "reliability": "medium",
+    "summary": "08.01.2026: İstanbul esnaf kurye 2026 tarifesi — gündüz 64,5 / gece 92 TL, km 0–3: 6,5, 6+: 7,8 TL, birleşen 27–41,5 TL, günlük 42 paket 1.610, 82 paket 4.400 TL.",
     "extraction_profile": []
   }
 ]
