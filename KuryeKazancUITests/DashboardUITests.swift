@@ -123,7 +123,14 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
         // Ornek veride bir elle, bir ekran goruntusu kaydi var. Satir bir dugme oldugundan
         // rozet metni dugmenin etiketine katilir (ic kimlikler XCUITest'te gorunmez).
-        let labels = app.buttons.matching(identifier: "dashboard.earningRow").allElementsBoundByIndex.map(\.label)
+        // 1.8: buyuk ana kart yuzunden ikinci satir ekran disinda kalabilir (liste tembel): kaydirarak topla
+        var found: Set<String> = []
+        for _ in 0..<4 {
+            found.formUnion(app.buttons.matching(identifier: "dashboard.earningRow").allElementsBoundByIndex.map(\.label))
+            if found.count >= 2 { break }
+            app.swipeUp()
+        }
+        let labels = Array(found)
         XCTAssertEqual(labels.count, 2)
         XCTAssertTrue(labels.contains { $0.contains("Elle girildi") }, "\(labels)")
         XCTAssertTrue(labels.contains { $0.contains("Ekran görüntüsü") }, "\(labels)")
