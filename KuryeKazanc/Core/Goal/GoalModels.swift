@@ -106,6 +106,8 @@ struct CourierTariffProfile: Equatable {
     var seniorityYears: Int?
     var vehicleType: String?
     var flags: [String]
+    /// Paket Taxi Restoran gunluk calisma suresi (9–12 saat).
+    var contractHours: Int? = nil
 }
 
 enum FuelType: String, Codable, CaseIterable, Identifiable {

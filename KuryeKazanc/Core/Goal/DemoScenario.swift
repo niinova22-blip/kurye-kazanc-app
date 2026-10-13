@@ -29,12 +29,12 @@ struct DemoScenario: Identifiable, Equatable {
     /// Senaryonun kullanici tarifeleri (yalnizca `tariffChanged`; ornek, gercek tarife degil). Tarihler bugune goredir.
     func userTariffs(today: String) -> [TariffVersion] {
         guard id == "tariffChanged",
-              var base = BundledTariffs.all.first(where: { $0.platformCode == "trendyol_go" }) else { return [] }
+              var base = BundledTariffs.all.first(where: { $0.id == "yemeksepeti-esnaf-v3" }) else { return [] }
         base.origin = .user
         base.sourceNote = "Test senaryosu (örnek)"
         func make(_ suffix: String, number: Int, from: Int, until: Int?, factor: Decimal) -> TariffVersion {
             var v = base
-            v.id = "demo-ty-\(suffix)"
+            v.id = "demo-ys-\(suffix)"
             v.versionNumber = 100 + number
             v.effectiveFrom = DemoScenarioCatalog.day(offset: from, from: today)
             v.effectiveUntil = until.map { DemoScenarioCatalog.day(offset: $0, from: today) }
@@ -95,29 +95,29 @@ enum DemoScenarioCatalog {
 
     static let all: [DemoScenario] = [
         DemoScenario(
-            id: "paketTaxi30", title: "Paket Taxi · 30 gün",
-            summary: "Plus bölge, kadın istihdam desteği, aylık 75.000 TL net hedef; hedefe giden kurye.",
-            profile: CourierTariffProfile(platformCode: "migros_hemen", regionTier: "plus", seniorityYears: 1, vehicleType: nil,
+            id: "paketTaxi30", title: "Paket Taxi Migros Hemen · 30 gün",
+            summary: "1. bölge, kadın istihdam desteği, aylık 110.000 TL net hedef; hedefe giden kurye.",
+            profile: CourierTariffProfile(platformCode: "migros_hemen", regionTier: "r1", seniorityYears: 1, vehicleType: nil,
                                           flags: ["woman_employment"]),
-            goal: GoalSpec(amount: Money(75_000), period: .month), consumption: 3,
+            goal: GoalSpec(amount: Money(110_000), period: .month), consumption: 3,
             fuelPrices: [DemoFuelPrice(dayOffset: -90, price: Money(41)), DemoFuelPrice(dayOffset: -60, price: Money(42)),
                          DemoFuelPrice(dayOffset: -30, price: Money(44)), DemoFuelPrice(dayOffset: -3, price: Money(45))],
-            workDays: workDays(count: 26, skipEvery: 7, packages: 30...45, rate: Decimal(string: "4.2")!,
+            workDays: workDays(count: 26, skipEvery: 7, packages: 34...44, rate: Decimal(string: "4.2")!,
                                kmPerPackage: Decimal(string: "3.5")!, seed: 17)
         ),
         DemoScenario(
-            id: "getirBehind", title: "Getir · hedefin gerisinde",
-            summary: "Motorlu, 14 gün düşük paket hızı; aylık 100.000 TL net hedef için ek gün gerekir.",
-            profile: CourierTariffProfile(platformCode: "getir", regionTier: nil, seniorityYears: nil, vehicleType: "motorcycle",
-                                          flags: []),
+            id: "yemeksepetiBehind", title: "Yemeksepeti · hedefin gerisinde",
+            summary: "İstanbul, 14 gün düşük paket hızı; aylık 100.000 TL net hedef için ek gün gerekir.",
+            profile: CourierTariffProfile(platformCode: "yemeksepeti", regionTier: "ys_istanbul", seniorityYears: nil,
+                                          vehicleType: nil, flags: []),
             goal: GoalSpec(amount: Money(100_000), period: .month, daysPerWeek: 5, maxHoursPerDay: 8), consumption: 3,
             fuelPrices: [DemoFuelPrice(dayOffset: -10, price: Money(45))],
             workDays: workDays(count: 14, skipEvery: nil, packages: 12...18, rate: Decimal(string: "2.2")!, kmPerPackage: 3, seed: 29)
         ),
         DemoScenario(
             id: "tariffChanged", title: "Tarife değişti + yakıt arttı",
-            summary: "Trendyol GO örnek tarifesi +%8, yakıt +%11; Firmalar ekranında bildirim ve ✓ uyumlu işareti.",
-            profile: CourierTariffProfile(platformCode: "migros_hemen", regionTier: "standard", seniorityYears: 0, vehicleType: nil,
+            summary: "Yemeksepeti örnek tarifesi +%8, yakıt +%11; Firmalar ekranında bildirim ve ✓ uyumlu işareti.",
+            profile: CourierTariffProfile(platformCode: "pt_migros", regionTier: "r23", seniorityYears: 0, vehicleType: nil,
                                           flags: []),
             goal: GoalSpec(amount: Money(80_000), period: .month), consumption: 3,
             fuelPrices: [DemoFuelPrice(dayOffset: -65, price: Money(40)),

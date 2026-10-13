@@ -1,9 +1,10 @@
 import Foundation
 
-/// Konumdan (il) tarifenin bolgeye bagli secimleri. Yalnizca firmanin yayimladigi kadarini otomatik yapar:
-/// - Yemeksepeti: Ankara / Izmir haftalik paket bonusu.
-/// - Paket Taxi: Plus bolge yalnizca Istanbul ve Ankara'da var; baska ilde standart bolge kesindir.
-///   Istanbul / Ankara icinde hangi ilcelerin Plus oldugu yayimlanmadigi icin kullanicinin secimi korunur.
+/// Konumdan (il / ilce / semt) tarifenin bolgesi. Yalnizca firmanin yayimladigi kadarini otomatik yapar.
+/// - Paket Taxi: 1. bolge Istanbul'da Besiktas, Sisli, Levent, Maslak, Uskumrukoy, Ortakoy, Kagithane, Eyup, Sariyer,
+///   Kadikoy, Sultangazi; Ankara'da Beytepe, Angora, Bilkent, Cayyolu, Umitkoy, Incek, Yasamkent, Konutkent.
+///   2.–3. bolge: Istanbul ve Ankara'nin geri kalani, Izmir, Antalya, Kocaeli, Bursa, Sakarya. 4. bolge: diger iller.
+/// - Yemeksepeti: haftalik bonus sehir grubuna gore (Istanbul / Ankara–Izmir / 3. grup iller / diger iller).
 struct RegionSuggestion: Equatable {
     var flags: [String]
     var regionTier: String?
@@ -11,49 +12,76 @@ struct RegionSuggestion: Equatable {
     var message: String?
     /// Profil degismeli mi.
     var changed: Bool
-    /// Plus / standart ayrimi icin kullanicidan secim gerekli (Istanbul / Ankara, bolge secilmemis).
+    /// Konumdan kesin bolge bulunamadi (or. Ankara'da semt bilinmiyor): kullanicidan secim istenir.
     var needsRegionChoice: Bool = false
 }
 
 enum RegionResolver {
-    static let ysCityFlag = "ys_ankara_izmir"
+    static let paketTaxiCodes: Set<String> = ["pt_restoran", "pt_migros", "migros_hemen"]
 
-    /// "İzmir" / "IZMIR" / "izmir" -> "izmir".
+    static let istanbulRegion1: [String] = ["besiktas", "sisli", "levent", "maslak", "uskumrukoy", "ortakoy", "kagithane",
+                                            "eyup", "sariyer", "kadikoy", "sultangazi"]
+    static let ankaraRegion1: [String] = ["beytepe", "angora", "bilkent", "cayyolu", "umitkoy", "incek", "yasamkent", "konutkent"]
+    static let region23Cities: [String] = ["izmir", "antalya", "kocaeli", "bursa", "sakarya"]
+    static let ysGroup3: [String] = ["kocaeli", "sakarya", "diyarbakir", "malatya", "van", "elazig", "mardin", "kahramanmaras",
+                                     "erzurum"]
+
+    /// "İzmir" / "IZMIR" / "Eyüpsultan" -> "izmir" / "eyupsultan".
     static func normalized(_ text: String) -> String {
         let lower: String = text.lowercased(with: Locale(identifier: "tr_TR"))
         let folded: String = lower.folding(options: [.diacriticInsensitive], locale: Locale(identifier: "tr_TR"))
         return folded.replacingOccurrences(of: "ı", with: "i").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static func suggest(province: String?, profile: CourierTariffProfile) -> RegionSuggestion? {
-        guard let province, !province.isEmpty else { return nil }
+    /// Paket Taxi bolgesi; Ankara'da semt bilinmiyorsa nil (sorulur).
+    static func paketTaxiRegion(province: String, district: String?, neighborhood: String?) -> String? {
         let city: String = normalized(province)
+        let place: String = [district, neighborhood].compactMap { $0 }.map(normalized).joined(separator: " ")
+        if city.contains("istanbul") {
+            if place.isEmpty { return nil }
+            return istanbulRegion1.contains(where: { place.contains($0) }) ? "r1" : "r23"
+        }
+        if city.contains("ankara") {
+            if ankaraRegion1.contains(where: { place.contains($0) }) { return "r1" }
+            return place.isEmpty ? nil : "r23"
+        }
+        if region23Cities.contains(where: { city.contains($0) }) { return "r23" }
+        return "r4"
+    }
+
+    static func yemeksepetiRegion(province: String) -> String {
+        let city: String = normalized(province)
+        if city.contains("istanbul") { return "ys_istanbul" }
+        if city.contains("ankara") || city.contains("izmir") { return "ys_ankara_izmir" }
+        if ysGroup3.contains(where: { city.contains($0) }) { return "ys_group3" }
+        return "ys_other"
+    }
+
+    static func suggest(province: String?, district: String? = nil, neighborhood: String? = nil,
+                        profile: CourierTariffProfile) -> RegionSuggestion? {
+        guard let province, !province.isEmpty else { return nil }
         var flags: [String] = profile.flags
         var tier: String? = profile.regionTier
         var message: String?
         var needsChoice = false
 
-        switch profile.platformCode {
-        case "yemeksepeti":
-            let eligible: Bool = city.contains("ankara") || city.contains("izmir")
-            let had: Bool = flags.contains(ysCityFlag)
-            if eligible, !had {
-                flags.append(ysCityFlag)
-                message = "\(province): Ankara/İzmir haftalık paket bonusu hesaba katıldı."
-            } else if !eligible, had {
-                flags.removeAll { $0 == ysCityFlag }
-                message = "\(province): Ankara/İzmir haftalık bonusu bu ilde yok, hesaptan çıkarıldı."
+        if profile.platformCode == "yemeksepeti" {
+            let group: String = yemeksepetiRegion(province: province)
+            flags.removeAll { $0 == "ys_ankara_izmir" }
+            if tier != group {
+                tier = group
+                message = "\(province): haftalık bonus \(TariffQuestions.regionName(group)) tablosundan hesaplanıyor."
             }
-        case "migros_hemen":
-            let plusCity: Bool = city.contains("istanbul") || city.contains("ankara")
-            if plusCity {
+        } else if paketTaxiCodes.contains(profile.platformCode) {
+            if let region = paketTaxiRegion(province: province, district: district, neighborhood: neighborhood) {
+                if tier != region {
+                    tier = region
+                    let place: String = [neighborhood, district, province].compactMap { $0 }.first ?? province
+                    message = "\(place): \(TariffQuestions.regionName(region)) ücreti kullanılıyor."
+                }
+            } else {
                 needsChoice = tier == nil
-            } else if tier != "standard" {
-                tier = "standard"
-                message = "\(province): Plus bölge yalnızca İstanbul ve Ankara'da; standart bölge ücreti kullanılıyor."
             }
-        default:
-            break
         }
         flags = Array(Set(flags)).sorted()
         let changed: Bool = flags != Array(Set(profile.flags)).sorted() || tier != profile.regionTier

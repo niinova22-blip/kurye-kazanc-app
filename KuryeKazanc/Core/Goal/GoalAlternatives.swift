@@ -119,9 +119,9 @@ enum GoalAlternatives {
         for item in items {
             guard let lower = item.lowerThreshold else { continue }
             let threshold: Int = PayEngine.decimalInt(lower)
-            if GoalPlanner.isPlannableTier(item, unit: .day, flags: profile.flags) {
+            if GoalPlanner.isPlannableTier(item, unit: .day, flags: profile.flags, regionTier: profile.regionTier) {
                 perDayTargets.insert(threshold)
-            } else if GoalPlanner.isPlannableTier(item, unit: .week, flags: profile.flags), item.conditions.weekdays == nil {
+            } else if GoalPlanner.isPlannableTier(item, unit: .week, flags: profile.flags, regionTier: profile.regionTier), item.conditions.weekdays == nil {
                 for days in 1...7 { perDayTargets.insert(Int((Double(threshold) / Double(days)).rounded(.up))) }
             }
         }

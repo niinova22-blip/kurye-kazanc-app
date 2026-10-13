@@ -15,11 +15,11 @@ final class GoalPlannerReviewFixTests: XCTestCase {
     private let pace = PaceEstimate(packagesPerHour: 5, kmPerPackage: 3, isAssumed: false, sampleCount: 20)
 
     private func engine(user: [TariffVersion] = []) -> PayEngine {
-        PayEngine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: user))
+        TariffFixtures.engine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: user))
     }
 
     func testMidMonthTariffIsUsed() throws {
-        var version = try XCTUnwrap(BundledTariffs.all.first { $0.platformCode == "trendyol_go" })
+        var version = try XCTUnwrap(TariffFixtures.all.first { $0.platformCode == "trendyol_go" })
         version.id = "user-ty-mid"
         version.origin = .user
         version.versionNumber = 50

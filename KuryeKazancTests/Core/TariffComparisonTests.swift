@@ -7,7 +7,7 @@ import XCTest
 
 final class TariffComparisonTests: XCTestCase {
     private let day = "2026-10-13"
-    private let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [])
+    private let catalog = TariffCatalog.merged(bundled: TariffFixtures.all, remote: [], user: [])
     private let fuel = FuelCostModel(settings: FuelSettings(entries: [FuelPriceEntry(day: "2026-10-01", pricePerUnit: Money(45), type: .gasoline)],
                                                             consumptionPer100Km: 3), vehicleType: "motorcycle", fallbackCostPerKm: Money(2))
     private let own = CourierTariffProfile(platformCode: "migros_hemen", regionTier: "plus", seniorityYears: 4, vehicleType: nil,
@@ -69,7 +69,7 @@ final class TariffComparisonTests: XCTestCase {
     }
 
     func testFuelCorrelation() {
-        var old = BundledTariffs.all.first { $0.platformCode == "trendyol_go" }!
+        var old = TariffFixtures.all.first { $0.platformCode == "trendyol_go" }!
         old.id = "u-ty-1"
         old.origin = .user
         old.versionNumber = 10
@@ -88,7 +88,7 @@ final class TariffComparisonTests: XCTestCase {
             i.amount = Money(Money.round(i.amount.value * Decimal(string: "1.08")!))
             return i
         }
-        let cat = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [old, new])
+        let cat = TariffCatalog.merged(bundled: TariffFixtures.all, remote: [], user: [old, new])
         let rising = FuelCostModel(settings: FuelSettings(entries: [
             FuelPriceEntry(day: "2026-07-20", pricePerUnit: Money(40), type: .gasoline),
             FuelPriceEntry(day: "2026-08-25", pricePerUnit: Money(Decimal(string: "44.4")!), type: .gasoline)]),
@@ -102,13 +102,13 @@ final class TariffComparisonTests: XCTestCase {
     }
 
     func testFuelUpTariffFlatIsCheck() {
-        var old = BundledTariffs.all.first { $0.platformCode == "trendyol_go" }!
+        var old = TariffFixtures.all.first { $0.platformCode == "trendyol_go" }!
         old.id = "u-ty-1"; old.origin = .user; old.versionNumber = 10; old.effectiveFrom = "2026-08-01"; old.effectiveUntil = "2026-08-31"
         old.items = old.items.map { var i = $0; i.id = "u1-" + i.id; i.versionID = "u-ty-1"; return i }
         var new = old
         new.id = "u-ty-2"; new.versionNumber = 11; new.effectiveFrom = "2026-09-01"; new.effectiveUntil = nil
         new.items = old.items.map { var i = $0; i.id = "u2-" + i.id; i.versionID = "u-ty-2"; return i }
-        let cat = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [old, new])
+        let cat = TariffCatalog.merged(bundled: TariffFixtures.all, remote: [], user: [old, new])
         let rising = FuelCostModel(settings: FuelSettings(entries: [
             FuelPriceEntry(day: "2026-07-20", pricePerUnit: Money(40), type: .gasoline),
             FuelPriceEntry(day: "2026-08-25", pricePerUnit: Money(44), type: .gasoline)]),

@@ -27,7 +27,8 @@ final class TariffQuestionsTests: XCTestCase {
     }
 
     func testDisplayNames() {
-        XCTAssertEqual(TariffQuestions.regionName("plus"), "Plus bölge (İstanbul/Ankara Plus)")
+        XCTAssertEqual(TariffQuestions.regionName("r1"), "1. bölge")
+        XCTAssertEqual(TariffQuestions.regionName("ys_group3"), "3. grup iller")
         XCTAssertEqual(TariffQuestions.flagName("woman_employment"), "Kadın istihdam desteğinden yararlanıyorum")
         XCTAssertEqual(TariffQuestions.vehicleName("motorcycle"), "Motosiklet")
     }

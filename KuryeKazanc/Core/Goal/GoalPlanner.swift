@@ -131,8 +131,9 @@ struct GoalPlanner {
         input.hours = pace.packagesPerHour > 0 ? Money.round(Decimal(packages) / pace.packagesPerHour) : 0
         input.regionTier = profile.regionTier
         input.seniorityYears = profile.seniorityYears
-        input.vehicleType = profile.vehicleType ?? (profile.platformCode == "getir" ? "motorcycle" : nil)
+        input.vehicleType = profile.vehicleType
         input.flags = profile.flags
+        input.contractHours = profile.contractHours
         return input
     }
 
@@ -155,9 +156,10 @@ struct GoalPlanner {
         let week: Int = min(7, max(1, daysPerWeek))
         let workDays: Int = GoalSpec.monthWorkDays(daysPerWeek: week)
         let perDay: Int = workDays > 0 ? packages / workDays : 0
+        payInput.workDays = workDays
         let items: [TariffItem] = version.activeItems(on: day)
         // Gunluk kademe (or. Trendyol 42 / 82 paket): esit dagilimda her is gunu esik asilir ya da hic asilmaz
-        for item in items where GoalPlanner.isPlannableTier(item, unit: .day, flags: profile.flags) {
+        for item in items where GoalPlanner.isPlannableTier(item, unit: .day, flags: profile.flags, regionTier: profile.regionTier) {
             if PayEngine.decimalInt(item.lowerThreshold) <= perDay { payInput.bonusTierDays[item.key] = workDays }
         }
         var breakdown: PayBreakdown
@@ -166,7 +168,8 @@ struct GoalPlanner {
         case let .failure(error): return .failure(error)
         }
         let weekly: [PayLine] = GoalPlanner.weeklyBonus(items: items, perDay: perDay, daysPerWeek: week, workDays: workDays,
-                                                        flags: profile.flags, weekdays: weekdays ?? workWeekdays)
+                                                        flags: profile.flags, weekdays: weekdays ?? workWeekdays,
+                                                        regionTier: profile.regionTier)
         breakdown.lines += weekly
         let side: [PayLine] = GoalPlanner.flaggedSideIncome(breakdown, version: version, flags: profile.flags)
         let sideIncome: Money = side.map(\.amount).sum()
@@ -177,8 +180,10 @@ struct GoalPlanner {
     }
 
     /// Planlamada sayilan kademe: nakit, belirtilen birimdeki kademe kalemi; kosul isareti varsa kullanicida olmali.
-    static func isPlannableTier(_ item: TariffItem, unit: TariffUnit, flags: [String] = []) -> Bool {
+    static func isPlannableTier(_ item: TariffItem, unit: TariffUnit, flags: [String] = [], regionTier: String? = nil) -> Bool {
         guard item.isCash, item.method == .tier, item.unit == unit else { return false }
+        // Bolgeye / sehre bagli kademe yalnizca kuryenin bolgesinde
+        if let tier = item.conditions.regionTier, tier != regionTier { return false }
         guard let flag = item.conditions.requiresFlag else { return true }
         return flags.contains(flag)
     }
@@ -187,8 +192,8 @@ struct GoalPlanner {
     /// her grupta ulasilan en yuksek kademe × ayin hafta sayisi (is gunu / haftalik gun).
     /// `weekdays` (Takvim: 1 = Pazar ... 7 = Cumartesi) verilirse hafta sonu kademesinde yalnizca secili gunler sayilir.
     static func weeklyBonus(items: [TariffItem], perDay: Int, daysPerWeek: Int, workDays: Int,
-                            flags: [String] = [], weekdays: [Int]? = nil) -> [PayLine] {
-        let tiers: [TariffItem] = items.filter { isPlannableTier($0, unit: .week, flags: flags) }
+                            flags: [String] = [], weekdays: [Int]? = nil, regionTier: String? = nil) -> [PayLine] {
+        let tiers: [TariffItem] = items.filter { isPlannableTier($0, unit: .week, flags: flags, regionTier: regionTier) }
         var groups: [String: [TariffItem]] = [:]
         for item in tiers { groups[item.group ?? item.key, default: []].append(item) }
         let days: Int = max(1, daysPerWeek)

@@ -163,6 +163,9 @@ struct PayBuilder {
     func isEligible(_ item: TariffItem) -> Bool {
         let c = item.conditions
         if let tier = c.regionTier, tier != input.regionTier { return false }
+        if let hours = c.contractHours {
+            guard let worked = input.contractHours, hours.contains(worked) else { return false }
+        }
         if let flag = c.requiresFlag, !input.has(flag: flag) { return false }
         if let min = c.minSeniorityYears {
             guard let years = input.seniorityYears, years >= min else { return false }
@@ -189,7 +192,8 @@ struct PayEngine {
     var clock: () -> Date = { Date() }
 
     static let standardCalculators: [PayCalculator] = [
-        TrendyolGoCalculator(), GetirCalculator(), YemeksepetiCalculator(), PaketTaxiCalculator(),
+        YemeksepetiCalculator(), PaketTaxiCalculator(platformCode: "pt_restoran"),
+        PaketTaxiCalculator(platformCode: "pt_migros"), PaketTaxiCalculator(platformCode: "migros_hemen"),
     ]
 
     init(catalog: TariffCatalog, calculators: [PayCalculator] = PayEngine.standardCalculators, clock: @escaping () -> Date = { Date() }) {

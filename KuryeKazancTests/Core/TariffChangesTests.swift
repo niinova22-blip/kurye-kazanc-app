@@ -50,7 +50,7 @@ final class TariffChangesTests: XCTestCase {
                       event("2", platform: "getir", verification: "verified")]
         let notices = TariffNotifier.notices(from: events, activePlatform: "migros_hemen", seen: [], now: Date())
         XCTAssertEqual(notices.map(\.id), ["1"])
-        XCTAssertEqual(notices[0].title, "Paket Taxi / Migros Hemen için yeni tarife sürümü yayımlandı")
+        XCTAssertEqual(notices[0].title, "Paket Taxi Migros Hemen için yeni tarife sürümü yayımlandı")
         XCTAssertTrue(notices[0].body.contains("1 Kasım 2026"))
         XCTAssertTrue(notices[0].body.contains("38.00 → 40.00 TL (+%5.26)"))
         XCTAssertTrue(TariffNotifier.notices(from: events, activePlatform: "migros_hemen", seen: ["1"], now: Date()).isEmpty)
@@ -106,10 +106,10 @@ final class TariffChangesTests: XCTestCase {
                                                base: TariffFixtures.bundled("trendyol_go-esnaf-v1"), sourceNote: "Ekran görüntüsü",
                                                effectiveFrom: "2026-10-01", today: "2026-10-11", id: "u3")
         XCTAssertEqual(version.approvalStatus, .draft)
-        let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [version])
+        let catalog = TariffCatalog.merged(bundled: TariffFixtures.all, remote: [], user: [version])
         var input = TariffFixtures.input("trendyol_go")
         input.dayPackages = 1
-        XCTAssertEqual(TariffFixtures.calc(input, engine: PayEngine(catalog: catalog)).gross, money("64.50"))
+        XCTAssertEqual(TariffFixtures.calc(input, engine: TariffFixtures.engine(catalog: catalog)).gross, money("64.50"))
         XCTAssertEqual(version.items.first { $0.key == "package.day" }?.amount, money("70"))
         XCTAssertTrue(version.items.contains { $0.key == "bonus.daily.82" }, "taban surumun diger kalemleri korunur")
     }

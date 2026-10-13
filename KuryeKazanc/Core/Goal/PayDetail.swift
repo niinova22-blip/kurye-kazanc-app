@@ -85,7 +85,8 @@ enum PayDetailBuilder {
     ///   - version: Gunluk / haftalik hesapta aylik sabit ucretin gune dusen payini bulmak icin tarife.
     ///   - monthWorkDays: Aylik sabit ucretin bolundugu is gunu (haftada 6 gun -> 26).
     static func make(breakdown: PayBreakdown, days: Int, version: TariffVersion? = nil, regionTier: String? = nil,
-                     monthWorkDays: Int = 26, extraRows: [PayDetailRow] = []) -> PayDetail {
+                     monthWorkDays: Int = 26, contractHours: Int? = nil, seniorityYears: Int? = nil,
+                     extraRows: [PayDetailRow] = []) -> PayDetail {
         let dayCount: Int = max(1, days)
         var rows: [PayDetailRow] = []
         for line in breakdown.lines where line.included && line.type != .deduction {
@@ -99,7 +100,7 @@ enum PayDetailBuilder {
         let hasFixed: Bool = rows.contains { $0.category == .fixed }
         if breakdown.span != .month, !hasFixed, let version {
             rows += fixedShares(version: version, day: breakdown.startDay, regionTier: regionTier, days: dayCount,
-                                monthWorkDays: max(1, monthWorkDays))
+                                monthWorkDays: max(1, monthWorkDays), contractHours: contractHours, seniorityYears: seniorityYears)
         }
         for line in breakdown.sideBenefits where line.amount.value > 0 {
             rows.append(PayDetailRow(id: "side." + line.id, category: .side, label: line.label, quantityText: nil,
@@ -108,14 +109,28 @@ enum PayDetailBuilder {
         return PayDetail(rows: rows, days: dayCount)
     }
 
-    /// Aylik sabit ucretin bu doneme dusen payi (gunluk / haftalik hesap ay sonunu beklemesin diye tahmin).
-    static func fixedShares(version: TariffVersion, day: String, regionTier: String?, days: Int, monthWorkDays: Int) -> [PayDetailRow] {
-        let fixed: [TariffItem] = version.activeItems(on: day).filter {
-            $0.type == .fixed && $0.unit == .month && $0.isCash && $0.conditions.minSeniorityYears == nil
-        }
+    /// Aylik sabit ucretin (ve kidem priminin) bu doneme dusen payi (gunluk / haftalik hesap ay sonunu beklemesin diye tahmin).
+    /// Bolge, gunluk calisma suresi ve kidem kosullari kuryenin bilgileriyle eslesir; bolge bilinmiyorsa en dusuk bolge ucreti.
+    static func fixedShares(version: TariffVersion, day: String, regionTier: String?, days: Int, monthWorkDays: Int,
+                            contractHours: Int? = nil, seniorityYears: Int? = nil) -> [PayDetailRow] {
+        let fixed: [TariffItem] = version.activeItems(on: day).filter { $0.type == .fixed && $0.unit == .month && $0.isCash }
         guard !fixed.isEmpty else { return [] }
-        let regional: [TariffItem] = fixed.filter { $0.conditions.regionTier != nil }
-        var chosen: [TariffItem] = fixed.filter { $0.conditions.regionTier == nil }
+        func hoursMatch(_ item: TariffItem) -> Bool {
+            guard let hours = item.conditions.contractHours else { return true }
+            guard let contractHours else { return false }
+            return hours.contains(contractHours)
+        }
+        func seniorityMatch(_ item: TariffItem) -> Bool {
+            let c = item.conditions
+            guard c.minSeniorityYears != nil || c.maxSeniorityYears != nil else { return true }
+            guard let years = seniorityYears else { return false }
+            if let min = c.minSeniorityYears, years < min { return false }
+            if let max = c.maxSeniorityYears, years >= max { return false }
+            return true
+        }
+        let candidates: [TariffItem] = fixed.filter { hoursMatch($0) && seniorityMatch($0) }
+        let regional: [TariffItem] = candidates.filter { $0.conditions.regionTier != nil }
+        var chosen: [TariffItem] = candidates.filter { $0.conditions.regionTier == nil }
         var unsure = false
         if let match = regional.first(where: { $0.conditions.regionTier == regionTier }) {
             chosen.append(match)
@@ -126,7 +141,7 @@ enum PayDetailBuilder {
         return chosen.map { item in
             let perDay: Money = divide(item.amount, by: monthWorkDays)
             let share: Money = days >= monthWorkDays ? item.amount : perDay * days
-            let label: String = unsure ? "\(item.label) · bölge seçilmedi" : item.label
+            let label: String = unsure && item.conditions.regionTier != nil ? "\(item.label) · bölge seçilmedi" : item.label
             return PayDetailRow(id: "share." + item.key, category: .fixed, label: label,
                                 quantityText: "\(Formatters.currency(item.amount.doubleValue)) ÷ \(monthWorkDays) gün",
                                 periodAmount: share, perDay: perDay, isEstimate: true)
