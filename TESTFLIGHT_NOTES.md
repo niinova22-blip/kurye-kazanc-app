@@ -6,6 +6,10 @@ CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "W
 ## 1.9.0
 
 Yeni:
+- Artık yalnızca iki firma: Yemeksepeti Express ve Paket Taxi. Paket Taxi seçilince kol sorulur: Restoran, Migros ya da Migros Hemen (her kolun tarifesi ayrı). Getir ve Trendyol GO kaldırıldı; bu firmayı seçmiş olanlar ilk açılışta firmasını yeniden seçer (eski kayıtlar durur).
+- Yemeksepeti 2026: gün ve saate göre paket ücreti (Pzt–Per / Cuma / Cumartesi / Pazar × 6 saat bandı), Pazar 17:00 sonrası ve gece 01:00 sonrası +15 TL, km 3,70 TL, günlük bonus 17–60+ paket, haftalık bonus şehir grubuna göre (İstanbul / Ankara–İzmir / 3. grup iller / diğer iller, resmî sitedeki baremler). Yan haklar: çalışma saati zorunluluğu yok, online bahşiş, muhasebe desteği.
+- Paket Taxi 2026 (resmî paylaşım): 1. / 2–3. / 4. bölge. Restoran: günlük saate (9–12) göre sabit ücret, kıdem primi, 21./26. paketten itibaren paket primi. Migros ve Migros Hemen: sabit 55.223 TL, bölgeye göre günlük paket primi, aylık bonus 700–1.800+ paket; Hemen'de km desteği (4–6 km 25 TL, 6+ km 35 TL); öğle yemeği, 1,5 saat mola.
+- Bölge konumdan: Paket Taxi'de ilçe / semte göre 1., 2–3. ya da 4. bölge; Yemeksepeti'nde şehir grubu.
 - Canlı vardiya: Bugün > "Vardiya başlat". Her paketi bırakınca ekrana bir kez dokun; tüm ekran marka rengine döner, her dokunuşta paketin tarifedeki yeri yazar (ör. "4–6 km bandı · 1 paket eklendi", "Akşam bandı · paket başı 67,50–78,50 TL"). Yanlış dokunuşta "Geri al".
 - İlk "Vardiya başlat"ta kısa tanıtım filmi; sonra Bugün'deki "Nasıl çalışır?", vardiya ekranındaki "?" ya da Profil > "Vardiya tanıtımını izle" ile tekrar.
 - Konumdan bölge: vardiya başlayınca il bulunur. Yemeksepeti'nde Ankara/İzmir haftalık bonusu, Paket Taxi'de İstanbul/Ankara dışında standart bölge kendiliğinden seçilir; İstanbul/Ankara'da Plus mı standart mı bir kez sorulur.
@@ -16,6 +20,8 @@ Yeni:
 - Konum izni kurulumda doğrudan sorulur.
 
 Lütfen test et:
+- Uygulamayı silip kur: Paket Taxi seç → kol → bölge (Restoran'da saat) ya da Yemeksepeti → şehir grubu.
+- Paket Taxi Migros, 1. bölge, Plan'da aylık hedef: günde 38 paket × 26 gün ≈ 144.103 TL brüt (resmî örnekle aynı).
 - Bugün > Vardiya başlat: tanıtım filmi → vardiya ekranı. Birkaç paket dokun (farklı yerlerde), Geri al, küçült (Bugün'de "Vardiya sürüyor" kartı), tekrar aç, bitir → özet ve "Ayrıntılı döküm".
 - Kazanç > Elle hesapla: günlük, haftalık, aylık.
 - Plan > Daha iyi yollar: bir öneriye dokun, hedefin değiştiğini gör.
