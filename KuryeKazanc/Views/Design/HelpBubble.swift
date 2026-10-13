@@ -16,12 +16,14 @@ enum HelpScreen {
     var lines: [String] {
         switch self {
         case .today:
-            ["Hedefinden bugüne düşen paket ve saat payını gösterir.",
-             "+ ile ekran görüntüsünden ya da elle kazanç ve gider eklersin.",
-             "Net = kazanç − yakıt (km × tüketim × yakıt fiyatı)."]
+            ["\"Vardiya başlat\" ile işe çık; her paketi bırakınca ekrana bir kez dokun.",
+             "Uygulama paketin saat ve mesafe bandını bulur; bitirince hesap kendiliğinden kaydedilir.",
+             "Hedef çubuğu her dokunuşta dolar. Net = kazanç − yakıt (km × tüketim × yakıt fiyatı).",
+             "+ ile ekran görüntüsünden ya da elle kazanç ve gider de ekleyebilirsin."]
         case .earnings:
-            ["Gün, hafta ya da ay için brüt, gider ve net.",
-             "Hakediş kayıtları firmanın tarifesiyle hesaplanır."]
+            ["Bitirdiğin vardiyalar buraya kendiliğinden düşer; ayın brütü ve neti güncellenir.",
+             "Vardiyayı başlatmayı unuttuysan \"Elle hesapla\" ile paket, km ve süreyi gün, hafta ya da ay olarak gir.",
+             "\"Ayrıntılı döküm\" paketleri, km'yi, bonusları ve sabit ücretin güne düşen payını ayrı gösterir."]
         case .firms:
             ["Aynı işi diğer firmalarda yapsaydın ne kazanırdın?",
              "Diğer firmalar yeni başlayan kademesiyle hesaplanır.",
@@ -29,7 +31,7 @@ enum HelpScreen {
         case .plan:
             ["Hedefini gir; firmanın tarifesine göre günde kaç paket ve kaç saat gerektiğini görürsün.",
              "Günlük hedefte gün seçilmez; haftalık ve aylıkta çalışacağın günleri seçersin.",
-             "\"Daha iyi yollar\" aynı paraya daha az saatle ulaşmanın yollarını gösterir.",
+             "\"Daha iyi yollar\" aynı paraya daha az saatle ulaşmanın yollarını gösterir; dokununca hedefine uygulanır.",
              "Hız kendi kayıtlarından hesaplanır; az kayıt varsa tahmin kullanılır."]
         }
     }

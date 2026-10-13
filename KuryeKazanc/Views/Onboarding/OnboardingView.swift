@@ -157,7 +157,7 @@ struct OnboardingView: View {
                 .accessibilityHidden(true)
             Text("Konum yalnızca vardiyada")
                 .font(.title.bold())
-            Text("Otomatik vardiya açıksa sürüşünü algılar, mesafeni ölçer; bitince durur. Kayıtlara yalnızca ilçe eklenir.")
+            Text("Vardiya sürerken km ve yakıtı ölçer, paketin mesafe bandını ve şehrine göre tarifeyi bulur; vardiya bitince durur. Kayıtlara yalnızca ilçe eklenir.")
                 .foregroundStyle(.secondary)
 
             if location.isAuthorized {
@@ -171,12 +171,16 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("onboarding.requestLocation")
-                Text("İstersen şimdi geçip daha sonra Profil'den verebilirsin.")
+                Text("İzin vermezsen paketler sayılır ama km, yakıt ve mesafe ek ödemesi hesaplanamaz.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
             autoShiftOption
+        }
+        // 1.9: izin bu adima gelince dogrudan sorulur (km, yakit ve bolge tarifesi icin gerekli)
+        .onAppear {
+            if location.authorizationStatus == .notDetermined { location.requestWhenInUseAuthorization() }
         }
     }
 

@@ -21,6 +21,7 @@ struct ProfileView: View {
 
     @State private var costText = ""
     @State private var showsFirmSetup = false
+    @State private var showsShiftTutorial = false
     @State private var showDeleteConfirmation = false
     @AppStorage("scanTestWindow") private var scanTestWindow = false
 
@@ -122,6 +123,13 @@ struct ProfileView: View {
                 Label("Tanıtımı izle", systemImage: "play.circle")
             }
             .accessibilityIdentifier("profile.intro")
+            Button { showsShiftTutorial = true } label: {
+                Label("Vardiya tanıtımını izle", systemImage: "hand.tap")
+            }
+            .accessibilityIdentifier("profile.shiftTutorial")
+            .fullScreenCover(isPresented: $showsShiftTutorial) {
+                ShiftTutorialView(mode: .replay) { showsShiftTutorial = false }
+            }
             NavigationLink { AdvancedView() } label: {
                 Label("Gelişmiş", systemImage: "gearshape.2")
             }

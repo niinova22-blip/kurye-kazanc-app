@@ -40,7 +40,11 @@ final class DashboardUITests: XCTestCase {
     func testTodayShowsScanButton() {
         let app = launch(sampleData: false)
 
-        XCTAssertTrue(app.buttons["scan.button"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
+        // 1.9: "Vardiya başlat" kartı eklendi; tarama düğmesi küçük ekranda aşağıda kalabilir
+        let scan = app.buttons["scan.button"]
+        if !scan.waitForExistence(timeout: 3) { app.swipeUp() }
+        XCTAssertTrue(scan.waitForExistence(timeout: 5))
     }
 
     func testDashboardSummarizesSampleData() {

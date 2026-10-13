@@ -3,12 +3,16 @@ import Foundation
 /// Kaydin hangi yontemle girildigi. Hepsi ayni motoru ve ayni tarife surumunu kullanir.
 enum EntryMethod: String, Codable, CaseIterable {
     case quick, detailed, period
+    /// 1.9: canli vardiya (her paket teslimde dokunma) ve unutulan gun icin elle hesap.
+    case shift, manual
 
     var displayName: String {
         switch self {
         case .quick: "Hızlı tahmin"
         case .detailed: "Detaylı kayıt"
         case .period: "Dönem özeti"
+        case .shift: "Vardiya"
+        case .manual: "Elle hesap"
         }
     }
 }

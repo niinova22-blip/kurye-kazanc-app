@@ -13,6 +13,8 @@ struct TodayView: View {
     @Environment(\.openURL) private var openURL
     @Environment(PayrollModel.self) private var payroll
     @Environment(\.showIntro) private var showIntro
+    @Environment(LiveShiftController.self) private var liveShift
+    @Environment(LocationService.self) private var location
 
     @Query private var todaysEarnings: [EarningRecord]
     @Query private var todaysExpenses: [ExpenseRecord]
@@ -24,6 +26,13 @@ struct TodayView: View {
 
     @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
+    @AppStorage(AppPreferences.hasSeenShiftTutorialKey) private var hasSeenShiftTutorial = false
+
+    /// Canli vardiya ekrani, ilk kullanim tanitimi ve konum kapali uyarisi.
+    @State private var showsLiveShift = false
+    @State private var showsShiftTutorial = false
+    @State private var showsLocationAlert = false
+    @State private var showsShiftReplay = false
 
     @State private var activeSheet: Sheet?
     @State private var showsHelp = false
@@ -88,12 +97,26 @@ struct TodayView: View {
         payroll.fuelModel(fallbackCostPerKm: costPerKm).costPerKm(on: payroll.today).doubleValue
     }
 
+    /// Bugunku hedef: kayitli kazanclar + suren vardiyanin paketleri (her dokunusta dolar) + sabit ucretin gunluk payi.
     private var dailyProgress: DailyGoalProgress? {
         let entries: [EarningEntry] = allEarnings.map(\.entry)
         guard case let .success(plan)? = payroll.goalPlan(entries: entries, fallbackCostPerKm: costPerKm),
               let code = payroll.tariffProfile?.platformCode else { return nil }
-        return DailyGoalProgress.today(plan: plan, entries: entries, platform: code, day: payroll.today,
-                                       fuel: payroll.fuelModel(fallbackCostPerKm: costPerKm), calendar: .current, now: .now)
+        var progress = DailyGoalProgress.today(plan: plan, entries: entries, platform: code, day: payroll.today,
+                                               fuel: payroll.fuelModel(fallbackCostPerKm: costPerKm), calendar: .current, now: .now)
+        progress.packages += liveShift.packageCount
+        if liveShift.isActive, let live = liveShift.liveEstimate() { progress.net = progress.net + live.gross }
+        progress.net = progress.net + fixedShareToday
+        return progress
+    }
+
+    /// Aylik sabit ucretin bugune dusen payi (Paket Taxi gibi): bugun calisildiysa bir kez eklenir.
+    private var fixedShareToday: Money {
+        guard !todaysEarnings.isEmpty || liveShift.isActive, let version = payroll.currentVersion() else { return .zero }
+        let rows: [PayDetailRow] = PayDetailBuilder.fixedShares(version: version, day: payroll.today,
+                                                                regionTier: payroll.state.regionTier, days: 1,
+                                                                monthWorkDays: payroll.goal?.monthWorkDays ?? 26)
+        return rows.map(\.perDay).sum()
     }
 
     var body: some View {
@@ -132,6 +155,24 @@ struct TodayView: View {
                 .onChange(of: autoShift.requestedPendingID) { _, _ in
                     openRequestedPending()
                 }
+                .fullScreenCover(isPresented: $showsLiveShift) { LiveShiftView() }
+                .fullScreenCover(isPresented: $showsShiftTutorial) {
+                    ShiftTutorialView(mode: .firstRun) {
+                        hasSeenShiftTutorial = true
+                        showsShiftTutorial = false
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(450))
+                            beginShift()
+                        }
+                    }
+                }
+                .alert("Konum izni kapalı", isPresented: $showsLocationAlert) {
+                    Button("Ayarlar'ı aç") { openSystemSettings() }
+                    Button("Konumsuz başlat") { startLiveShift() }
+                    Button("Vazgeç", role: .cancel) {}
+                } message: {
+                    Text("Konum olmadan km, yakıt ve mesafe ek ödemesi (bant) hesaplanamaz; yalnızca paket ve saat sayılır.")
+                }
         }
     }
 
@@ -145,12 +186,13 @@ struct TodayView: View {
             noticesSection
             autoShiftSections
             heroSection(summary)
+            shiftStartSection
             Section {
                 TodayGoalCard(progress: dailyProgress, hasGoal: payroll.goal != nil)
             }
             fuelReminderSection
 
-            if workSession.isWorking {
+            if workSession.isWorking, !liveShift.isActive {
                 Section {
                     shiftPanel(summary)
                 }
@@ -309,7 +351,7 @@ struct TodayView: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                     Spacer()
-                    if workSession.isWorking {
+                    if workSession.isWorking || liveShift.isActive {
                         Label("Vardiyada", systemImage: "dot.radiowaves.left.and.right")
                             .font(.caption.weight(.bold))
                             .padding(.horizontal, 10)
@@ -319,8 +361,15 @@ struct TodayView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    HeroAmount(title: "Bugün cebine kalan", value: summary.netEarnings, identifier: "dashboard.netEarnings")
-                    NetBreakdownLine(gross: summary.totalEarnings, expenses: summary.totalExpenses)
+                    HeroAmount(title: "Bugün cebine kalan", value: summary.netEarnings + fixedShareToday.doubleValue,
+                               identifier: "dashboard.netEarnings")
+                    NetBreakdownLine(gross: summary.totalEarnings + fixedShareToday.doubleValue, expenses: summary.totalExpenses)
+                    if fixedShareToday.value > 0 {
+                        Text("Sabit ücretin bugüne düşen payı dahil: \(PayFormat.tl(fixedShareToday))")
+                            .font(.footnote)
+                            .opacity(0.8)
+                            .accessibilityIdentifier("dashboard.fixedShare")
+                    }
                 }
                 MetricStrip(metricItems(summary))
                     .padding(12)
@@ -505,6 +554,84 @@ struct TodayView: View {
                 offsets.map { todaysExpenses[$0] }.forEach { delete($0) }
             }
         }
+    }
+
+    // MARK: - Canli vardiya
+
+    /// "Vardiya başlat" ya da suren vardiyanin karti (dokununca vardiya ekrani).
+    private var shiftStartSection: some View {
+        Section {
+            if liveShift.isActive {
+                Button { showsLiveShift = true } label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: "hand.tap.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white)
+                            .frame(width: 48, height: 48)
+                            .background(Theme.brandGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .symbolEffect(.pulse)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Vardiya sürüyor · \(liveShift.packageCount) paket")
+                                .font(.headline)
+                            Text("Paket bırakınca dokunmak için aç")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("today.liveShift")
+            } else {
+                VStack(spacing: 8) {
+                    Button(action: requestStart) {
+                        Label("Vardiya başlat", systemImage: "play.fill")
+                    }
+                    .buttonStyle(PrimaryActionButtonStyle())
+                    .accessibilityIdentifier("today.startShift")
+                    Text("Her paketi bırakınca ekrana dokun; saat, km ve ücret kendiliğinden hesaplanır.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    if hasSeenShiftTutorial {
+                        Button("Nasıl çalışır? Tanıtımı izle") { showsShiftReplay = true }
+                            .font(.footnote.weight(.semibold))
+                            .buttonStyle(.borderless)
+                            .accessibilityIdentifier("today.shiftTutorial")
+                    }
+                }
+                .fullScreenCover(isPresented: $showsShiftReplay) {
+                    ShiftTutorialView(mode: .replay) { showsShiftReplay = false }
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+            }
+        }
+    }
+
+    /// Ilk kullanimda once tanitim filmi; sonra konum kontrolu ve baslatma.
+    private func requestStart() {
+        Haptics.impact()
+        if !hasSeenShiftTutorial {
+            showsShiftTutorial = true
+        } else {
+            beginShift()
+        }
+    }
+
+    private func beginShift() {
+        switch location.authorizationStatus {
+        case .denied, .restricted:
+            showsLocationAlert = true
+        default:
+            startLiveShift()
+        }
+    }
+
+    private func startLiveShift() {
+        liveShift.start()
+        showsLiveShift = true
     }
 
     // MARK: - Eylemler

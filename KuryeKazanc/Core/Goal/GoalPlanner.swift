@@ -289,9 +289,10 @@ struct GoalPlanner {
     }
 
     func plan(goal: GoalSpec, profile: CourierTariffProfile, pace: PaceEstimate, day: String) -> Result<GoalPlan, PayError> {
-        if goal.workWeekdays != workWeekdays {
+        if goal.workWeekdays != workWeekdays || (goal.nightShare ?? nightShare) != nightShare {
             var planner = self
             planner.workWeekdays = goal.workWeekdays
+            if let share = goal.nightShare { planner.nightShare = share }
             return planner.plan(goal: goal, profile: profile, pace: pace, day: day)
         }
         let week: Int = goal.daysPerWeek

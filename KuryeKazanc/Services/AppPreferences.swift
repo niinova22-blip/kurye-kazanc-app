@@ -23,6 +23,9 @@ enum AppPreferences {
     static let hasSeenIntroV18Key = "hasSeenIntroV18"
     /// Ilk acilista karsilama ekraninda secilen firma (kurulum bitene kadar).
     static let startFirmKey = "setup.startFirm"
+    /// 1.9 canli vardiya (her teslimde dokunma): suren vardiya (JSON) ve ilk kullanim tanitimi.
+    static let liveShiftKey = "liveShift.v1"
+    static let hasSeenShiftTutorialKey = "hasSeenShiftTutorial"
     /// Haftalik / gunluk net kazanc hedefi (TL). 0 = ayarlanmadi.
     static let weeklyGoalKey = "weeklyNetGoal"
     static let dailyGoalKey = "dailyNetGoal"

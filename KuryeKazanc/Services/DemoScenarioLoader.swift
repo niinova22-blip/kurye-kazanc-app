@@ -51,6 +51,8 @@ struct DemoScenarioLoader {
             defaults.set(false, forKey: AppPreferences.hasSeenIntroV17Key)
             defaults.set(false, forKey: AppPreferences.hasSeenIntroV18Key)
             defaults.removeObject(forKey: AppPreferences.startFirmKey)
+            defaults.set(false, forKey: AppPreferences.hasSeenShiftTutorialKey)
+            defaults.removeObject(forKey: AppPreferences.liveShiftKey)
             defaults.set(false, forKey: AppPreferences.hasCompletedOnboardingKey)
         }
     }

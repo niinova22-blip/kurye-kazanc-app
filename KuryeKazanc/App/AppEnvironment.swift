@@ -17,6 +17,7 @@ final class AppEnvironment {
     let account: AccountService
     let tariffs: TariffSyncService
     let payroll: PayrollModel
+    let liveShift: LiveShiftController
 
     private init() {
         let launch = LaunchOptions.current
@@ -74,6 +75,8 @@ final class AppEnvironment {
             todayNet: { todaySummary().netEarnings },
             todayWorkedSeconds: { todaySummary().workDuration }
         )
+        liveShift = LiveShiftController(autoShift: autoShift, workSession: workSession, location: location, payroll: payroll,
+                                        defaults: testDefaults ?? .standard)
         // Canli Etkinlik "Vardiyayi bitir": iOS uygulamayi arka planda soguk baslatsa da bagli olsun.
         // Form acilamaz: ozet bekleyen vardiya olur, "Vardiya bitti" bildirimi kazanc formuna goturur.
         ShiftIntentBridge.endShift = { [weak self] in

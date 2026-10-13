@@ -72,12 +72,13 @@ struct PayrollDashboardView: View {
             if let platform = model.activePlatform {
                 PlatformHeaderSection(platform: platform)
             }
+            LiveShiftBanner()
             if let dashboard {
                 DashboardCardsSection(dashboard: dashboard)
                 PlatformSpecificSection(dashboard: dashboard)
             }
-            MethodsSection()
             RecentLogsSection()
+            MethodsSection()
             MoreSection()
             VerificationFootnote(items: unverifiedItems)
         }
@@ -226,19 +227,36 @@ private struct PlatformSpecificSection: View {
     }
 }
 
+/// Suren vardiya: Kazanc'tan da vardiya ekranina donulur.
+private struct LiveShiftBanner: View {
+    @Environment(LiveShiftController.self) private var liveShift
+    @State private var showsShift = false
+
+    var body: some View {
+        if liveShift.isActive {
+            Section {
+                Button { showsShift = true } label: {
+                    Label("Vardiya sürüyor · \(liveShift.packageCount) paket — aç", systemImage: "hand.tap.fill")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .accessibilityIdentifier("payroll.liveShift")
+            } footer: {
+                Text("Vardiyayı bitirince hesap kendiliğinden buraya eklenir.")
+            }
+            .fullScreenCover(isPresented: $showsShift) { LiveShiftView() }
+        }
+    }
+}
+
 private struct MethodsSection: View {
     var body: some View {
         Section {
-            NavigationLink { QuickEstimateView() } label: {
-                Label("Hızlı tahmin", systemImage: "bolt")
+            NavigationLink { ManualCalcView() } label: {
+                Label("Elle hesapla", systemImage: "square.and.pencil")
             }
-            .accessibilityIdentifier("payroll.quick")
-            NavigationLink { DetailedLogView() } label: {
-                Label("Detaylı günlük kayıt", systemImage: "list.bullet.rectangle")
-            }
-            .accessibilityIdentifier("payroll.detailed")
+            .accessibilityIdentifier("payroll.manual")
             NavigationLink { PeriodSummaryView() } label: {
-                Label("Dönem özeti (hafta / ay)", systemImage: "calendar")
+                Label("Hafta / ay özeti", systemImage: "calendar")
             }
             .accessibilityIdentifier("payroll.period")
             NavigationLink { PaymentCheckView() } label: {
@@ -248,7 +266,7 @@ private struct MethodsSection: View {
         } header: {
             Text("Hesapla")
         } footer: {
-            Text("Dört yöntem de aynı hesaplama motorunu ve aynı tarife sürümünü kullanır.")
+            Text("Vardiya başlatmayı unuttuysan paket, km ve süreyi elle gir; günlük, haftalık ya da aylık hesaplanır.")
         }
     }
 }
@@ -259,9 +277,9 @@ private struct RecentLogsSection: View {
     var body: some View {
         let code: String = model.state.activePlatform ?? ""
         let recent: [WorkLog] = Array(model.logs(platform: code).prefix(5))
-        Section("Son kayıtlar") {
+        Section("Vardiyalar ve kayıtlar") {
             if recent.isEmpty {
-                Text("Henüz kayıt yok. Hızlı tahmin ya da detaylı kayıtla başla.")
+                Text("Henüz kayıt yok. Bugün ekranından vardiya başlat; bitirince hesap buraya kendiliğinden düşer.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

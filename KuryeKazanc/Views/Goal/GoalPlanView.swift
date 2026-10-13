@@ -116,14 +116,10 @@ struct GoalPlanView: View {
         }
     }
 
-    /// Alternatifi hedefe uygular: gun sayisi ve gunluk sure.
+    /// Alternatifi hedefe uygular: gun sayisi, gunluk sure, kademe hedefi ya da aksam payi (GoalAlternatives.applied).
     private func apply(_ alternative: GoalAlternative) {
         guard let goal = payroll.goal else { return }
-        let hours: Int = max(NSDecimalNumber(decimal: goal.maxHoursPerDay).intValue,
-                             Int(NSDecimalNumber(decimal: alternative.hoursPerDay).doubleValue.rounded(.up)))
-        let days: [Int] = GoalSpec.defaultWeekdays(count: alternative.daysPerWeek)
-        payroll.setGoal(GoalSpec(amount: goal.amount, period: goal.period, daysPerWeek: alternative.daysPerWeek,
-                                 maxHoursPerDay: Decimal(min(16, hours)), workWeekdays: goal.period == .day ? nil : days))
+        payroll.setGoal(GoalAlternatives.applied(alternative, to: goal))
         load()
         Haptics.success()
         withAnimation { saved = true }
@@ -242,6 +238,13 @@ private struct GoalAlternativeRow: View {
     let apply: (GoalAlternative) -> Void
 
     var body: some View {
+        Button { apply(alternative) } label: { content }
+            .buttonStyle(.pressable)
+            .accessibilityHint("Dokununca bu yol hedefine uygulanır")
+            .accessibilityIdentifier("plan.alternative.\(alternative.id)")
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: symbol)
@@ -261,16 +264,22 @@ private struct GoalAlternativeRow: View {
                 HStack(spacing: 8) { pills }
                 VStack(alignment: .leading, spacing: 6) { pills }
             }
-            if canApply {
-                Button("Bu planı uygula") { apply(alternative) }
-                    .font(.subheadline.weight(.semibold))
-                    .buttonStyle(.borderless)
-                    .accessibilityIdentifier("plan.alternative.apply.\(alternative.id)")
-            }
+            Label(applyTitle, systemImage: "checkmark.circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                .accessibilityIdentifier("plan.alternative.apply.\(alternative.id)")
         }
         .padding(.vertical, 6)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plan.alternative.\(alternative.id)")
+        .foregroundStyle(.primary)
+        .contentShape(Rectangle())
+    }
+
+    private var applyTitle: String {
+        switch alternative.kind {
+        case .nextTier: "Hedefimi buna yükselt"
+        case .evening: "Akşam saatleriyle planla"
+        case .days, .bonusPace: "Bu planı uygula"
+        }
     }
 
     @ViewBuilder private var pills: some View {
@@ -282,8 +291,6 @@ private struct GoalAlternativeRow: View {
         }
         pill("Saati \(PayFormat.tl(alternative.netPerHour)) net", color: Theme.accent)
     }
-
-    private var canApply: Bool { alternative.kind == .days || alternative.kind == .bonusPace }
 
     private var symbol: String {
         switch alternative.kind {

@@ -13,12 +13,28 @@ struct GoalResultCard: View {
             ReachabilityNote(plan: plan)
             if !plan.guaranteed.isEmpty { GuaranteedBlock(plan: plan) }
             MoneyBlock(plan: plan)
+            if plan.reachability != .alreadyMet || !plan.breakdown.lines.isEmpty {
+                PayDetailDisclosure(detail: detail, periodTitle: "Ayda", identifier: "goal.detail")
+            }
             if let hint = plan.nextTier { hintRow(hint) }
         } header: {
             Text("Planın")
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("goal.result")
+    }
+
+    /// Aylik plan kalem kalem; her kalemin gune dusen payi (ayda is gunune bolunur).
+    private var detail: PayDetail {
+        var extra: [PayDetailRow] = []
+        let hasWeekly: Bool = plan.breakdown.lines.contains { $0.type == .weeklyBonus && $0.included }
+        if plan.weeklyBonusIncome.value > 0, !hasWeekly {
+            let days: Int = max(1, plan.workDays)
+            extra.append(PayDetailRow(id: "weekly.bonus", category: .bonus, label: "Haftalık bonuslar (aylık karşılığı)",
+                                      quantityText: nil, periodAmount: plan.weeklyBonusIncome,
+                                      perDay: Money(Money.round(plan.weeklyBonusIncome.value / Decimal(days)))))
+        }
+        return PayDetailBuilder.make(breakdown: plan.breakdown, days: plan.workDays, extraRows: extra)
     }
 
     // MARK: - Ust kart

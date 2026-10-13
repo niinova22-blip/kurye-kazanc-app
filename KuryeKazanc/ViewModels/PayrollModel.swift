@@ -107,8 +107,33 @@ final class PayrollModel {
         var input = PayInput(platformCode: code, span: span, startDay: day, endDay: end)
         input.regionTier = state.regionTier
         input.seniorityYears = state.seniorityYears
+        input.flags = state.flags
         if code == "getir" { input.vehicleType = state.vehicleType ?? "motorcycle" }
         return input
+    }
+
+    /// Kaydin tarife surumu (gecmis kayitta o gunku surum; bulunamazsa guncel).
+    func version(id: String) -> TariffVersion? {
+        catalog.versions.first { $0.id == id } ?? currentVersion()
+    }
+
+    /// Ayrintili dokum: kalem kalem, gune dusen paylariyla. Gunluk / haftalik hesapta aylik sabit ucretin payi tahmin olarak eklenir.
+    func detail(for breakdown: PayBreakdown, days: Int) -> PayDetail {
+        PayDetailBuilder.make(breakdown: breakdown, days: days, version: version(id: breakdown.tariffVersionID),
+                              regionTier: state.regionTier, monthWorkDays: state.goal?.monthWorkDays ?? 26)
+    }
+
+    /// Konumdan gelen bolge onerisini profile yazar (yalnizca degisiklik varsa).
+    func applyRegion(_ suggestion: RegionSuggestion) {
+        guard suggestion.changed else { return }
+        store.setPreferences(regionTier: suggestion.regionTier, seniorityYears: state.seniorityYears, vehicleType: state.vehicleType)
+        store.setFlags(suggestion.flags)
+        reload()
+    }
+
+    func setRegionTier(_ tier: String) {
+        store.setPreferences(regionTier: tier, seniorityYears: state.seniorityYears, vehicleType: state.vehicleType)
+        reload()
     }
 
     func calculate(_ input: PayInput) -> Result<PayBreakdown, PayError> {
@@ -128,7 +153,9 @@ final class PayrollModel {
 
     /// Kaydeder. Gunluk kayit icin mevcut Bugun/Analiz ekranlarina yansiyan bir kazanc kaydi da olusturulur.
     @discardableResult
-    func save(_ input: PayInput, method: EntryMethod, start: Date? = nil, end: Date? = nil, context: ModelContext?) -> WorkLog? {
+    /// - Parameter recordKm: Kazanc kaydina (yakit gideri) yazilacak yol; nil ise girdinin mesafesi.
+    func save(_ input: PayInput, method: EntryMethod, start: Date? = nil, end: Date? = nil, recordKm: Double? = nil,
+              context: ModelContext?) -> WorkLog? {
         lastError = nil
         let breakdown: PayBreakdown
         switch calculate(input) {
@@ -148,14 +175,14 @@ final class PayrollModel {
             return nil
         }
         if input.span == .day, let context {
-            let recordID: UUID? = createEarningRecord(for: log, start: start, end: end, context: context)
+            let recordID: UUID? = createEarningRecord(for: log, start: start, end: end, km: recordKm, context: context)
             if let recordID { store.linkEarningRecord(recordID, to: log.id) }
         }
         reload()
         return store.log(id: log.id)
     }
 
-    private func createEarningRecord(for log: WorkLog, start: Date?, end: Date?, context: ModelContext) -> UUID? {
+    private func createEarningRecord(for log: WorkLog, start: Date?, end: Date?, km: Double?, context: ModelContext) -> UUID? {
         let parts: [Int] = log.startDay.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
         let localDay: Date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 9)) ?? clock()
@@ -168,7 +195,7 @@ final class PayrollModel {
         let gross: Money = log.result.gross - bonus + log.result.tips + log.result.extraPayments
         let record = EarningRecord(
             startTime: recordStart, endTime: recordEnd, platform: platform, grossEarning: gross.doubleValue,
-            bonus: bonus.doubleValue, distanceKm: log.input.distanceKm.doubleValue,
+            bonus: bonus.doubleValue, distanceKm: km ?? log.input.distanceKm.doubleValue,
             packageCount: log.input.totalPackages, source: .manual, verification: .manual
         )
         context.insert(record)
