@@ -36,7 +36,7 @@ final class DemoScenarioTests: XCTestCase {
         let s = try XCTUnwrap(DemoScenarioCatalog.scenario("paketTaxi30"))
         XCTAssertEqual(s.profile?.platformCode, "migros_hemen")
         XCTAssertEqual(s.profile?.flags, ["woman_employment"])
-        XCTAssertEqual(s.goal?.amount, Money(100_000))
+        XCTAssertEqual(s.goal?.amount, Money(75_000))
         XCTAssertEqual(s.fuelPrices.count, 4)
         XCTAssertEqual(s.workDays.count, 26)
         XCTAssertTrue(s.workDays.allSatisfy { (30...45).contains($0.packages) && $0.dayOffset <= 0 && $0.dayOffset > -31 })
@@ -47,7 +47,8 @@ final class DemoScenarioTests: XCTestCase {
         let pace = PaceEstimate.estimate(entries: entries(s, platform: "migros_hemen"), platform: "migros_hemen",
                                          now: Date(timeIntervalSince1970: 1_791_000_000 + 86_400))
         XCTAssertFalse(pace.isAssumed)
-        let planner = GoalPlanner(engine: PayEngine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: [])),
+        // Uygulamadaki gercek katalog (guncel tarifeler) ile
+        let planner = GoalPlanner(engine: PayEngine(catalog: TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [])),
                                   fuel: fuel(s))
         guard case let .success(plan) = planner.plan(goal: try XCTUnwrap(s.goal), profile: try XCTUnwrap(s.profile), pace: pace,
                                                      day: today) else { return XCTFail() }

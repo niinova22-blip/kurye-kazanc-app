@@ -96,10 +96,10 @@ enum DemoScenarioCatalog {
     static let all: [DemoScenario] = [
         DemoScenario(
             id: "paketTaxi30", title: "Paket Taxi · 30 gün",
-            summary: "Plus bölge, kadın istihdam desteği, aylık 100.000 TL net hedef; hedefe giden kurye.",
+            summary: "Plus bölge, kadın istihdam desteği, aylık 75.000 TL net hedef; hedefe giden kurye.",
             profile: CourierTariffProfile(platformCode: "migros_hemen", regionTier: "plus", seniorityYears: 1, vehicleType: nil,
                                           flags: ["woman_employment"]),
-            goal: GoalSpec(amount: Money(100_000), period: .month), consumption: 3,
+            goal: GoalSpec(amount: Money(75_000), period: .month), consumption: 3,
             fuelPrices: [DemoFuelPrice(dayOffset: -90, price: Money(41)), DemoFuelPrice(dayOffset: -60, price: Money(42)),
                          DemoFuelPrice(dayOffset: -30, price: Money(44)), DemoFuelPrice(dayOffset: -3, price: Money(45))],
             workDays: workDays(count: 26, skipEvery: 7, packages: 30...45, rate: Decimal(string: "4.2")!,
