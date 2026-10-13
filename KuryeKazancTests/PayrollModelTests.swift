@@ -59,20 +59,21 @@ final class PayrollModelTests: XCTestCase {
 
     func testSavingDailyLogCreatesLinkedEarningRecord() throws {
         let model = makeModel()
-        model.select(platform: "trendyol_go")
-        var input = try XCTUnwrap(model.baseInput(day: "2026-10-07"))
-        input.dayPackages = 45
+        model.select(platform: "yemeksepeti")
+        var input = try XCTUnwrap(model.baseInput(day: "2026-10-07")) // Carsamba
+        input.dayPackages = 20
         input.hours = 8
         input.tips = Money(50)
-        let log = try XCTUnwrap(model.save(input, method: .quick, context: context))
-        XCTAssertEqual(log.gross, Money(text: "4512.50"))
+        let log = try XCTUnwrap(model.save(input, method: .shift, context: context))
+        // 20 × 59 TL (Pzt–Per 12:00–14:59) + gunluk 20–22 paket bonusu 150 TL
+        XCTAssertEqual(log.gross, Money(1_330))
         let records = try context.fetch(FetchDescriptor<EarningRecord>())
         XCTAssertEqual(records.count, 1)
         XCTAssertEqual(records.first?.id, log.earningRecordID)
-        XCTAssertEqual(records.first?.platform?.code, "trendyol_go")
-        XCTAssertEqual(records.first?.bonus ?? 0, 1610, accuracy: 0.001)
-        XCTAssertEqual(records.first?.grossEarning ?? 0, 2952.5, accuracy: 0.001) // 2902,50 paket + 50 bahsis
-        XCTAssertEqual(records.first?.packageCount, 45)
+        XCTAssertEqual(records.first?.platform?.code, "yemeksepeti")
+        XCTAssertEqual(records.first?.bonus ?? 0, 150, accuracy: 0.001)
+        XCTAssertEqual(records.first?.grossEarning ?? 0, 1230, accuracy: 0.001) // 1.180 paket + 50 bahsis
+        XCTAssertEqual(records.first?.packageCount, 20)
 
         model.delete(log, context: context)
         XCTAssertTrue(try context.fetch(FetchDescriptor<EarningRecord>()).isEmpty)
@@ -94,27 +95,26 @@ final class PayrollModelTests: XCTestCase {
 
     func testPlatformSwitchKeepsLogsAndUsesOnlySelectedTariff() throws {
         let model = makeModel()
-        model.select(platform: "getir")
-        var getir = try XCTUnwrap(model.baseInput(day: "2026-10-06"))
-        XCTAssertEqual(getir.vehicleType, "motorcycle")
-        getir.dayPackages = 10
-        getir.hours = 4
-        let saved = try XCTUnwrap(model.save(getir, method: .detailed, context: nil))
+        model.select(platform: "pt_migros")
+        var migros = try XCTUnwrap(model.baseInput(day: "2026-10-06"))
+        migros.dayPackages = 20
+        migros.hours = 9
+        let saved = try XCTUnwrap(model.save(migros, method: .manual, context: nil))
         model.select(platform: "migros_hemen")
         XCTAssertEqual(model.currentVersion()?.platformCode, "migros_hemen")
-        XCTAssertEqual(model.state.logs.first { $0.id == saved.id }?.result.tariffVersionID, "getir-esnaf-motorcycle-v1")
+        XCTAssertEqual(model.state.logs.first { $0.id == saved.id }?.result.tariffVersionID, "pt_migros-esnaf-v1")
         let input = try XCTUnwrap(model.baseInput(day: "2026-10-07"))
         XCTAssertEqual(input.platformCode, "migros_hemen")
     }
 
     func testTariffRefreshFailureKeepsLastKnownTariff() async throws {
-        var remote = BundledTariffs.all.first { $0.platformCode == "trendyol_go" }!
+        var remote = BundledTariffs.all.first { $0.id == "yemeksepeti-esnaf-v3" }!
         remote.id = "tgo-remote-v2"
-        remote.versionNumber = 2
+        remote.versionNumber = 9
         remote.origin = .remote
         let client = FakeTariffClient(versions: [remote])
         let model = makeModel(client: client)
-        model.select(platform: "trendyol_go")
+        model.select(platform: "yemeksepeti")
         await model.tariffs.refreshIfNeeded(force: true)
         XCTAssertEqual(model.currentVersion()?.id, "tgo-remote-v2")
 
@@ -141,15 +141,15 @@ final class PayrollModelTests: XCTestCase {
         let client = FakeTariffClient(versions: nil)
         let change = TariffItemChange(kind: .changed, itemKey: "hourly", label: "Saatlik", oldAmount: Money(50), newAmount: Money(55))
         client.events = [
-            TariffChangeEvent(id: "1", platformCode: "getir", tariffVersionID: "v", kind: "published", effectiveFrom: "2026-11-01",
+            TariffChangeEvent(id: "1", platformCode: "yemeksepeti", tariffVersionID: "v", kind: "published", effectiveFrom: "2026-11-01",
                               verification: "needs_verification", sourceType: "news", sourceURL: nil, changes: [change], createdAt: "2026-10-07"),
-            TariffChangeEvent(id: "2", platformCode: "trendyol_go", tariffVersionID: "v", kind: "published", effectiveFrom: "2026-11-01",
+            TariffChangeEvent(id: "2", platformCode: "pt_migros", tariffVersionID: "v", kind: "published", effectiveFrom: "2026-11-01",
                               verification: "verified", sourceType: "official_announcement", sourceURL: nil, changes: [change], createdAt: "2026-10-07"),
         ]
         let model = makeModel(client: client)
-        model.select(platform: "getir")
+        model.select(platform: "yemeksepeti")
         await model.refreshNotices()
-        XCTAssertEqual(client.eventPlatforms, ["getir"])
+        XCTAssertEqual(client.eventPlatforms, ["yemeksepeti"])
         XCTAssertEqual(model.state.notices.map(\.id), ["1"])
         XCTAssertTrue(model.state.notices[0].title.contains("doğrulama bekliyor"))
         XCTAssertEqual(model.unreadNoticeCount, 1)
@@ -161,25 +161,25 @@ final class PayrollModelTests: XCTestCase {
 
     func testDashboardUsesMonthExpenses() throws {
         let model = makeModel()
-        model.select(platform: "trendyol_go")
+        model.select(platform: "yemeksepeti")
         var input = try XCTUnwrap(model.baseInput(day: "2026-10-07"))
         input.dayPackages = 10
         input.hours = 5
-        _ = model.save(input, method: .quick, context: nil)
+        _ = model.save(input, method: .manual, context: nil)
         let expenses = [DatedExpense(day: "2026-10-07", category: .fuel, amount: Money(145)),
                         DatedExpense(day: "2026-09-30", category: .fuel, amount: Money(999))]
         let dashboard = try XCTUnwrap(model.dashboard(expenses: expenses, month: now))
-        XCTAssertEqual(dashboard.estimatedGross, Money(645))
+        XCTAssertEqual(dashboard.estimatedGross, Money(590)) // 10 × 59 TL
         XCTAssertEqual(dashboard.expenses, Money(145))
-        XCTAssertEqual(dashboard.estimatedNet, Money(500))
-        XCTAssertEqual(dashboard.netPerHour, Money(100))
+        XCTAssertEqual(dashboard.estimatedNet, Money(445))
+        XCTAssertEqual(dashboard.netPerHour, Money(89))
     }
 
     // MARK: - 1.7
 
     func testChooseFirmStoresProfileAndGoalPlan() throws {
         let model = makeModel()
-        model.chooseFirm("migros_hemen", regionTier: "plus", seniorityYears: 1, vehicleType: nil, flags: ["woman_employment"])
+        model.chooseFirm("migros_hemen", regionTier: "r1", seniorityYears: 1, vehicleType: nil, flags: ["woman_employment"])
         model.setGoal(GoalSpec(amount: Money(100_000), period: .month))
         model.setConsumption(3)
         model.addFuelPrice(Money(45), type: .gasoline, on: now)
@@ -195,7 +195,7 @@ final class PayrollModelTests: XCTestCase {
     func testGoalPlanNilWithoutFirmOrGoal() {
         let model = makeModel()
         XCTAssertNil(model.goalPlan(entries: [], fallbackCostPerKm: 2))
-        model.chooseFirm("getir", regionTier: nil, seniorityYears: nil, vehicleType: "motorcycle", flags: [])
+        model.chooseFirm("yemeksepeti", regionTier: "ys_istanbul", seniorityYears: nil, vehicleType: nil, flags: [])
         XCTAssertNil(model.goalPlan(entries: [], fallbackCostPerKm: 2))
     }
 
@@ -212,19 +212,19 @@ final class PayrollModelTests: XCTestCase {
 
     func testSwitchSuggestionShownOnce() {
         let model = makeModel()
-        model.chooseFirm("migros_hemen", regionTier: "standard", seniorityYears: 0, vehicleType: nil, flags: [])
+        model.chooseFirm("migros_hemen", regionTier: "r4", seniorityYears: 0, vehicleType: nil, flags: [])
         let scenario = DemoScenarioCatalog.scenario("tariffChanged")!
         for version in scenario.userTariffs(today: model.today) { _ = model.saveUserTariff(version, activate: true) }
         let workload = WorkloadSpec(packagesPerDay: 32, hoursPerDay: 8, kmPerPackage: 3, daysPerMonth: 26)
         let suggestion = model.pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: 2)
-        XCTAssertEqual(suggestion?.platformCode, "trendyol_go")
+        XCTAssertEqual(suggestion?.platformCode, "yemeksepeti")
         if let suggestion { model.markSwitchSeen(suggestion) }
         XCTAssertNil(model.pendingSwitchSuggestion(workload: workload, fallbackCostPerKm: 2))
     }
 
     func testSwitchNotificationOnlyOnce() {
         let model = makeModel()
-        model.chooseFirm("migros_hemen", regionTier: "standard", seniorityYears: 0, vehicleType: nil, flags: [])
+        model.chooseFirm("migros_hemen", regionTier: "r4", seniorityYears: 0, vehicleType: nil, flags: [])
         XCTAssertNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2)) // taban
         for version in DemoScenarioCatalog.scenario("tariffChanged")!.userTariffs(today: model.today) {
             _ = model.saveUserTariff(version, activate: true)
@@ -235,7 +235,7 @@ final class PayrollModelTests: XCTestCase {
 
     func testFirstSwitchEvaluationIsSilent() {
         let model = makeModel()
-        model.chooseFirm("migros_hemen", regionTier: "standard", seniorityYears: 0, vehicleType: nil, flags: [])
+        model.chooseFirm("migros_hemen", regionTier: "r4", seniorityYears: 0, vehicleType: nil, flags: [])
         // Kurulum: taban kaydedilir, bildirim yok
         XCTAssertNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2))
         for version in DemoScenarioCatalog.scenario("tariffChanged")!.userTariffs(today: model.today) {
@@ -243,5 +243,35 @@ final class PayrollModelTests: XCTestCase {
         }
         // Tarife degisti: oneri bir kez
         XCTAssertNotNil(model.switchSuggestionToNotify(entries: [], fallbackCostPerKm: 2))
+    }
+
+    // MARK: - 1.9
+
+    func testMigrationResetsRemovedFirmAndMapsOldRegions() {
+        let removed = makeModel()
+        removed.chooseFirm("getir", regionTier: nil, seniorityYears: nil, vehicleType: "motorcycle", flags: [])
+        XCTAssertTrue(removed.migrateTo19())
+        XCTAssertFalse(removed.state.hasChosenFirm)
+
+        let plus = makeModel()
+        plus.chooseFirm("migros_hemen", regionTier: "plus", seniorityYears: 1, vehicleType: nil, flags: [])
+        XCTAssertFalse(plus.migrateTo19())
+        XCTAssertEqual(plus.state.regionTier, "r1")
+
+        let ys = makeModel()
+        ys.chooseFirm("yemeksepeti", regionTier: nil, seniorityYears: nil, vehicleType: nil, flags: ["ys_ankara_izmir"])
+        ys.migrateTo19()
+        XCTAssertEqual(ys.state.regionTier, "ys_ankara_izmir")
+        XCTAssertTrue(ys.state.flags.isEmpty)
+    }
+
+    func testRestoranProfileUsesContractHoursAndFixedShare() throws {
+        let model = makeModel()
+        model.chooseFirm("pt_restoran", regionTier: "r1", seniorityYears: 2, vehicleType: nil, flags: [], contractHours: 10)
+        let input = try XCTUnwrap(model.baseInput(day: "2026-10-07"))
+        XCTAssertEqual(input.contractHours, 10)
+        // 77.370 sabit + 2.250 kidem primi, 26 gune: gunluk pay
+        XCTAssertEqual(model.fixedShareToday(), Money(Money.round(Decimal(77_370) / 26)) + Money(Money.round(Decimal(2_250) / 26)))
+        XCTAssertEqual(model.questions(for: "pt_restoran").contractHours, [9, 10, 11, 12])
     }
 }

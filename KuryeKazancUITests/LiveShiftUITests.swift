@@ -7,7 +7,7 @@ final class LiveShiftUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func launch(firm: String = "trendyol_go") -> XCUIApplication {
+    private func launch(firm: String = "yemeksepeti") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",

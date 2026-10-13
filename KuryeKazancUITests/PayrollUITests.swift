@@ -10,7 +10,7 @@ final class PayrollUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
-            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV18", "YES", "-firm", "trendyol_go", "-autoEstimateExpenses", "YES", "-reset-defaults",
+            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV18", "YES", "-firm", "pt_migros", "-autoEstimateExpenses", "YES", "-reset-defaults",
         ]
         app.launch()
         return app
@@ -22,7 +22,7 @@ final class PayrollUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Kazanç"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Kazanç"].tap()
         XCTAssertTrue(app.staticTexts["payroll.platformName"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["payroll.platformName"].label, "Trendyol GO")
+        XCTAssertEqual(app.staticTexts["payroll.platformName"].label, "Paket Taxi Migros")
         XCTAssertFalse(app.buttons["payroll.quick"].exists)
 
         let manual = app.buttons["payroll.manual"]
@@ -32,11 +32,11 @@ final class PayrollUITests: XCTestCase {
         let packages = app.textFields["manual.packages"]
         XCTAssertTrue(packages.waitForExistence(timeout: 5))
         packages.tap()
-        packages.typeText("45")
+        packages.typeText("38")
         let net = app.staticTexts["manual.net"]
         XCTAssertTrue(net.waitForExistence(timeout: 5))
-        // 45 x 64,50 + 1.610 gunluk bonus (ornek tarife); km girilmedi -> yakit yok
-        XCTAssertTrue(net.label.contains("4.512"), "gelen: \(net.label)")
+        // 1. bolge gunluk 38–42 paket primi 2.360 TL + sabit ucretin gunluk payi 55.223 / 26 = 2.123,96 TL; km yok -> yakit yok
+        XCTAssertTrue(net.label.contains("4.483"), "gelen: \(net.label)")
 
         let save = app.buttons["manual.save"]
         if !save.isHittable { app.swipeUp() }
@@ -46,7 +46,8 @@ final class PayrollUITests: XCTestCase {
         let monthGross = app.staticTexts["dashboard.monthGross"]
         if !monthGross.exists { app.swipeDown() }
         XCTAssertTrue(monthGross.waitForExistence(timeout: 5))
-        XCTAssertTrue(monthGross.label.contains("4.512"), "gelen: \(monthGross.label)")
+        // Ay: sabit 55.223 + gunluk prim 2.360
+        XCTAssertTrue(monthGross.label.contains("57.583"), "gelen: \(monthGross.label)")
     }
 
     func testManualWeekShowsDailyAverageAndDetail() {

@@ -23,6 +23,7 @@ final class ScanResultsViewModelTests: XCTestCase {
     override func setUp() {
         container = ModelContainerFactory.make(inMemory: true)
         DataSeeder.seedPlatformsIfNeeded(in: context)
+        LegacyPlatforms.insert(into: context)
         store = BroadcastCaptureStore(directory: FileManager.default.temporaryDirectory
             .appendingPathComponent("scan-results-\(UUID())"))
     }

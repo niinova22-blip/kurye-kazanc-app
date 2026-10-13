@@ -7,8 +7,6 @@ struct MockEarningsScreen: View {
 
     private var accent: Color {
         switch scenario.platformCode {
-        case "trendyol_go": .orange
-        case "getir": .purple
         case "yemeksepeti": .red
         case "migros_hemen": Color(red: 1, green: 0.5, blue: 0)
         case "uber": .black

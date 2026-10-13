@@ -19,7 +19,7 @@ const ptItem = async (repo, key, day) => (await repo.activeItems(PT_VERSION, day
 
 test('RLS: istemci yalnizca yayindaki tarifeyi okur, yazamaz, yonetim fonksiyonlarini calistiramaz', async () => {
   const { db } = await freshDb();
-  assert.equal((await asRole(db, 'anon', 'select count(*)::int n from public.tariff_versions'))[0].n, 7);
+  assert.equal((await asRole(db, 'anon', 'select count(*)::int n from public.tariff_versions'))[0].n, 11);
   for (const table of ['tariff_candidates', 'tariff_sources', 'tariff_audit_log', 'tariff_source_checks', 'tariff_config']) {
     await assert.rejects(asRole(db, 'anon', `select * from public.${table}`), /permission denied/, table);
   }
@@ -295,14 +295,14 @@ test('gunluk bakim: karar bekleyen eski adaylarin suresi dolar; ekonomik gosterg
   assert.deepEqual(out.expired, [created.candidate_id]);
   assert.equal((await sql(`select count(*)::int n from public.tariff_candidates`))[0].n, 1, 'gosterge aday olusturmadi');
   const items = await sql(`select count(*)::int n from public.tariff_items`);
-  assert.equal(items[0].n, 83);
+  assert.equal(items[0].n, 294);
 });
 
 test('Tarife Merkezi genel bakis: dort platform karti', async () => {
   const { repo } = await freshDb();
   const admin = createAdmin(repo);
   const overview = await admin.overview();
-  assert.deepEqual(overview.map((p) => p.platform_id), ['getir', 'migros_hemen', 'trendyol_go', 'yemeksepeti']);
+  assert.deepEqual(overview.map((p) => p.platform_id), ['getir', 'migros_hemen', 'pt_migros', 'pt_restoran', 'trendyol_go', 'yemeksepeti']);
   const getir = overview.find((p) => p.platform_id === 'getir');
   assert.equal(getir.versions.length, 2);
   assert.equal(getir.sources.length, 1);
@@ -323,7 +323,7 @@ test('Tarife Merkezi HTTP: belirtecsiz istek reddedilir, yerel API calisir', asy
     assert.equal((await fetch(`${base}/api/overview`, { headers: { 'X-Admin-Token': 'yanlis-belirtec' } })).status, 401);
     const headers = { 'X-Admin-Token': 'gizli-belirtec', 'Content-Type': 'application/json' };
     const overview = await (await fetch(`${base}/api/overview`, { headers })).json();
-    assert.equal(overview.length, 4);
+    assert.equal(overview.length, 6);
     const created = await (await fetch(`${base}/api/candidates`, { method: 'POST', headers, body: JSON.stringify({
       platform: 'trendyol_go', versionId: 'trendyol_go-esnaf-v1', effectiveFrom: '2026-11-01', sourceRef: 'https://example.com/duyuru',
       sourceType: 'official_announcement',

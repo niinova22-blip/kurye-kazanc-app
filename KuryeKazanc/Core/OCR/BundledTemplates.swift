@@ -6,6 +6,12 @@ import Foundation
 enum BundledTemplates {
     static let all: [OCRTemplate] = decode(json)
 
+    /// 1.9: uygulama yalnizca iki firmanin ekranlarini okur (Yemeksepeti Express, Paket Taxi). Diger sablonlar
+    /// ayristirici testleri icin JSON'da durur ama uygulamada kullanilmaz.
+    static let supportedPlatformCodes: Set<String> = ["yemeksepeti", "migros_hemen", "pt_migros", "pt_restoran"]
+
+    static var supported: [OCRTemplate] { all.filter { supportedPlatformCodes.contains($0.platformCode) } }
+
     static let generic = OCRTemplate(
         id: "generic", version: 1, status: .calibrating, platformCode: "",
         detectionKeywords: [], fingerprint: [], minFingerprintMatches: 0,

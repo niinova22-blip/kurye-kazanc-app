@@ -341,9 +341,10 @@ final class SyncCoordinator {
         defaults.set(now.timeIntervalSince1970, forKey: AppPreferences.templatesFetchedAtKey)
     }
 
-    /// Gomulu + uzak sablonlar (ayni id icin yuksek surum).
+    /// Gomulu + uzak sablonlar (ayni id icin yuksek surum); yalnizca uygulamadaki iki firma.
     func mergedTemplates() -> [OCRTemplate] {
-        TemplateMerger.merge(bundled: BundledTemplates.all, remote: remoteTemplates)
+        TemplateMerger.merge(bundled: BundledTemplates.supported, remote: remoteTemplates)
+            .filter { BundledTemplates.supportedPlatformCodes.contains($0.platformCode) }
     }
 
     /// Sunucu her sablonun tum surumlerini dondurur: id basina en yuksek surum, id'ye gore sirali.

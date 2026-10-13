@@ -112,11 +112,8 @@ struct TodayView: View {
 
     /// Aylik sabit ucretin bugune dusen payi (Paket Taxi gibi): bugun calisildiysa bir kez eklenir.
     private var fixedShareToday: Money {
-        guard !todaysEarnings.isEmpty || liveShift.isActive, let version = payroll.currentVersion() else { return .zero }
-        let rows: [PayDetailRow] = PayDetailBuilder.fixedShares(version: version, day: payroll.today,
-                                                                regionTier: payroll.state.regionTier, days: 1,
-                                                                monthWorkDays: payroll.goal?.monthWorkDays ?? 26)
-        return rows.map(\.perDay).sum()
+        guard !todaysEarnings.isEmpty || liveShift.isActive else { return .zero }
+        return payroll.fixedShareToday()
     }
 
     var body: some View {

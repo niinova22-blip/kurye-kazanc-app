@@ -234,6 +234,14 @@ final class PayrollStore {
 
     // MARK: - 1.7 hedef, yakit, isaretler
 
+    /// Desteklenmeyen firmadan gecis: firma secimi baştan yapilir (kayitlar ve odemeler kalir).
+    func resetFirmChoice() {
+        state.platformHistory = []
+        state.regionTier = nil
+        state.contractHours = nil
+        persist()
+    }
+
     func setContractHours(_ hours: Int?) {
         state.contractHours = hours
         persist()

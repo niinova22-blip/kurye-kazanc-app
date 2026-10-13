@@ -16,6 +16,7 @@ final class FormViewModelTests: XCTestCase {
     override func setUp() async throws {
         container = ModelContainerFactory.make(inMemory: true)
         DataSeeder.seedPlatformsIfNeeded(in: context)
+        LegacyPlatforms.insert(into: context)
     }
 
     override func tearDown() async throws {

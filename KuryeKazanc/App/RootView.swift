@@ -37,6 +37,8 @@ struct RootView: View {
         .task {
             DataSeeder.seedPlatformsIfNeeded(in: modelContext)
             payroll.migrateLegacyGoal(defaults: .standard)
+            // 1.9: Getir / Trendyol GO secenler firmayi yeniden secer
+            if payroll.migrateTo19() { startFirm = "" }
             retireAnonymousSharing(defaults: .standard)
         }
     }

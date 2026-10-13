@@ -86,7 +86,7 @@ final class PayrollModel {
     /// Aktif platformun bugunku tarife surumu (gosterim icin).
     func currentVersion(platform: String? = nil) -> TariffVersion? {
         guard let code = platform ?? state.activePlatform else { return nil }
-        return catalog.current(platform: code, day: today, vehicleType: code == "getir" ? state.vehicleType ?? "motorcycle" : nil)
+        return catalog.current(platform: code, day: today)
     }
 
     // MARK: - Platform ve tercihler
@@ -108,7 +108,7 @@ final class PayrollModel {
         input.regionTier = state.regionTier
         input.seniorityYears = state.seniorityYears
         input.flags = state.flags
-        if code == "getir" { input.vehicleType = state.vehicleType ?? "motorcycle" }
+        input.contractHours = state.contractHours
         return input
     }
 
@@ -120,7 +120,16 @@ final class PayrollModel {
     /// Ayrintili dokum: kalem kalem, gune dusen paylariyla. Gunluk / haftalik hesapta aylik sabit ucretin payi tahmin olarak eklenir.
     func detail(for breakdown: PayBreakdown, days: Int) -> PayDetail {
         PayDetailBuilder.make(breakdown: breakdown, days: days, version: version(id: breakdown.tariffVersionID),
-                              regionTier: state.regionTier, monthWorkDays: state.goal?.monthWorkDays ?? 26)
+                              regionTier: state.regionTier, monthWorkDays: state.goal?.monthWorkDays ?? 26,
+                              contractHours: state.contractHours, seniorityYears: state.seniorityYears)
+    }
+
+    /// Aylik sabit ucretin (ve kidem priminin) bugune dusen payi: Paket Taxi'de calisilan gun bir kez eklenir.
+    func fixedShareToday() -> Money {
+        guard let version = currentVersion() else { return .zero }
+        return PayDetailBuilder.fixedShares(version: version, day: today, regionTier: state.regionTier, days: 1,
+                                            monthWorkDays: state.goal?.monthWorkDays ?? 26, contractHours: state.contractHours,
+                                            seniorityYears: state.seniorityYears).map(\.perDay).sum()
     }
 
     /// Konumdan gelen bolge onerisini profile yazar (yalnizca degisiklik varsa).
@@ -128,6 +137,11 @@ final class PayrollModel {
         guard suggestion.changed else { return }
         store.setPreferences(regionTier: suggestion.regionTier, seniorityYears: state.seniorityYears, vehicleType: state.vehicleType)
         store.setFlags(suggestion.flags)
+        reload()
+    }
+
+    func setContractHours(_ hours: Int?) {
+        store.setContractHours(hours)
         reload()
     }
 
@@ -248,7 +262,8 @@ final class PayrollModel {
         var preferences = PayInput(platformCode: platform, startDay: start, endDay: end)
         preferences.regionTier = state.regionTier
         preferences.seniorityYears = state.seniorityYears
-        preferences.vehicleType = platform == "getir" ? state.vehicleType ?? "motorcycle" : nil
+        preferences.contractHours = state.contractHours
+        preferences.flags = state.flags
         let isMonth: Bool = aggregator.monthRange(containing: start).map { $0.start == start && $0.end == end } ?? false
         return aggregator.summarize(platform: platform, logs: state.logs, start: start, end: end, preferences: preferences,
                                     includeMonthly: isMonth)
@@ -322,11 +337,41 @@ final class PayrollModel {
     }
 
     /// Calisilan tek firmayi ve tarifesinin istedigi kisisel bilgileri kaydeder.
-    func chooseFirm(_ code: String, regionTier: String?, seniorityYears: Int?, vehicleType: String?, flags: [String]) {
+    func chooseFirm(_ code: String, regionTier: String?, seniorityYears: Int?, vehicleType: String?, flags: [String],
+                    contractHours: Int? = nil) {
         store.select(platform: code, at: clock())
         store.setPreferences(regionTier: regionTier, seniorityYears: seniorityYears, vehicleType: vehicleType)
         store.setFlags(flags)
+        store.setContractHours(contractHours)
         reload()
+    }
+
+    /// 1.9 gecisi: Getir / Trendyol GO secen kullanici firmasini yeniden secer (eski kayitlar kalir);
+    /// eski Paket Taxi "plus" bolgesi 1. bolge olur, Yemeksepeti Ankara/Izmir isareti sehir grubuna donusur.
+    /// - Returns: Firma secimi sifirlandiysa true.
+    @discardableResult
+    func migrateTo19() -> Bool {
+        if let code = state.activePlatform, PayPlatform.named(code) == nil {
+            store.resetFirmChoice()
+            reload()
+            return true
+        }
+        var tier: String? = state.regionTier
+        var flags: [String] = state.flags
+        switch (state.activePlatform, tier) {
+        case (_, "plus"?): tier = "r1"
+        case (_, "standard"?): tier = nil
+        default: break
+        }
+        if flags.contains("ys_ankara_izmir") {
+            flags.removeAll { $0 == "ys_ankara_izmir" }
+            if state.activePlatform == "yemeksepeti", tier == nil { tier = "ys_ankara_izmir" }
+        }
+        guard tier != state.regionTier || flags != state.flags else { return false }
+        store.setPreferences(regionTier: tier, seniorityYears: state.seniorityYears, vehicleType: state.vehicleType)
+        store.setFlags(flags)
+        reload()
+        return false
     }
 
     func setGoal(_ goal: GoalSpec?) {

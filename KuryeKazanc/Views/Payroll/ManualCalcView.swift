@@ -23,9 +23,11 @@ struct ManualCalcView: View {
 
     private var version: TariffVersion? { model.currentVersion() }
 
-    /// Tarifede aksam / gece paket ucreti var mi.
+    /// Tarifede aksam / gece paket ucreti var mi (Yemeksepeti: saat bantli ucret).
     private var hasNightBand: Bool {
-        (version?.items ?? []).contains { $0.type == .singlePackage && $0.conditions.timeBand == .night }
+        (version?.items ?? []).contains { item in
+            item.type == .singlePackage && (item.conditions.timeBand == .night || (item.conditions.hourFrom ?? 0) >= 18)
+        }
     }
 
     var body: some View {
@@ -73,9 +75,7 @@ struct ManualCalcView: View {
             if span != .day {
                 NumberField(title: "Kaç gün çalıştın", text: $days, identifier: "manual.days")
             }
-            if code == "getir", span == .week {
-                NumberField(title: "Cuma–Pazar paket (biliyorsan)", text: $weekendPackages, identifier: "manual.weekend")
-            }
+
         } header: {
             Text(PayrollModel.platformName(code))
         } footer: {
@@ -83,8 +83,8 @@ struct ManualCalcView: View {
         }
     }
 
-    private var dayTitle: String { code == "yemeksepeti" ? "Gündüz paketi (08:00–17:59)" : "Gündüz paketi" }
-    private var nightTitle: String { code == "yemeksepeti" ? "Akşam paketi (18:00 sonrası)" : "Gece paketi (00:00–08:00)" }
+    private let dayTitle: String = "Gündüz paketi (18:00 öncesi)"
+    private let nightTitle: String = "Akşam paketi (18:00 sonrası)"
 
     private func resultSection(_ breakdown: PayBreakdown, input: PayInput) -> some View {
         let workDays: Int = span == .day ? 1 : entry.days

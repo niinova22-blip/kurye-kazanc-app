@@ -115,19 +115,13 @@ private struct ManualPeriodSections: View {
         let code: String = model.state.activePlatform ?? ""
         let dailyTiers: [TariffItem] = (model.currentVersion()?.items ?? []).filter { $0.method == .tier && $0.unit == .day && $0.isCash }
         Section("Dönem toplamları") {
-            NumberField(title: code == "trendyol_go" ? "Gündüz paket" : "Tekli paket", text: $packages, identifier: "period.packages")
-            if code == "trendyol_go" {
-                NumberField(title: "Gece paket", text: $nightPackages, identifier: "period.night")
+            NumberField(title: code == "yemeksepeti" ? "Gündüz paket" : "Paket", text: $packages, identifier: "period.packages")
+            if code == "yemeksepeti" {
+                NumberField(title: "Akşam paket (18:00 sonrası)", text: $nightPackages, identifier: "period.night")
             }
             NumberField(title: "Birleşen paket", text: $combined, identifier: "period.combined")
             NumberField(title: "Süre (saat)", text: $hours, decimal: true, identifier: "period.hours")
             NumberField(title: "Toplam km", text: $km, decimal: true, identifier: "period.km")
-            if code == "getir", span == .week {
-                NumberField(title: "Cuma–Pazar paket", text: $weekendPackages, identifier: "period.weekend")
-            }
-            if code == "trendyol_go" {
-                Toggle("Haftalık performans bonusu hak edildi", isOn: $weeklyPerformance)
-            }
         }
         if !dailyTiers.isEmpty {
             Section {
@@ -169,7 +163,6 @@ private struct ManualPeriodSections: View {
         input.hours = PayFormat.parseDecimal(hours) ?? 0
         input.totalKm = PayFormat.parseDecimal(km)
         input.periodPackages = input.totalPackages
-        if code == "getir", span == .week { input.weekendPackages = PayFormat.parseInt(weekendPackages) }
         var days: [String: Int] = [:]
         for (key, text) in tierDays {
             let value: Int = PayFormat.parseInt(text)

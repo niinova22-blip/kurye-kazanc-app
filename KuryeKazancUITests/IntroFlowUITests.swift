@@ -10,8 +10,14 @@ final class IntroFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing", "-reset-defaults"]
         app.launch()
-        XCTAssertTrue(app.buttons["firm.migros_hemen"].waitForExistence(timeout: 10))
-        app.buttons["firm.migros_hemen"].tap()
+        // 1.9: iki firma; Paket Taxi secilince kol sorulur
+        XCTAssertTrue(app.buttons["firm.pakettaxi"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["firm.yemeksepeti"].exists)
+        XCTAssertFalse(app.buttons["firm.getir"].exists)
+        app.buttons["firm.pakettaxi"].tap()
+        XCTAssertTrue(app.buttons["branch.migros_hemen"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["welcome.next"].isEnabled, "Kol secmeden devam edilmemeli")
+        app.buttons["branch.migros_hemen"].tap()
         app.buttons["welcome.next"].tap()
 
         XCTAssertTrue(app.staticTexts["intro.page.0"].waitForExistence(timeout: 10))
@@ -20,9 +26,10 @@ final class IntroFlowUITests: XCTestCase {
         app.buttons["intro.start"].tap()
 
         // Firma karsilamada secildi: kurulum dogrudan tarife sorulariyla baslar
-        XCTAssertTrue(app.buttons["question.region.plus"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["question.region.r1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["question.region.r4"].exists)
         XCTAssertFalse(app.buttons["setup.next"].isEnabled, "Bolge secmeden devam edilmemeli")
-        app.buttons["question.region.plus"].tap()
+        app.buttons["question.region.r1"].tap()
         app.buttons["setup.next"].tap()
         let price = app.textFields["fuel.price"]
         XCTAssertTrue(price.waitForExistence(timeout: 5))
@@ -56,7 +63,7 @@ final class IntroFlowUITests: XCTestCase {
     func testPlanKeyboardClosesAndDailyGoalHidesDays() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing", "-reset-defaults", "-hasCompletedOnboarding", "YES",
-                               "-hasSeenIntroV18", "YES", "-firm", "trendyol_go"]
+                               "-hasSeenIntroV18", "YES", "-firm", "yemeksepeti"]
         app.launch()
         let card = app.buttons["today.goalCard"]
         XCTAssertTrue(card.waitForExistence(timeout: 10))

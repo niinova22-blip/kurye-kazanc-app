@@ -150,80 +150,45 @@ private struct DashboardCardsSection: View {
     }
 }
 
-/// Yalnizca secili platforma ozgu kart.
+/// Yalnizca secili firmaya ozgu kart: Yemeksepeti gunluk / haftalik bonus, Paket Taxi bolge, prim ve aylik kademe.
 private struct PlatformSpecificSection: View {
     @Environment(PayrollModel.self) private var model
     let dashboard: PayrollDashboard
 
     var body: some View {
         Section(title) {
-            switch model.state.activePlatform {
-            case "trendyol_go":
-                trendyolRows
-            case "getir":
-                LabeledContent("Araç tipi", value: (model.state.vehicleType ?? "motorcycle") == "car" ? "Araçlı" : "Motorlu")
-                LabeledContent("Bu ay km", value: Formatters.distance(dashboard.period.km.doubleValue))
-                weeklyProgress
-            case "yemeksepeti":
-                LabeledContent("Saatlik garanti", value: guaranteeStatus)
-                weeklyProgress
-            case "migros_hemen":
-                LabeledContent("Bölge kademesi", value: regionName)
-                LabeledContent("Aylık paket", value: "\(dashboard.packages)")
-                monthlyProgress
-            default:
-                EmptyView()
+            LabeledContent(model.state.activePlatform == "yemeksepeti" ? "Şehir grubu" : "Bölge", value: regionName)
+            if model.state.activePlatform == "pt_restoran" {
+                LabeledContent("Günlük çalışma", value: model.state.contractHours.map { "\($0) saat" } ?? "Seçilmedi")
+                LabeledContent("Kıdem", value: "\(model.state.seniorityYears ?? 0) yıl")
+            }
+            LabeledContent("Bu ay paket", value: "\(dashboard.packages)")
+            ForEach(Array(progressItems.enumerated()), id: \.offset) { _, progress in
+                BonusProgressRow(progress: progress)
+            }
+            if progressItems.isEmpty {
+                Text("Bu dönem için bekleyen bonus kademesi yok ya da hedefe ulaşıldı.").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
 
     private var title: String {
         switch model.state.activePlatform {
-        case "trendyol_go": "Gündüz / gece ve günlük bonus"
-        case "getir": "Araç, km ve hafta sonu bonusu"
-        case "yemeksepeti": "Garanti ve haftalık bonus"
-        case "migros_hemen": "Aylık kademe ve sabit ücret"
-        default: "Platform"
+        case "yemeksepeti": "Günlük ve haftalık bonus"
+        case "pt_restoran": "Sabit ücret ve paket primi"
+        default: "Günlük prim ve aylık bonus"
         }
     }
 
-    @ViewBuilder private var trendyolRows: some View {
-        let todayLogs: [WorkLog] = model.logs(platform: "trendyol_go").filter { $0.startDay == model.today && $0.isDaily }
-        let day: Int = todayLogs.map(\.input.dayPackages).reduce(0, +)
-        let night: Int = todayLogs.map(\.input.nightPackages).reduce(0, +)
-        LabeledContent("Bugün gündüz / gece", value: "\(day) / \(night) paket")
-        ForEach(Array(dashboard.period.progress.filter { $0.unit == .day }.enumerated()), id: \.offset) { _, progress in
-            BonusProgressRow(progress: progress)
-        }
-    }
-
-    @ViewBuilder private var weeklyProgress: some View {
-        let items: [BonusProgress] = dashboard.period.progress.filter { $0.unit == .week }
-        if items.isEmpty {
-            Text("Bu hafta için bonus kademesi yok ya da hedefe ulaşıldı.").font(.caption).foregroundStyle(.secondary)
-        }
-        ForEach(Array(items.enumerated()), id: \.offset) { _, progress in
-            BonusProgressRow(progress: progress)
-        }
-    }
-
-    @ViewBuilder private var monthlyProgress: some View {
-        ForEach(Array(dashboard.period.progress.filter { $0.unit == .month }.enumerated()), id: \.offset) { _, progress in
-            BonusProgressRow(progress: progress)
-        }
-    }
-
-    private var guaranteeStatus: String {
-        guard let item = model.currentVersion()?.items.first(where: { $0.method == .guaranteeTopUp }) else { return "Tarifede yok" }
-        return "\(PayFormat.tl(item.amount))/sa"
+    /// Yemeksepeti haftalik, Paket Taxi aylik kademe ilerlemesi.
+    private var progressItems: [BonusProgress] {
+        let unit: TariffUnit = model.state.activePlatform == "yemeksepeti" ? .week : .month
+        return dashboard.period.progress.filter { $0.unit == unit }
     }
 
     private var regionName: String {
-        switch model.state.regionTier {
-        case "plus": "İstanbul / Ankara Plus"
-        case "standard": "Standart bölge"
-        default: "Seçilmedi"
-        }
+        guard let tier = model.state.regionTier else { return "Seçilmedi" }
+        return TariffQuestions.regionName(tier)
     }
 }
 

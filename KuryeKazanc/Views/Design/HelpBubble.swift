@@ -26,7 +26,7 @@ enum HelpScreen {
              "\"Ayrıntılı döküm\" paketleri, km'yi, bonusları ve sabit ücretin güne düşen payını ayrı gösterir."]
         case .firms:
             ["Aynı işi diğer firmalarda yapsaydın ne kazanırdın?",
-             "Diğer firmalar yeni başlayan kademesiyle hesaplanır.",
+             "Yemeksepeti ile Paket Taxi kolları aynı iş yüküyle karşılaştırılır; diğer firma kıdemsiz ve en düşük bölgeyle hesaplanır.",
              "Tarife değişiklikleri yakıt fiyatıyla karşılaştırılır."]
         case .plan:
             ["Hedefini gir; firmanın tarifesine göre günde kaç paket ve kaç saat gerektiğini görürsün.",

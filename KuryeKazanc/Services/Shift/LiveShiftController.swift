@@ -79,7 +79,8 @@ final class LiveShiftController {
         shift?.district = place.district
         persist()
         guard let profile = payroll.tariffProfile,
-              let suggestion = RegionResolver.suggest(province: place.province, profile: profile) else { return }
+              let suggestion = RegionResolver.suggest(province: place.province, district: place.district,
+                                                      neighborhood: place.neighborhood, profile: profile) else { return }
         payroll.applyRegion(suggestion)
         regionMessage = suggestion.message
         needsRegionChoice = suggestion.needsRegionChoice
@@ -88,7 +89,12 @@ final class LiveShiftController {
     func chooseRegion(_ tier: String) {
         payroll.setRegionTier(tier)
         needsRegionChoice = false
-        regionMessage = tier == "plus" ? "Plus bölge ücreti kullanılıyor." : "Standart bölge ücreti kullanılıyor."
+        regionMessage = "\(TariffQuestions.regionName(tier)) ücreti kullanılıyor."
+    }
+
+    /// Konumdan bulunamazsa sorulacak bolgeler (tarifedeki).
+    var regionChoices: [String] {
+        payroll.questions(for: platformCode).regionTiers
     }
 
     // MARK: - Teslimat
@@ -104,7 +110,7 @@ final class LiveShiftController {
         shift = current
         persist()
         let zone: DeliveryZone = ShiftZones.zone(for: delivery, platform: current.platformCode, version: currentVersion,
-                                                 day: payroll.day(now))
+                                                 day: payroll.day(now), calendar: calendar)
         let feedback = ShiftTapFeedback(id: delivery.id, zone: zone, count: current.packageCount)
         lastFeedback = feedback
         return feedback
@@ -125,7 +131,8 @@ final class LiveShiftController {
 
     private func input(end: Date, km: Double?) -> PayInput? {
         guard let shift, let base = payroll.baseInput(day: payroll.day(shift.start)) else { return nil }
-        return ShiftPayInput.make(shift: shift, end: end, gpsKm: km.map { Decimal($0) }, base: base, version: currentVersion)
+        return ShiftPayInput.make(shift: shift, end: end, gpsKm: km.map { Decimal($0) }, base: base, version: currentVersion,
+                                  calendar: calendar)
     }
 
     /// Su ana kadarki paketlerle hesap (motor ayni; kayit yapilmaz).

@@ -17,6 +17,7 @@ struct SetupFlowView: View {
     @State private var firm: String?
     @State private var regionTier: String?
     @State private var seniority: Int = 0
+    @State private var contractHours: Int = 10
     @State private var vehicle: String = "motorcycle"
     @State private var flags: Set<String> = []
     @State private var fuelPrice: Decimal?
@@ -63,7 +64,7 @@ struct SetupFlowView: View {
         case .firm: firmSection
         case .questions:
             TariffQuestionSections(questions: questions, regionTier: $regionTier, seniority: $seniority,
-                                   vehicle: $vehicle, flags: $flags)
+                                   contractHours: $contractHours, vehicle: $vehicle, flags: $flags)
         case .fuel: fuelSection
         case .goal: goalSection
         }
@@ -186,6 +187,7 @@ struct SetupFlowView: View {
         }
         regionTier = profile?.regionTier
         seniority = profile?.seniorityYears ?? 0
+        contractHours = profile?.contractHours ?? 10
         vehicle = profile?.vehicleType ?? "motorcycle"
         flags = Set(profile?.flags ?? [])
         if let goal = payroll.goal {
@@ -204,7 +206,8 @@ struct SetupFlowView: View {
                            regionTier: q.regionTiers.isEmpty ? nil : regionTier,
                            seniorityYears: q.asksSeniority ? seniority : nil,
                            vehicleType: vehicle,
-                           flags: Array(flags.intersection(Set(q.flags))))
+                           flags: Array(flags.intersection(Set(q.flags))),
+                           contractHours: q.contractHours.isEmpty ? nil : contractHours)
         if !firmOnly {
             payroll.setConsumption(consumption)
             if let fuelPrice, fuelPrice > 0 {
@@ -221,39 +224,57 @@ struct SetupFlowView: View {
     }
 }
 
-/// Dort firma; secili olan vurgulanir.
+/// Iki firma; Paket Taxi secilince kollari (Restoran / Migros / Migros Hemen) acilir. Secim tarife kodudur.
 struct FirmPicker: View {
     @Binding var selection: String?
+    @State private var openBrand: String?
 
     var body: some View {
-        ForEach(PayPlatform.all.filter(\.isActive)) { platform in
+        ForEach(PayPlatform.brands) { firm in
+            let isSelected: Bool = selection.flatMap { PayPlatform.brand(of: $0)?.id } == firm.id
             Button {
-                withAnimation(.snappy) { selection = platform.code }
+                withAnimation(.snappy) {
+                    openBrand = firm.id
+                    if firm.hasBranches {
+                        if !isSelected { selection = nil }
+                    } else {
+                        selection = firm.branches.first?.code
+                    }
+                }
                 Haptics.selection()
             } label: {
-                FirmPickerRow(platform: platform, isSelected: selection == platform.code)
+                FirmPickerRow(firm: firm, isSelected: isSelected || openBrand == firm.id)
             }
             .buttonStyle(.pressable)
-            .accessibilityIdentifier("firm.\(platform.code)")
+            .accessibilityIdentifier("firm.\(firm.id)")
+            if firm.hasBranches, openBrand == firm.id || isSelected {
+                ForEach(firm.branches) { option in
+                    BranchRow(option: option, isSelected: selection == option.code) {
+                        withAnimation(.snappy) { selection = option.code }
+                        Haptics.selection()
+                    }
+                    .padding(.leading, 12)
+                }
+            }
         }
     }
 }
 
 private struct FirmPickerRow: View {
-    let platform: PayPlatform
+    let firm: FirmBrand
     let isSelected: Bool
 
     var body: some View {
         HStack(spacing: 14) {
-            Text(platform.monogram)
+            Text(firm.monogram)
                 .font(.headline)
                 .frame(width: 44, height: 44)
                 .background(Theme.accent.opacity(isSelected ? 0.25 : 0.1), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text(platform.name)
+                Text(firm.name)
                     .font(.headline)
                     .foregroundStyle(.primary)
-                Text(platform.modelSummary)
+                Text(firm.summary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -272,11 +293,25 @@ struct TariffQuestionSections: View {
     let questions: TariffQuestions
     @Binding var regionTier: String?
     @Binding var seniority: Int
+    @Binding var contractHours: Int
     @Binding var vehicle: String
     @Binding var flags: Set<String>
 
     var body: some View {
         if !questions.regionTiers.isEmpty { regionSection }
+        if !questions.contractHours.isEmpty {
+            Section {
+                Picker("Günlük çalışma", selection: $contractHours) {
+                    ForEach(questions.contractHours, id: \.self) { Text("\($0) saat").tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("question.hours")
+            } header: {
+                Text("Günde kaç saat çalışıyorsun?")
+            } footer: {
+                Text("Sabit ücret, kıdem primi ve paket primi eşikleri günlük saate göre değişir (26 gün fiyatı).")
+            }
+        }
         if questions.asksSeniority {
             Section("Kıdem") {
                 CountStepper(title: "Bu firmada", value: $seniority, range: 0...30, unit: "yıl", identifier: "question.seniority")
@@ -304,7 +339,14 @@ struct TariffQuestionSections: View {
                     Haptics.selection()
                 } label: {
                     HStack {
-                        Text(TariffQuestions.regionName(tier)).foregroundStyle(.primary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(TariffQuestions.regionName(tier)).foregroundStyle(.primary)
+                            let detail: String = TariffQuestions.regionDetail(tier)
+                            if !detail.isEmpty {
+                                Text(detail).font(.caption).foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
                         Spacer()
                         if regionTier == tier {
                             Image(systemName: "checkmark").foregroundStyle(Theme.accent)
@@ -316,7 +358,7 @@ struct TariffQuestionSections: View {
         } header: {
             Text("Çalıştığın bölge")
         } footer: {
-            Text("Hangi ilçelerin Plus bölgede olduğu tarifede yazmıyor; sözleşmendeki bölgeyi seç.")
+            Text("Vardiya başlayınca konumundan kendiliğinden bulunur; şimdilik çalıştığın yeri seç.")
         }
     }
 

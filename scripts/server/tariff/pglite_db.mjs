@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { createRepo } from './repo.mjs';
-import { seedStatements } from './seed.mjs';
+import { bundledVersions, legacyVersions, seedStatements } from './seed.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const migration = readFileSync(join(root, 'supabase/migrations/20261011000005_tariffs.sql'), 'utf8');
@@ -15,7 +15,8 @@ export async function freshDb({ autoPublish = false } = {}) {
   await db.exec(`create role anon nologin; create role authenticated nologin;`);
   await db.exec(migration);
   const sql = async (query) => (await db.query(query)).rows;
-  for (const statement of seedStatements()) await sql(statement);
+  // Testler kaldirilan firmalarin surumleriyle de calisir (bkz. legacyVersions)
+  for (const statement of seedStatements([...bundledVersions(), ...legacyVersions()])) await sql(statement);
   if (autoPublish) await sql(`update public.tariff_config set value = 'true'::jsonb where key = 'auto_publish_official'`);
   return { db, sql, repo: createRepo(sql) };
 }

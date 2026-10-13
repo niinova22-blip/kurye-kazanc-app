@@ -116,14 +116,16 @@ struct LiveShiftView: View {
     private var regionBanner: some View {
         if controller.needsRegionChoice {
             VStack(alignment: .leading, spacing: 8) {
-                Text("İstanbul/Ankara'da Plus bölge mi çalışıyorsun?")
+                Text("Hangi bölgede çalışıyorsun?")
                     .font(.subheadline.weight(.semibold))
-                Text("Firma hangi ilçelerin Plus olduğunu yayımlamıyor; sabit ücret buna göre değişir.")
+                Text("Semtin konumdan okunamadı; prim ve sabit ücret bölgeye göre değişir.")
                     .font(.caption)
                     .opacity(0.8)
                 HStack {
-                    Button("Plus bölge") { controller.chooseRegion("plus") }
-                    Button("Standart") { controller.chooseRegion("standard") }
+                    ForEach(controller.regionChoices, id: \.self) { tier in
+                        Button(TariffQuestions.regionName(tier)) { controller.chooseRegion(tier) }
+                            .accessibilityIdentifier("shift.region.\(tier)")
+                    }
                 }
                 .buttonStyle(.bordered)
                 .tint(.white)

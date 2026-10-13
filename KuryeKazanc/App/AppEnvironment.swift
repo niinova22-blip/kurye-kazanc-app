@@ -56,8 +56,8 @@ final class AppEnvironment {
                                         writeOptions: OutboxQueue.writeOptions)
         payroll = PayrollModel(store: payrollStore, tariffs: tariffs)
         if launch.isUITesting, let firm = launch.firm {
-            payroll.chooseFirm(firm, regionTier: firm == "migros_hemen" ? "plus" : nil, seniorityYears: nil,
-                               vehicleType: firm == "getir" ? "motorcycle" : nil, flags: [])
+            payroll.chooseFirm(firm, regionTier: firm == "yemeksepeti" ? "ys_istanbul" : "r1", seniorityYears: nil,
+                               vehicleType: nil, flags: [], contractHours: firm == "pt_restoran" ? 10 : nil)
             if launch.loadsSampleData { payroll.setGoal(GoalSpec(amount: Money(100_000), period: .month)) }
         }
         let templates: @MainActor () -> [OCRTemplate] = { sync.mergedTemplates() }
