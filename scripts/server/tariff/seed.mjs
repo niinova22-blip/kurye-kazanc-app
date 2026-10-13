@@ -15,6 +15,14 @@ export function bundledVersions() {
   return JSON.parse(match[1]);
 }
 
+/** 1.9'da uygulamadan kalkan Trendyol GO / Getir surumleri: yalnizca yerel SQL testlerinin veritabaninda (canliya yazilmaz). */
+export function legacyVersions() {
+  const source = readFileSync(join(root, 'KuryeKazancTests/Core/LegacyFirmFixtures.swift'), 'utf8');
+  const match = source.match(/#"""\s*([\s\S]*?)\s*"""#/);
+  if (!match) throw new Error('LegacyFirmFixtures JSON bulunamadi');
+  return JSON.parse(match[1]);
+}
+
 export function seedSources() {
   return JSON.parse(readFileSync(join(here, 'sources.json'), 'utf8'));
 }
@@ -23,7 +31,9 @@ export const PLATFORMS = [
   ['trendyol_go', 'Trendyol GO'],
   ['getir', 'Getir'],
   ['yemeksepeti', 'Yemeksepeti Express'],
-  ['migros_hemen', 'Paket Taxi / Migros Hemen'],
+  ['migros_hemen', 'Paket Taxi Migros Hemen'],
+  ['pt_restoran', 'Paket Taxi Restoran'],
+  ['pt_migros', 'Paket Taxi Migros'],
 ];
 
 const num = (v) => (v === null || v === undefined || v === '' ? 'null' : Number(v));

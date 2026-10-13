@@ -97,6 +97,9 @@ enum CalculationMethod: String, Codable {
     /// Teslimat mesafesi [alt, ust] km araligindaysa teslimat basina sabit ek odeme (Paket Taxi 4–6 km +25 TL).
     /// Bir teslimat birden cok banda uyarsa alt esigi kucuk olan band gecerlidir (6 km tam: 4–6 km bandi).
     case deliveryBand = "delivery_band"
+    /// Gunluk paket sayisi [alt, ust] araligindaki her paket icin paket basi prim (Paket Taxi Restoran: 21–35. paket 34 TL,
+    /// 36. paketten itibaren 43 TL). Donem hesabinda gunluk ortalama paketle, calisilan gun sayisi kadar.
+    case dailyPackageRate = "daily_package_rate"
 
     init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
@@ -155,6 +158,11 @@ struct EligibilityConditions: Codable, Equatable {
     /// Kidem yili esigi (Paket Taxi kidem tarifesi) [alt, ust).
     var minSeniorityYears: Int? = nil
     var maxSeniorityYears: Int? = nil
+    /// Saat bandi [hourFrom, hourTo) (0–24). Yemeksepeti saat saat paket ucreti.
+    var hourFrom: Int? = nil
+    var hourTo: Int? = nil
+    /// Gunluk calisma suresi (saat) kosulu: Paket Taxi Restoran 9 / 10 / 11 / 12 saat tarifesi.
+    var contractHours: [Int]? = nil
 
     enum CodingKeys: String, CodingKey {
         case timeBand = "time_band"
@@ -163,6 +171,17 @@ struct EligibilityConditions: Codable, Equatable {
         case requiresFlag = "requires_flag"
         case minSeniorityYears = "min_seniority_years"
         case maxSeniorityYears = "max_seniority_years"
+        case hourFrom = "hour_from"
+        case hourTo = "hour_to"
+        case contractHours = "contract_hours"
+    }
+
+    /// Bu gun (Takvim gunu) ve saat kalemin saat / gun kosuluna uyuyor mu.
+    func matches(weekday: Int, hour: Int) -> Bool {
+        if let weekdays, !weekdays.contains(weekday) { return false }
+        if let hourFrom, hour < hourFrom { return false }
+        if let hourTo, hour >= hourTo { return false }
+        return true
     }
 }
 
@@ -618,32 +637,60 @@ struct PayPlatform: Codable, Equatable, Identifiable {
     var monogram: String
     var lastSuccessfulCheckAt: String? = nil
     var nextScheduledCheckAt: String? = nil
+    /// Firma ("yemeksepeti" / "pakettaxi") ve firmanin kolu (Paket Taxi: Restoran / Migros / Migros Hemen).
+    var brand: String = ""
+    var branchName: String? = nil
 
     var id: String { code }
 
-    /// Desteklenen dort platform. Kodlar uygulamadaki mevcut `Platform.defaults` ile ayni.
+    /// 1.9: yalnizca iki firma. Yemeksepeti Express tek kol; Paket Taxi uc kol (Restoran, Migros, Migros Hemen),
+    /// her kolun tarifesi ayri. Kodlar `Platform.defaults` ile ayni ("migros_hemen" eski kayitlarla uyum icin korunur).
     static let all: [PayPlatform] = [
         PayPlatform(
-            code: "trendyol_go", name: "Trendyol GO", isActive: true, supportedWorkModels: ["esnaf"],
-            modelSummary: "Paket başı (gündüz/gece), birleşen paket, km primi, günlük paket bonusu.",
-            symbol: "shippingbox", monogram: "TG"
-        ),
-        PayPlatform(
-            code: "getir", name: "Getir", isActive: true, supportedWorkModels: ["esnaf"],
-            modelSummary: "Saatlik ücret + paket başı + km; motorlu/araçlı ayrı tarife, hafta sonu bonusu.",
-            symbol: "clock.badge.checkmark", monogram: "G"
-        ),
-        PayPlatform(
             code: "yemeksepeti", name: "Yemeksepeti Express", isActive: true, supportedWorkModels: ["esnaf"],
-            modelSummary: "Saate ve güne göre paket ücreti, km ücreti, günlük paket bonusu; bahşiş ayrı.",
-            symbol: "fork.knife", monogram: "YS"
+            modelSummary: "Güne ve saate göre paket ücreti, km ücreti, günlük ve şehre göre haftalık bonus.",
+            symbol: "fork.knife", monogram: "YS", brand: "yemeksepeti", branchName: nil
         ),
         PayPlatform(
-            code: "migros_hemen", name: "Paket Taxi / Migros Hemen", isActive: true, supportedWorkModels: ["esnaf"],
-            modelSummary: "Bölgeye göre aylık sabit ücret, aylık paket bonusu, uzun teslimat ek ödemesi.",
-            symbol: "calendar", monogram: "PT"
+            code: "pt_restoran", name: "Paket Taxi Restoran", isActive: true, supportedWorkModels: ["esnaf"],
+            modelSummary: "Bölgeye ve günlük saate (9–12) göre sabit ücret, kıdem primi, günlük paket primi.",
+            symbol: "takeoutbag.and.cup.and.straw", monogram: "PT", brand: "pakettaxi", branchName: "Restoran"
+        ),
+        PayPlatform(
+            code: "pt_migros", name: "Paket Taxi Migros", isActive: true, supportedWorkModels: ["esnaf"],
+            modelSummary: "Sabit ücret, bölgeye göre günlük paket primi, aylık paket bonusu.",
+            symbol: "cart", monogram: "PT", brand: "pakettaxi", branchName: "Migros"
+        ),
+        PayPlatform(
+            code: "migros_hemen", name: "Paket Taxi Migros Hemen", isActive: true, supportedWorkModels: ["esnaf"],
+            modelSummary: "Sabit ücret, bölgeye göre günlük paket primi, aylık bonus, km desteği.",
+            symbol: "bolt.car", monogram: "PT", brand: "pakettaxi", branchName: "Migros Hemen"
         ),
     ]
 
     static func named(_ code: String) -> PayPlatform? { all.first { $0.code == code } }
+
+    /// Secim ekranindaki iki firma.
+    static let brands: [FirmBrand] = [
+        FirmBrand(id: "yemeksepeti", name: "Yemeksepeti Express", symbol: "fork.knife", monogram: "YS",
+                  summary: "Güne ve saate göre paket ücreti, km ücreti, günlük ve haftalık bonus.",
+                  branches: all.filter { $0.brand == "yemeksepeti" }),
+        FirmBrand(id: "pakettaxi", name: "Paket Taxi", symbol: "shippingbox", monogram: "PT",
+                  summary: "Restoran, Migros ya da Migros Hemen; sabit ücret + paket primi + aylık bonus.",
+                  branches: all.filter { $0.brand == "pakettaxi" }),
+    ]
+
+    static func brand(of code: String) -> FirmBrand? { brands.first { $0.branches.contains { $0.code == code } } }
+}
+
+/// Firma (secim karti). Birden cok kolu varsa (Paket Taxi) kol ayrica secilir.
+struct FirmBrand: Equatable, Identifiable {
+    var id: String
+    var name: String
+    var symbol: String
+    var monogram: String
+    var summary: String
+    var branches: [PayPlatform]
+
+    var hasBranches: Bool { branches.count > 1 }
 }

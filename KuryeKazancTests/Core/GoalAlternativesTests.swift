@@ -7,7 +7,7 @@ import XCTest
 
 final class GoalAlternativesTests: XCTestCase {
     private let day = "2026-10-13"
-    private let engine = PayEngine(catalog: TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: []))
+    private let engine = TariffFixtures.engine(catalog: TariffCatalog.merged(bundled: TariffFixtures.all, remote: [], user: []))
     private let fuel = FuelCostModel(
         settings: FuelSettings(entries: [FuelPriceEntry(day: "2026-10-01", pricePerUnit: Money(45), type: .gasoline)],
                                consumptionPer100Km: 3),
@@ -40,13 +40,14 @@ final class GoalAlternativesTests: XCTestCase {
         XCTAssertGreaterThan(evening.hoursSaved, 0)
     }
 
-    func testPaketTaxiSuggestsBigMonthlyTierJump() throws {
-        let (plan, alternatives) = try run(GoalSpec(amount: Money(70_000), period: .month), platform: "migros_hemen",
-                                           region: "plus", perHour: 6)
-        XCTAssertEqual(plan.monthlyPackages, 700)
-        let tier = try XCTUnwrap(alternatives.first { $0.kind == .nextTier })
-        XCTAssertTrue(tier.title.contains("1.700"))
-        XCTAssertGreaterThan(tier.extraNet.value, 30_000)
+    func testPaketTaxiPlanUsesDailyPrimeAndMonthlyBonus() throws {
+        let (plan, alternatives) = try run(GoalSpec(amount: Money(120_000), period: .month), platform: "pt_migros",
+                                           region: "r1", perHour: 5)
+        XCTAssertEqual(plan.reachability, .reachable)
+        XCTAssertFalse(plan.net < Money(120_000))
+        XCTAssertTrue(plan.breakdown.lines.contains { $0.type == .dailyBonus })
+        XCTAssertTrue(plan.breakdown.lines.contains { $0.type == .monthlyBonus })
+        XCTAssertTrue(alternatives.allSatisfy { !($0.net < plan.goal.monthlyTarget()) || $0.kind == .nextTier })
     }
 
     func testUnreachableGoalGetsReachableDayOption() throws {
@@ -73,5 +74,54 @@ final class GoalAlternativesTests: XCTestCase {
         let (_, alternatives) = try run(GoalSpec(amount: Money(80_000), period: .month), platform: "trendyol_go", perHour: 4)
         XCTAssertLessThanOrEqual(alternatives.count, 3)
         XCTAssertEqual(alternatives.map(\.hoursSaved), alternatives.map(\.hoursSaved).sorted(by: >))
+    }
+
+    // MARK: - Uygulama
+
+    func testApplyingNextTierRaisesGoalAndPlanReachesTier() throws {
+        let tier = GoalAlternative(id: "tier.1200", kind: .nextTier, title: "", detail: "", daysPerWeek: 6, packagesPerDay: 47,
+                                   hoursPerDay: Decimal(string: "9.5")!, monthlyHours: 247, net: Money(Decimal(string: "151234.56")!),
+                                   hoursSaved: 0, extraNet: Money(10_000))
+        let goal = GoalSpec(amount: Money(120_000), period: .month)
+        let applied = GoalAlternatives.applied(tier, to: goal)
+        XCTAssertEqual(applied.amount, Money(151_230))
+        XCTAssertEqual(applied.maxHoursPerDay, 10)
+        let weekly = GoalAlternatives.applied(tier, to: GoalSpec(amount: Money(20_000), period: .week))
+        XCTAssertEqual(weekly.amount, Money(Decimal(34_900)))
+        let (plan, _) = try run(applied, platform: "pt_migros", region: "r1", perHour: 5)
+        XCTAssertFalse(plan.net < applied.amount)
+    }
+
+    func testApplyingEveningSetsNightShareAndNeedsFewerPackages() throws {
+        let goal = GoalSpec(amount: Money(50_000), period: .month)
+        let (base, alternatives) = try run(goal, platform: "trendyol_go")
+        let evening = try XCTUnwrap(alternatives.first { $0.kind == .evening })
+        let applied = GoalAlternatives.applied(evening, to: goal)
+        XCTAssertEqual(applied.nightShare, Decimal(string: "0.5"))
+        XCTAssertEqual(applied.amount, goal.amount)
+        let (plan, again) = try run(applied, platform: "trendyol_go")
+        XCTAssertLessThan(plan.monthlyPackages, base.monthlyPackages)
+        XCTAssertFalse(again.contains { $0.kind == .evening })
+    }
+
+    func testApplyingDaysKeepsAmountAndChangesWeekdays() throws {
+        let goal = GoalSpec(amount: Money(40_000), period: .week, daysPerWeek: 5, maxHoursPerDay: 8,
+                            workWeekdays: [2, 3, 4, 5, 6])
+        let alternative = GoalAlternative(id: "days.6", kind: .days, title: "", detail: "", daysPerWeek: 6, packagesPerDay: 30,
+                                          hoursPerDay: Decimal(string: "9.5")!, monthlyHours: 247, net: Money(1), hoursSaved: 0,
+                                          extraNet: .zero)
+        let applied = GoalAlternatives.applied(alternative, to: goal)
+        XCTAssertEqual(applied.amount, goal.amount)
+        XCTAssertEqual(applied.daysPerWeek, 6)
+        XCTAssertEqual(applied.workWeekdays, [2, 3, 4, 5, 6, 7])
+        XCTAssertEqual(applied.maxHoursPerDay, 10)
+    }
+
+    func testNightShareSurvivesCoding() throws {
+        let goal = GoalSpec(amount: Money(100), period: .day, nightShare: Decimal(string: "0.5"))
+        let data = try JSONEncoder().encode(goal)
+        XCTAssertEqual(try JSONDecoder().decode(GoalSpec.self, from: data), goal)
+        let old = try JSONDecoder().decode(GoalSpec.self, from: Data(#"{"amount":"100","period":"day"}"#.utf8))
+        XCTAssertNil(old.nightShare)
     }
 }

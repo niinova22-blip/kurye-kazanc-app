@@ -58,24 +58,39 @@ enum TariffComparison {
                                   day: String) -> (CourierTariffProfile, [String]) {
         if platform == own.platformCode { return (own, []) }
         var notes: [String] = []
-        let versions: [TariffVersion] = catalog.usable(platform: platform, day: day)
-        let fixed: [TariffItem] = versions.flatMap { $0.activeItems(on: day) }.filter { $0.type == .fixed }
+        let items: [TariffItem] = (catalog.current(platform: platform, day: day)?.activeItems(on: day)) ?? []
+        // Bolge: kendi bolgen o firmada varsa ayni; yoksa (firmalar arasi kodlar farkli) en dusuk ucretli bolge
+        let tiers: Set<String> = Set(items.compactMap(\.conditions.regionTier))
         var tier: String? = nil
-        let tiers: [TariffItem] = fixed.filter { $0.conditions.regionTier != nil }
         if !tiers.isEmpty {
-            if let mine = own.regionTier, tiers.contains(where: { $0.conditions.regionTier == mine }) {
+            if let mine = own.regionTier, tiers.contains(mine) {
                 tier = mine
             } else {
-                tier = tiers.min { $0.amount < $1.amount }?.conditions.regionTier
+                tier = lowestTier(tiers, items: items)
+                notes.append("en düşük ücretli bölgeyle")
             }
         }
-        if fixed.contains(where: { $0.conditions.minSeniorityYears != nil }) {
-            notes.append("yeni başlayan kademesiyle")
+        var hours: Int? = nil
+        let hourOptions: [Int] = Array(Set(items.flatMap { $0.conditions.contractHours ?? [] })).sorted()
+        if !hourOptions.isEmpty {
+            hours = own.contractHours.flatMap { hourOptions.contains($0) ? $0 : nil } ?? (hourOptions.contains(10) ? 10 : hourOptions.first)
+            if own.contractHours == nil { notes.append("günde \(hours ?? 0) saatle") }
         }
-        let vehicle: String? = platform == "getir" ? (own.vehicleType == "car" ? "car" : "motorcycle") : nil
-        let profile = CourierTariffProfile(platformCode: platform, regionTier: tier, seniorityYears: 0, vehicleType: vehicle,
-                                           flags: own.flags)
+        if items.contains(where: { $0.conditions.minSeniorityYears != nil }) {
+            notes.append("kıdem primi olmadan")
+        }
+        let profile = CourierTariffProfile(platformCode: platform, regionTier: tier, seniorityYears: 0, vehicleType: nil,
+                                           flags: own.flags, contractHours: hours)
         return (profile, notes)
+    }
+
+    /// Ayni kosulu tasiyan kalemlerin toplami en dusuk bolge (Paket Taxi 4. bolge, Yemeksepeti diger iller).
+    static func lowestTier(_ tiers: Set<String>, items: [TariffItem]) -> String? {
+        tiers.min { a, b in
+            let sa: Money = items.filter { $0.conditions.regionTier == a }.map(\.amount).sum()
+            let sb: Money = items.filter { $0.conditions.regionTier == b }.map(\.amount).sum()
+            return sa == sb ? a < b : sa < sb
+        }
     }
 
     static func rows(workload: WorkloadSpec, profile own: CourierTariffProfile, catalog: TariffCatalog, fuel: FuelCostModel,

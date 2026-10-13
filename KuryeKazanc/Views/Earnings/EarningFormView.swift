@@ -264,7 +264,7 @@ struct EarningFormView: View {
                 .accessibilityIdentifier("earningForm.ocrReport")
             }
         } footer: {
-            Text("Trendyol GO, Getir, Yemeksepeti ve Migros kazanç ekranları tanınır. Görüntü cihazında işlenir; görselin kendisi saklanmaz.")
+            Text("Yemeksepeti Express ve Paket Taxi (Migros Hemen) kazanç ekranları tanınır. Görüntü cihazında işlenir; görselin kendisi saklanmaz.")
         }
     }
 

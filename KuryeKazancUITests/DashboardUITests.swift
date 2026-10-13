@@ -14,7 +14,7 @@ final class DashboardUITests: XCTestCase {
         // -key value: UserDefaults arguman alani; testleri onceki durumdan bagimsiz kilar.
         app.launchArguments = [
             "-ui-testing", "-costPerKm", "2.5", "-isWorking", "NO",
-            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV18", "YES", "-firm", "trendyol_go", "-autoEstimateExpenses", "YES",
+            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV18", "YES", "-firm", "yemeksepeti", "-autoEstimateExpenses", "YES",
             // Paylasim tercihleri testler arasinda tasinmasin. "-anahtar NO" argumani KULLANILMAZ: argumanla
             // verilen deger UserDefaults'ta en ust katmandir; uygulamanin yazdigi "acik" degeri okunamaz olur
             // (paylasim onayindan sonra anahtar ara sira kapali kaliyordu). Bunun yerine kayitli tercihler silinir.
@@ -40,7 +40,11 @@ final class DashboardUITests: XCTestCase {
     func testTodayShowsScanButton() {
         let app = launch(sampleData: false)
 
-        XCTAssertTrue(app.buttons["scan.button"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
+        // 1.9: "Vardiya başlat" kartı eklendi; tarama düğmesi küçük ekranda aşağıda kalabilir
+        let scan = app.buttons["scan.button"]
+        if !scan.waitForExistence(timeout: 3) { app.swipeUp() }
+        XCTAssertTrue(scan.waitForExistence(timeout: 5))
     }
 
     func testDashboardSummarizesSampleData() {
@@ -166,7 +170,7 @@ final class DashboardUITests: XCTestCase {
         app.tabBars.buttons["Kazanç"].tap()
         app.segmentedControls["earnings.mode"].buttons["Analiz"].tap()
         app.segmentedControls["history.periodPicker"].buttons["Gün"].tap()
-        let platforms = app.staticTexts["analysis.platform.getir"]
+        let platforms = app.staticTexts["analysis.platform.migros_hemen"]
         for _ in 0..<4 where !platforms.exists { app.swipeUp() }
         XCTAssertTrue(platforms.exists)
     }
@@ -228,13 +232,15 @@ final class OnboardingUITests: XCTestCase {
         app.launch()
 
         // Ilk ekran firma secimi, sonra tanitim (gecilir), firma sorulari (Getir: arac), yakit, hedef, konum
-        XCTAssertTrue(app.buttons["firm.getir"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["firm.yemeksepeti"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["welcome.next"].isEnabled, "Firma secmeden devam edilmemeli")
-        app.buttons["firm.getir"].tap()
+        app.buttons["firm.yemeksepeti"].tap()
         app.buttons["welcome.next"].tap()
         XCTAssertTrue(app.buttons["intro.skip"].waitForExistence(timeout: 10))
         app.buttons["intro.skip"].tap()
-        XCTAssertTrue(app.buttons["setup.next"].waitForExistence(timeout: 5)) // arac sorusu
+        // Yemeksepeti: sehir grubu sorusu (haftalik bonus)
+        XCTAssertTrue(app.buttons["question.region.ys_istanbul"].waitForExistence(timeout: 5))
+        app.buttons["question.region.ys_istanbul"].tap()
         app.buttons["setup.next"].tap()              // -> yakit
         app.buttons["setup.next"].tap()              // -> hedef
         app.buttons["setup.finish"].tap()

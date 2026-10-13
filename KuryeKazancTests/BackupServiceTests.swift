@@ -120,7 +120,7 @@ final class BackupServiceTests: XCTestCase {
     /// 2 kazanc (biri kanitli) + 1 gider.
     @discardableResult
     private func seedRecords(in context: ModelContext) throws -> (EarningRecord, EarningRecord, ExpenseRecord) {
-        let getir: Platform = platforms(in: context).first { $0.code == "getir" }!
+        let getir: Platform = platforms(in: context).first { $0.code == "yemeksepeti" }!
         let first = EarningRecord(
             startTime: now, endTime: now.addingTimeInterval(3600), platform: getir,
             province: "İstanbul", district: "Kadıköy", grossEarning: 980, bonus: 20.5,
@@ -173,7 +173,7 @@ final class BackupServiceTests: XCTestCase {
         let expenses = try targetContext.fetch(FetchDescriptor<ExpenseRecord>())
         XCTAssertEqual(earnings.count, 2)
         XCTAssertEqual(expenses.count, 1)
-        XCTAssertEqual(earnings[0].platform?.code, "getir")
+        XCTAssertEqual(earnings[0].platform?.code, "yemeksepeti")
         XCTAssertEqual(earnings[0].grossEarning, 980)
         XCTAssertEqual(earnings[0].bonus, 20.5)
         XCTAssertEqual(earnings[0].distanceKm, 42.25)

@@ -17,6 +17,7 @@ final class AppEnvironment {
     let account: AccountService
     let tariffs: TariffSyncService
     let payroll: PayrollModel
+    let liveShift: LiveShiftController
 
     private init() {
         let launch = LaunchOptions.current
@@ -31,6 +32,8 @@ final class AppEnvironment {
         self.container = container
         // UI testlerinde ayri (bos) tercih alani: tarama ve otomatik vardiya kapali, izin sorulmaz
         let testDefaults: UserDefaults? = launch.isUITesting ? (UserDefaults(suiteName: "ui-tests") ?? .standard) : nil
+        // Temiz baslangic test alanini da siler (or. onceki testte yarim kalan canli vardiya)
+        if launch.resetsDefaults, launch.isUITesting { testDefaults?.removePersistentDomain(forName: "ui-tests") }
         // UI testlerinde konum kapali: simulatorde izin diyalogu testleri kilitlemesin
         let location = LocationService(isEnabled: !launch.isUITesting)
         self.location = location
@@ -53,8 +56,8 @@ final class AppEnvironment {
                                         writeOptions: OutboxQueue.writeOptions)
         payroll = PayrollModel(store: payrollStore, tariffs: tariffs)
         if launch.isUITesting, let firm = launch.firm {
-            payroll.chooseFirm(firm, regionTier: firm == "migros_hemen" ? "plus" : nil, seniorityYears: nil,
-                               vehicleType: firm == "getir" ? "motorcycle" : nil, flags: [])
+            payroll.chooseFirm(firm, regionTier: firm == "yemeksepeti" ? "ys_istanbul" : "r1", seniorityYears: nil,
+                               vehicleType: nil, flags: [], contractHours: firm == "pt_restoran" ? 10 : nil)
             if launch.loadsSampleData { payroll.setGoal(GoalSpec(amount: Money(100_000), period: .month)) }
         }
         let templates: @MainActor () -> [OCRTemplate] = { sync.mergedTemplates() }
@@ -74,6 +77,8 @@ final class AppEnvironment {
             todayNet: { todaySummary().netEarnings },
             todayWorkedSeconds: { todaySummary().workDuration }
         )
+        liveShift = LiveShiftController(autoShift: autoShift, workSession: workSession, location: location, payroll: payroll,
+                                        defaults: testDefaults ?? .standard)
         // Canli Etkinlik "Vardiyayi bitir": iOS uygulamayi arka planda soguk baslatsa da bagli olsun.
         // Form acilamaz: ozet bekleyen vardiya olur, "Vardiya bitti" bildirimi kazanc formuna goturur.
         ShiftIntentBridge.endShift = { [weak self] in

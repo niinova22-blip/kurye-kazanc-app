@@ -14,20 +14,23 @@ final class TariffCatalogTests: XCTestCase {
                                status: status, from: from, until: until, number: number, region: region, origin: origin)
     }
 
-    func testBundledSeedDecodesAllFourPlatforms() {
+    func testBundledSeedHasOnlyTwoFirms() {
         let versions = BundledTariffs.all
-        XCTAssertEqual(versions.count, 7)
-        XCTAssertEqual(Set(versions.map(\.platformCode)), ["trendyol_go", "getir", "yemeksepeti", "migros_hemen"])
-        for version in versions {
-            // Dogrulanmis kalem yalnizca firmanin kendi yayinina dayanan surumde olabilir; o surum de tam dogrulanmis sayilmaz
-            if version.sourceType == .officialAnnouncement {
-                XCTAssertEqual(version.verificationStatus, .partial, version.id)
-            } else {
-                XCTAssertEqual(version.verificationStatus, .unverified, "ornek tarife dogrulanmis gosterilmemeli")
-                XCTAssertTrue(version.items.allSatisfy { $0.confidence == .needsVerification }, version.id)
-            }
+        XCTAssertEqual(versions.count, 8)
+        XCTAssertEqual(Set(versions.map(\.platformCode)), ["yemeksepeti", "pt_restoran", "pt_migros", "migros_hemen"])
+        for version in versions where version.versionNumber == 1 && version.origin == .bundled
+            && ["yemeksepeti", "migros_hemen"].contains(version.platformCode) {
+            // Ilk ornek surumler dogrulanmis gosterilmez
+            XCTAssertEqual(version.verificationStatus, .unverified, version.id)
         }
-        XCTAssertEqual(PayPlatform.all.map(\.code), ["trendyol_go", "getir", "yemeksepeti", "migros_hemen"])
+        // Paket Taxi'nin kendi 2026 paylasimina dayanan kollar dogrulanmis
+        for id in ["pt_restoran-esnaf-v1", "pt_migros-esnaf-v1", "migros_hemen-esnaf-v3"] {
+            XCTAssertEqual(versions.first { $0.id == id }?.verificationStatus, .verified, id)
+        }
+        XCTAssertEqual(PayPlatform.all.map(\.code), ["yemeksepeti", "pt_restoran", "pt_migros", "migros_hemen"])
+        XCTAssertEqual(PayPlatform.brands.map(\.name), ["Yemeksepeti Express", "Paket Taxi"])
+        XCTAssertEqual(PayPlatform.brand(of: "pt_migros")?.id, "pakettaxi")
+        XCTAssertEqual(PayPlatform.brands[1].branches.compactMap(\.branchName), ["Restoran", "Migros", "Migros Hemen"])
     }
 
     func testOnlyPublishedVersionsReachTheEngine() {
@@ -115,11 +118,11 @@ final class TariffCatalogTests: XCTestCase {
 
     func testRemoteReplacesBundledOnlyForItsPlatform() {
         let remote = [packageVersion("remote-tgo", amount: "70")]
-        let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: remote, user: [])
+        let catalog = TariffCatalog.merged(bundled: TariffFixtures.all, remote: remote, user: [])
         XCTAssertFalse(catalog.versions.contains { $0.id == "trendyol_go-esnaf-v1" })
         XCTAssertTrue(catalog.versions.contains { $0.id == "getir-esnaf-motorcycle-v1" })
         // Sunucuda yalnizca taslak varsa gomulu yedek korunur
-        let draftOnly = TariffCatalog.merged(bundled: BundledTariffs.all,
+        let draftOnly = TariffCatalog.merged(bundled: TariffFixtures.all,
                                              remote: [packageVersion("d", amount: "1", status: .draft)], user: [])
         XCTAssertTrue(draftOnly.versions.contains { $0.id == "trendyol_go-esnaf-v1" })
     }
@@ -129,10 +132,10 @@ final class TariffCatalogTests: XCTestCase {
         let catalog = TariffCatalog.merged(bundled: [packageVersion("official", amount: "60")], remote: [], user: [user])
         var input = TariffFixtures.input("trendyol_go")
         input.dayPackages = 1
-        XCTAssertEqual(TariffFixtures.calc(input, engine: PayEngine(catalog: catalog)).tariffVersionID, "official")
+        XCTAssertEqual(TariffFixtures.calc(input, engine: TariffFixtures.engine(catalog: catalog)).tariffVersionID, "official")
         user.approvalStatus = .published
         let active = TariffCatalog.merged(bundled: [packageVersion("official", amount: "60")], remote: [], user: [user])
-        XCTAssertEqual(TariffFixtures.calc(input, engine: PayEngine(catalog: active)).tariffVersionID, "mine")
+        XCTAssertEqual(TariffFixtures.calc(input, engine: TariffFixtures.engine(catalog: active)).tariffVersionID, "mine")
     }
 
     func testNoTariffAndUnsupportedPlatformErrors() {

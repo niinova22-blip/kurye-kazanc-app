@@ -22,10 +22,14 @@ struct GoalSpec: Codable, Equatable {
     /// Secilen calisma gunleri (Takvim: 1 = Pazar ... 7 = Cumartesi). Verilirse `daysPerWeek` bunlarin sayisidir ve
     /// hafta sonu bonusu yalnizca secili hafta sonu gunleriyle hesaplanir. nil: yalnizca gun sayisi bilinir.
     var workWeekdays: [Int]? = nil
+    /// Paketlerin aksam / gece bandinda yapilmasi planlanan payi (0...1). "Daha iyi yollar" aksam onerisi uygulaninca.
+    var nightShare: Decimal? = nil
 
-    init(amount: Money, period: GoalPeriod, daysPerWeek: Int = 6, maxHoursPerDay: Decimal = 10, workWeekdays: [Int]? = nil) {
+    init(amount: Money, period: GoalPeriod, daysPerWeek: Int = 6, maxHoursPerDay: Decimal = 10, workWeekdays: [Int]? = nil,
+         nightShare: Decimal? = nil) {
         self.amount = amount
         self.period = period
+        self.nightShare = nightShare.map { min(1, max(0, $0)) }.flatMap { $0 > 0 ? $0 : nil }
         let days: [Int] = Array(Set((workWeekdays ?? []).filter { (1...7).contains($0) })).sorted()
         if days.isEmpty {
             self.daysPerWeek = min(7, max(1, daysPerWeek))
@@ -64,7 +68,8 @@ struct GoalSpec: Codable, Equatable {
                   period: try c.decodeIfPresent(GoalPeriod.self, forKey: .period) ?? .month,
                   daysPerWeek: try c.decodeIfPresent(Int.self, forKey: .daysPerWeek) ?? 6,
                   maxHoursPerDay: try c.decodeIfPresent(Decimal.self, forKey: .maxHoursPerDay) ?? 10,
-                  workWeekdays: try c.decodeIfPresent([Int].self, forKey: .workWeekdays))
+                  workWeekdays: try c.decodeIfPresent([Int].self, forKey: .workWeekdays),
+                  nightShare: try c.decodeIfPresent(Decimal.self, forKey: .nightShare))
     }
 
     /// Ayda calisilan gun: haftalik gun × 52 / 12, en yakin tam sayi (6 -> 26).
@@ -101,6 +106,8 @@ struct CourierTariffProfile: Equatable {
     var seniorityYears: Int?
     var vehicleType: String?
     var flags: [String]
+    /// Paket Taxi Restoran gunluk calisma suresi (9–12 saat).
+    var contractHours: Int? = nil
 }
 
 enum FuelType: String, Codable, CaseIterable, Identifiable {

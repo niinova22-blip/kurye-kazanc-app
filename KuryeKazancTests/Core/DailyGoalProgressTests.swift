@@ -7,7 +7,7 @@ import XCTest
 
 final class DailyGoalProgressTests: XCTestCase {
     func testTodayShareAndAchieved() throws {
-        let engine = PayEngine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: []))
+        let engine = TariffFixtures.engine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: []))
         let fuel = FuelCostModel(settings: FuelSettings(entries: [FuelPriceEntry(day: "2026-10-01", pricePerUnit: Money(45), type: .gasoline)],
                                                         consumptionPer100Km: 3), vehicleType: "motorcycle", fallbackCostPerKm: Money(2))
         let pace = PaceEstimate(packagesPerHour: Decimal(string: "4.2")!, kmPerPackage: Decimal(string: "3.5")!, isAssumed: false, sampleCount: 9)

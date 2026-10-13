@@ -9,21 +9,30 @@ import XCTest
 enum TariffFixtures {
     /// Hesap mekanigi testleri icin ilk (v1) ornek surumler: kademeli paket ucreti, kidem, garanti gibi kurallari
     /// kapsar. Guncel tarifeler (v2) `BundledTariffs.all` ile ayri testlerde.
-    static var bundled: [TariffVersion] { BundledTariffs.all.filter { $0.versionNumber == 1 } }
+    static var bundled: [TariffVersion] { all.filter { $0.versionNumber == 1 } }
+
+    /// Uygulamanin gomulu tarifeleri + yalnizca testte tutulan eski firmalar (Trendyol GO, Getir; bkz. LegacyFirms).
+    static var all: [TariffVersion] { BundledTariffs.all + LegacyFirms.versions }
+
+    static let calculators: [PayCalculator] = PayEngine.standardCalculators + LegacyFirms.calculators
+
+    static func engine(catalog: TariffCatalog, clock: @escaping () -> Date = { Date(timeIntervalSince1970: 1_790_000_000) }) -> PayEngine {
+        PayEngine(catalog: catalog, calculators: calculators, clock: clock)
+    }
 
     static func bundled(_ id: String) -> TariffVersion {
-        guard let version = BundledTariffs.all.first(where: { $0.id == id }) else {
+        guard let version = all.first(where: { $0.id == id }) else {
             fatalError("gomulu surum yok: \(id)")
         }
         return version
     }
 
     static var engine: PayEngine {
-        PayEngine(catalog: TariffCatalog(versions: bundled), clock: { Date(timeIntervalSince1970: 1_790_000_000) })
+        engine(catalog: TariffCatalog(versions: bundled))
     }
 
     static func engine(_ versions: [TariffVersion]) -> PayEngine {
-        PayEngine(catalog: TariffCatalog(versions: versions), clock: { Date(timeIntervalSince1970: 1_790_000_000) })
+        engine(catalog: TariffCatalog(versions: versions))
     }
 
     static func item(_ key: String, _ type: TariffItemType, _ amount: String, version: String = "v",
@@ -58,7 +67,10 @@ enum TariffFixtures {
         case let .success(breakdown): return breakdown
         case let .failure(error):
             XCTFail("hesaplama basarisiz: \(error)", file: file, line: line)
-            fatalError()
+            return PayBreakdown(platformCode: input.platformCode, tariffVersionID: "", tariffVersionLabel: "", tariffOrigin: .bundled,
+                                tariffVerification: .unverified, span: input.span, startDay: input.startDay, endDay: input.endDay,
+                                computedAt: Date(), lines: [], sideBenefits: [], notices: [], progress: [], extraPayments: .zero,
+                                deductions: .zero, advances: .zero)
         }
     }
 }

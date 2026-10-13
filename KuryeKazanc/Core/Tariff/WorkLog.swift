@@ -3,12 +3,16 @@ import Foundation
 /// Kaydin hangi yontemle girildigi. Hepsi ayni motoru ve ayni tarife surumunu kullanir.
 enum EntryMethod: String, Codable, CaseIterable {
     case quick, detailed, period
+    /// 1.9: canli vardiya (her paket teslimde dokunma) ve unutulan gun icin elle hesap.
+    case shift, manual
 
     var displayName: String {
         switch self {
         case .quick: "Hızlı tahmin"
         case .detailed: "Detaylı kayıt"
         case .period: "Dönem özeti"
+        case .shift: "Vardiya"
+        case .manual: "Elle hesap"
         }
     }
 }
@@ -112,6 +116,8 @@ struct PayrollState: Codable, Equatable {
     var regionTier: String? = nil
     var seniorityYears: Int? = nil
     var vehicleType: String? = nil
+    /// 1.9: Paket Taxi Restoran gunluk calisma suresi (9–12 saat).
+    var contractHours: Int? = nil
     /// 1.7: kosula bagli kalemler icin isaretler (or. "woman_employment").
     var flags: [String] = []
     var goal: GoalSpec? = nil
@@ -136,6 +142,7 @@ struct PayrollState: Codable, Equatable {
         regionTier = try c.decodeIfPresent(String.self, forKey: .regionTier)
         seniorityYears = try c.decodeIfPresent(Int.self, forKey: .seniorityYears)
         vehicleType = try c.decodeIfPresent(String.self, forKey: .vehicleType)
+        contractHours = try c.decodeIfPresent(Int.self, forKey: .contractHours)
         flags = try c.decodeIfPresent([String].self, forKey: .flags) ?? []
         goal = try c.decodeIfPresent(GoalSpec.self, forKey: .goal)
         fuel = try c.decodeIfPresent(FuelSettings.self, forKey: .fuel) ?? FuelSettings()
@@ -151,7 +158,7 @@ struct PayrollState: Codable, Equatable {
     var tariffProfile: CourierTariffProfile? {
         guard let code = activePlatform else { return nil }
         return CourierTariffProfile(platformCode: code, regionTier: regionTier, seniorityYears: seniorityYears,
-                                    vehicleType: vehicleType, flags: flags)
+                                    vehicleType: vehicleType, flags: flags, contractHours: contractHours)
     }
 }
 
@@ -226,6 +233,19 @@ final class PayrollStore {
     }
 
     // MARK: - 1.7 hedef, yakit, isaretler
+
+    /// Desteklenmeyen firmadan gecis: firma secimi baştan yapilir (kayitlar ve odemeler kalir).
+    func resetFirmChoice() {
+        state.platformHistory = []
+        state.regionTier = nil
+        state.contractHours = nil
+        persist()
+    }
+
+    func setContractHours(_ hours: Int?) {
+        state.contractHours = hours
+        persist()
+    }
 
     func setFlags(_ flags: [String]) {
         state.flags = Array(Set(flags)).sorted()

@@ -7,7 +7,7 @@ import XCTest
 
 final class GoalPlannerTests: XCTestCase {
     private let day = "2026-10-13"
-    private let engine = PayEngine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: []))
+    private let engine = TariffFixtures.engine(catalog: TariffCatalog.merged(bundled: TariffFixtures.bundled, remote: [], user: []))
     private let fuel = FuelCostModel(
         settings: FuelSettings(entries: [FuelPriceEntry(day: "2026-10-01", pricePerUnit: Money(45), type: .gasoline)],
                                consumptionPer100Km: 3),
@@ -99,10 +99,7 @@ final class GoalPlannerTests: XCTestCase {
         XCTAssertTrue(result.guaranteed.contains { $0.label == "Saatlik ücret" })
     }
 
-    func testGetirWithoutVehicleDefaultsToMotorcycle() throws {
-        let getir = CourierTariffProfile(platformCode: "getir", regionTier: nil, seniorityYears: nil, vehicleType: nil, flags: [])
-        XCTAssertGreaterThan(try plan(GoalSpec(amount: Money(80_000), period: .month), profile: getir).monthlyPackages, 0)
-    }
+
 
     func testUnsupportedPlatformFails() {
         let planner = GoalPlanner(engine: engine, fuel: fuel)

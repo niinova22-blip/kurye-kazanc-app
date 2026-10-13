@@ -25,6 +25,7 @@ struct KuryeKazancApp: App {
                 .environment(environment.account)
                 .environment(environment.payroll)
                 .environment(environment.tariffs)
+                .environment(environment.liveShift)
                 .task {
                     // Acilis: sablonlar (12 saatte bir) ve bekleyen gonderimler. Riza yoksa ag yok.
                     await syncNow()

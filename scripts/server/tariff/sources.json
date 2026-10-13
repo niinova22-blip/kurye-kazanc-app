@@ -106,5 +106,56 @@
     "reliability": "medium",
     "summary": "08.01.2026: İstanbul esnaf kurye 2026 tarifesi — gündüz 64,5 / gece 92 TL, km 0–3: 6,5, 6+: 7,8 TL, birleşen 27–41,5 TL, günlük 42 paket 1.610, 82 paket 4.400 TL.",
     "extraction_profile": []
+  },
+  {
+    "source_id": "yemeksepeti-kurye-site-2026",
+    "platform_id": "yemeksepeti",
+    "tariff_version_id": "yemeksepeti-esnaf-v3",
+    "url": "https://www.yemeksepeti.com/kurye",
+    "source_type": "official_channel",
+    "priority": 1,
+    "check_interval_minutes": 1440,
+    "reliability": "high",
+    "summary": "Yemeksepeti kurye sitesi 2026: haftalık bonus baremleri İstanbul / Ankara-İzmir / Kocaeli, Sakarya, Diyarbakır, Malatya, Van, Elazığ, Mardin, Kahramanmaraş, Erzurum / diğer iller (160–400+ paket, KDV dahil); çalışma saati serbest, online bahşiş, Bimasraf muhasebe desteği.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "pakettaxi-2026-restoran",
+    "platform_id": "pt_restoran",
+    "tariff_version_id": "pt_restoran-esnaf-v1",
+    "url": "https://www.pakettaxi.com/",
+    "document_ref": "Paket Taxi Restoran Moto Kurye 2026 Fiyatları (resmî paylaşım görselleri)",
+    "source_type": "official_channel",
+    "priority": 1,
+    "check_interval_minutes": 1440,
+    "reliability": "high",
+    "summary": "1. / 2–3. / 4. bölge, 9–12 saat sabit ücret (26 gün, KDV dahil), kıdem primi 2 yıl ve 3+ yıl, günlük paket primi 21/26. paketten itibaren.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "pakettaxi-2026-migros",
+    "platform_id": "pt_migros",
+    "tariff_version_id": "pt_migros-esnaf-v1",
+    "url": "https://www.pakettaxi.com/",
+    "document_ref": "Paket Taxi | Migros 2026 Fiyatlar (resmî paylaşım görselleri)",
+    "source_type": "official_channel",
+    "priority": 1,
+    "check_interval_minutes": 1440,
+    "reliability": "high",
+    "summary": "Migros hızlı kurye: sabit 55.223 TL (177 TL/saat), bölgeye göre günlük paket primi 16+ paket, aylık bonus 700–1.800+ paket, öğle yemeği, 1,5 saat mola.",
+    "extraction_profile": []
+  },
+  {
+    "source_id": "pakettaxi-2026-migros-hemen",
+    "platform_id": "migros_hemen",
+    "tariff_version_id": "migros_hemen-esnaf-v3",
+    "url": "https://www.pakettaxi.com/",
+    "document_ref": "Paket Taxi | Migros Hemen 2026 Yeni Kazançları (resmî paylaşım görselleri)",
+    "source_type": "official_channel",
+    "priority": 1,
+    "check_interval_minutes": 1440,
+    "reliability": "high",
+    "summary": "Migros Hemen kurye: sabit 55.223 TL, bölgeye göre günlük paket primi 20+ paket, aylık bonus 700–1.800+ paket, Migros yemek paketlerine 4–6 km 25 TL, 6+ km 35 TL km desteği.",
+    "extraction_profile": []
   }
 ]

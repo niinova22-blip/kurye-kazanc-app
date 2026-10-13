@@ -540,20 +540,20 @@ struct PayrollSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Bölge kademesi", selection: regionBinding) {
+                Picker("Bölge", selection: regionBinding) {
                     Text("Seçilmedi").tag(String?.none)
-                    Text("İstanbul / Ankara Plus").tag(String?.some("plus"))
-                    Text("Standart bölge").tag(String?.some("standard"))
+                    ForEach(regionOptions, id: \.self) { Text(TariffQuestions.regionName($0)).tag(String?.some($0)) }
                 }
-                Stepper("Kıdem: \(model.state.seniorityYears ?? 0) yıl", value: seniorityBinding, in: 0...30)
+                if model.state.activePlatform == "pt_restoran" {
+                    Stepper("Kıdem: \(model.state.seniorityYears ?? 0) yıl", value: seniorityBinding, in: 0...30)
+                    Picker("Günlük çalışma", selection: hoursBinding) {
+                        ForEach([9, 10, 11, 12], id: \.self) { Text("\($0) saat").tag($0) }
+                    }
+                }
             } header: {
-                Text("Paket Taxi / Migros Hemen")
-            }
-            Section("Getir") {
-                Picker("Araç tipi", selection: vehicleBinding) {
-                    Text("Motorlu").tag("motorcycle")
-                    Text("Araçlı").tag("car")
-                }
+                Text(PayrollModel.platformName(model.state.activePlatform ?? ""))
+            } footer: {
+                Text("Vardiya başlayınca bölge konumundan kendiliğinden güncellenir.")
             }
             Section {
                 Toggle("Tarife güncellemelerini al", isOn: $updatesEnabled)
@@ -584,9 +584,11 @@ struct PayrollSettingsView: View {
         })
     }
 
-    private var vehicleBinding: Binding<String> {
-        Binding(get: { model.state.vehicleType ?? "motorcycle" }, set: { value in
-            model.setPreferences(regionTier: model.state.regionTier, seniorityYears: model.state.seniorityYears, vehicleType: value)
-        })
+    private var regionOptions: [String] {
+        model.questions(for: model.state.activePlatform ?? "").regionTiers
+    }
+
+    private var hoursBinding: Binding<Int> {
+        Binding(get: { model.state.contractHours ?? 10 }, set: { value in model.setContractHours(value) })
     }
 }

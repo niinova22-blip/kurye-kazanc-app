@@ -7,6 +7,7 @@ struct MockEarningsScreen: View {
 
     private var accent: Color {
         switch scenario.platformCode {
+        // Test araci: OCR dogruluk senaryolari eski firma ekranlarini da uretir
         case "trendyol_go": .orange
         case "getir": .purple
         case "yemeksepeti": .red

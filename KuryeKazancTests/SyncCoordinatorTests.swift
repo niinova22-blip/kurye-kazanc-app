@@ -110,6 +110,7 @@ final class SyncCoordinatorTests: XCTestCase {
     override func setUp() async throws {
         container = ModelContainerFactory.make(inMemory: true)
         DataSeeder.seedPlatformsIfNeeded(in: context)
+        LegacyPlatforms.insert(into: context)
         suiteName = "SyncCoordinatorTests-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)!
         directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -551,7 +552,7 @@ final class SyncCoordinatorTests: XCTestCase {
 
     func testRefreshTemplates_picksLatestAndThrottles() async {
         setConsents(sharing: true, calibration: false)
-        let base: OCRTemplate = BundledTemplates.template(id: "getir.earnings")!
+        let base: OCRTemplate = BundledTemplates.template(id: "yemeksepeti.earnings")!
         var v2 = base
         v2.version = 2
         var v3 = base
@@ -563,8 +564,10 @@ final class SyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(fake.fetchCount, 1)
         XCTAssertEqual(sync.remoteTemplates.map(\.version), [3])
         let merged = sync.mergedTemplates()
-        XCTAssertEqual(merged.first { $0.id == "getir.earnings" }?.version, 3)
-        XCTAssertEqual(merged.count, BundledTemplates.all.count)
+        XCTAssertEqual(merged.first { $0.id == "yemeksepeti.earnings" }?.version, 3)
+        XCTAssertEqual(merged.count, BundledTemplates.supported.count)
+        // Uygulamada yalnizca iki firmanin sablonlari
+        XCTAssertTrue(merged.allSatisfy { BundledTemplates.supportedPlatformCodes.contains($0.platformCode) })
 
         // 12 saat dolmadan tekrar cekilmez
         now = now.addingTimeInterval(11 * 3600)
@@ -590,7 +593,7 @@ final class SyncCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(fake.fetchCount, 2)
         XCTAssertTrue(sync.remoteTemplates.isEmpty)
-        XCTAssertEqual(sync.mergedTemplates(), BundledTemplates.all)
+        XCTAssertEqual(sync.mergedTemplates(), BundledTemplates.supported)
     }
 
     // MARK: - Planlama kurallari

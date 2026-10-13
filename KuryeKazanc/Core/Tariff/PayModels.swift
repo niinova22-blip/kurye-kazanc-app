@@ -63,9 +63,15 @@ struct PayInput: Codable, Equatable {
     var periodPackages: Int? = nil
     /// Donem hesabinda gunluk bonus kademesine ulasilan gun sayisi (kalem anahtari -> gun).
     var bonusTierDays: [String: Int] = [:]
-    /// Paket Taxi bolge kademesi ("plus" / "standard") ve kidem yili.
+    /// Paket Taxi bolgesi ("r1" / "r23" / "r4") ve kidem yili.
     var regionTier: String? = nil
     var seniorityYears: Int? = nil
+    /// Gunluk calisma suresi (Paket Taxi Restoran 9–12 saat tarifesi).
+    var contractHours: Int? = nil
+    /// Donem hesabinda calisilan gun (gunluk paket primi icin; nil: bilinmiyor).
+    var workDays: Int? = nil
+    /// Teslimatlarin gun / saat dagilimi (Yemeksepeti saat saat ucret). Bos ise gunduz / aksam paketlerinden tahmin.
+    var deliverySlots: [DeliverySlot] = []
 
     var extraPayments: Money = .zero
     var deductions: Money = .zero
@@ -105,6 +111,9 @@ struct PayInput: Codable, Equatable {
         bonusTierDays = try c.decodeIfPresent([String: Int].self, forKey: .bonusTierDays) ?? [:]
         regionTier = try c.decodeIfPresent(String.self, forKey: .regionTier)
         seniorityYears = try c.decodeIfPresent(Int.self, forKey: .seniorityYears)
+        contractHours = try c.decodeIfPresent(Int.self, forKey: .contractHours)
+        workDays = try c.decodeIfPresent(Int.self, forKey: .workDays)
+        deliverySlots = try c.decodeIfPresent([DeliverySlot].self, forKey: .deliverySlots) ?? []
         extraPayments = try c.decodeIfPresent(Money.self, forKey: .extraPayments) ?? .zero
         deductions = try c.decodeIfPresent(Money.self, forKey: .deductions) ?? .zero
         advances = try c.decodeIfPresent(Money.self, forKey: .advances) ?? .zero
@@ -122,6 +131,13 @@ struct PayInput: Codable, Equatable {
     }
 
     func has(flag: String) -> Bool { flags.contains(flag) }
+}
+
+/// Teslimatin gunu ve saati (Takvim: 1 = Pazar ... 7 = Cumartesi; saat 0–23) ve o saatteki paket sayisi.
+struct DeliverySlot: Codable, Equatable {
+    var weekday: Int
+    var hour: Int
+    var count: Int
 }
 
 /// Satirin ait oldugu donem duzeyi. Donem toplamlarinda ayni kalemin iki kez sayilmamasi icin kullanilir:

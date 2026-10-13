@@ -52,8 +52,9 @@ final class ModelTests: XCTestCase {
         DataSeeder.seedPlatformsIfNeeded(in: context)
         let platforms = try context.fetch(FetchDescriptor<Platform>())
         XCTAssertEqual(platforms.count, Platform.defaults.count)
-        XCTAssertTrue(platforms.contains { $0.code == "trendyol_go" })
-        XCTAssertTrue(platforms.contains { $0.code == "getir" })
+        XCTAssertTrue(platforms.contains { $0.code == "yemeksepeti" })
+        XCTAssertTrue(platforms.contains { $0.code == "pt_restoran" })
+        XCTAssertFalse(platforms.contains { $0.code == "getir" })
     }
 
     func testEarningPlatformRelationship() throws {

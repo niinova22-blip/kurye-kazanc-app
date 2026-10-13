@@ -7,10 +7,10 @@ import XCTest
 
 final class TariffComparisonTests: XCTestCase {
     private let day = "2026-10-13"
-    private let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [])
+    private let catalog = TariffCatalog.merged(bundled: TariffFixtures.all, remote: [], user: [])
     private let fuel = FuelCostModel(settings: FuelSettings(entries: [FuelPriceEntry(day: "2026-10-01", pricePerUnit: Money(45), type: .gasoline)],
                                                             consumptionPer100Km: 3), vehicleType: "motorcycle", fallbackCostPerKm: Money(2))
-    private let own = CourierTariffProfile(platformCode: "migros_hemen", regionTier: "plus", seniorityYears: 4, vehicleType: nil,
+    private let own = CourierTariffProfile(platformCode: "migros_hemen", regionTier: "r1", seniorityYears: 4, vehicleType: nil,
                                            flags: ["woman_employment"])
     private let workload = WorkloadSpec(packagesPerDay: 38, hoursPerDay: 9, kmPerPackage: Decimal(string: "3.5")!, daysPerMonth: 26)
 
@@ -26,19 +26,28 @@ final class TariffComparisonTests: XCTestCase {
         XCTAssertTrue(rows.allSatisfy { $0.netPerHour != nil })
     }
 
-    func testOtherFirmsUseLowestSeniority() {
-        let (profile, notes) = TariffComparison.comparisonProfile(for: "migros_hemen",
-            own: CourierTariffProfile(platformCode: "getir", regionTier: nil, seniorityYears: 5, vehicleType: "motorcycle", flags: []),
+    func testOtherFirmsUseLowestRegionAndNoSeniority() {
+        // Yemeksepeti kuryesi Paket Taxi Restoran'a bakarsa: bolge kodu farkli -> en dusuk (4.) bolge, gunde 10 saat, kidemsiz
+        let (profile, notes) = TariffComparison.comparisonProfile(for: "pt_restoran",
+            own: CourierTariffProfile(platformCode: "yemeksepeti", regionTier: "ys_istanbul", seniorityYears: 5, vehicleType: nil, flags: []),
             catalog: catalog, day: day)
         XCTAssertEqual(profile.seniorityYears, 0)
-        XCTAssertEqual(profile.regionTier, "standard") // kendi kademesi yok -> en dusuk sabit ucretli kademe
-        XCTAssertTrue(notes.contains("yeni başlayan kademesiyle"))
+        XCTAssertEqual(profile.regionTier, "r4")
+        XCTAssertEqual(profile.contractHours, 10)
+        XCTAssertTrue(notes.contains("kıdem primi olmadan"))
+        XCTAssertTrue(notes.contains("en düşük ücretli bölgeyle"))
+        // Paket Taxi kollari arasinda bolge ayni kalir
+        let (branch, branchNotes) = TariffComparison.comparisonProfile(for: "pt_migros", own: own, catalog: catalog, day: day)
+        XCTAssertEqual(branch.regionTier, "r1")
+        XCTAssertFalse(branchNotes.contains("en düşük ücretli bölgeyle"))
+        // Paket Taxi kuryesi Yemeksepeti'ne bakarsa: haftalik bonusu toplamda en dusuk grup (3. grup iller)
+        XCTAssertEqual(TariffComparison.comparisonProfile(for: "yemeksepeti", own: own, catalog: catalog, day: day).0.regionTier, "ys_group3")
     }
 
     func testOwnFirmKeepsOwnSeniorityAndTier() {
         let (profile, notes) = TariffComparison.comparisonProfile(for: "migros_hemen", own: own, catalog: catalog, day: day)
         XCTAssertEqual(profile.seniorityYears, 4)
-        XCTAssertEqual(profile.regionTier, "plus")
+        XCTAssertEqual(profile.regionTier, "r1")
         XCTAssertTrue(notes.isEmpty)
     }
 
@@ -69,7 +78,7 @@ final class TariffComparisonTests: XCTestCase {
     }
 
     func testFuelCorrelation() {
-        var old = BundledTariffs.all.first { $0.platformCode == "trendyol_go" }!
+        var old = TariffFixtures.all.first { $0.platformCode == "trendyol_go" }!
         old.id = "u-ty-1"
         old.origin = .user
         old.versionNumber = 10
@@ -88,7 +97,7 @@ final class TariffComparisonTests: XCTestCase {
             i.amount = Money(Money.round(i.amount.value * Decimal(string: "1.08")!))
             return i
         }
-        let cat = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [old, new])
+        let cat = TariffCatalog.merged(bundled: TariffFixtures.all, remote: [], user: [old, new])
         let rising = FuelCostModel(settings: FuelSettings(entries: [
             FuelPriceEntry(day: "2026-07-20", pricePerUnit: Money(40), type: .gasoline),
             FuelPriceEntry(day: "2026-08-25", pricePerUnit: Money(Decimal(string: "44.4")!), type: .gasoline)]),
@@ -102,13 +111,13 @@ final class TariffComparisonTests: XCTestCase {
     }
 
     func testFuelUpTariffFlatIsCheck() {
-        var old = BundledTariffs.all.first { $0.platformCode == "trendyol_go" }!
+        var old = TariffFixtures.all.first { $0.platformCode == "trendyol_go" }!
         old.id = "u-ty-1"; old.origin = .user; old.versionNumber = 10; old.effectiveFrom = "2026-08-01"; old.effectiveUntil = "2026-08-31"
         old.items = old.items.map { var i = $0; i.id = "u1-" + i.id; i.versionID = "u-ty-1"; return i }
         var new = old
         new.id = "u-ty-2"; new.versionNumber = 11; new.effectiveFrom = "2026-09-01"; new.effectiveUntil = nil
         new.items = old.items.map { var i = $0; i.id = "u2-" + i.id; i.versionID = "u-ty-2"; return i }
-        let cat = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [old, new])
+        let cat = TariffCatalog.merged(bundled: TariffFixtures.all, remote: [], user: [old, new])
         let rising = FuelCostModel(settings: FuelSettings(entries: [
             FuelPriceEntry(day: "2026-07-20", pricePerUnit: Money(40), type: .gasoline),
             FuelPriceEntry(day: "2026-08-25", pricePerUnit: Money(44), type: .gasoline)]),

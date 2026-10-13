@@ -45,6 +45,8 @@ enum GoalAlternatives {
     static func suggest(base: GoalPlan, planner: GoalPlanner, profile: CourierTariffProfile, pace: PaceEstimate,
                         day: String, limit: Int = 3) -> [GoalAlternative] {
         guard pace.packagesPerHour > 0 else { return [] }
+        var planner = planner
+        if let share = base.goal.nightShare { planner.nightShare = share }
         let baseHours: Decimal = base.reachability == .alreadyMet ? 0 : base.hoursPerDay * Decimal(base.workDays)
         let baseReached: Bool = base.reachability == .reachable || base.reachability == .alreadyMet
         guard base.reachability != .alreadyMet else { return [] }
@@ -78,7 +80,7 @@ enum GoalAlternatives {
         var options: [GoalAlternative] = []
         for days in [5, 6, 7] where days != base.goal.daysPerWeek {
             let goal = GoalSpec(amount: base.goal.amount, period: base.goal.period, daysPerWeek: days,
-                                maxHoursPerDay: max(base.goal.maxHoursPerDay, maxHoursPerDay))
+                                maxHoursPerDay: max(base.goal.maxHoursPerDay, maxHoursPerDay), nightShare: base.goal.nightShare)
             guard case let .success(plan) = planner.plan(goal: goal, profile: profile, pace: pace, day: day),
                   plan.reachability == .reachable, plan.hoursPerDay <= maxHoursPerDay else { continue }
             let hours: Decimal = plan.hoursPerDay * Decimal(plan.workDays)
@@ -117,9 +119,9 @@ enum GoalAlternatives {
         for item in items {
             guard let lower = item.lowerThreshold else { continue }
             let threshold: Int = PayEngine.decimalInt(lower)
-            if GoalPlanner.isPlannableTier(item, unit: .day, flags: profile.flags) {
+            if GoalPlanner.isPlannableTier(item, unit: .day, flags: profile.flags, regionTier: profile.regionTier) {
                 perDayTargets.insert(threshold)
-            } else if GoalPlanner.isPlannableTier(item, unit: .week, flags: profile.flags), item.conditions.weekdays == nil {
+            } else if GoalPlanner.isPlannableTier(item, unit: .week, flags: profile.flags, regionTier: profile.regionTier), item.conditions.weekdays == nil {
                 for days in 1...7 { perDayTargets.insert(Int((Double(threshold) / Double(days)).rounded(.up))) }
             }
         }
@@ -205,6 +207,48 @@ enum GoalAlternatives {
             id: "evening", kind: .evening, title: "Yoğun akşam saatlerinde çalış", detail: detail,
             daysPerWeek: plan.goal.daysPerWeek, packagesPerDay: plan.packagesPerDay, hoursPerDay: plan.hoursPerDay,
             monthlyHours: hours, net: plan.net, hoursSaved: saved, extraNet: plan.net - base.net)
+    }
+
+    // MARK: - Uygulama
+
+    /// Oneriyi kayitli hedefe cevirir. Gun / bonus: ayni tutar, yeni gun sayisi ve gunluk sure. Sonraki kademe: hedef
+    /// tutar o kademenin netine cikar (10 TL'ye asagi yuvarlanir). Aksam: paketlerin yarisi aksam / gece bandinda planlanir.
+    static func applied(_ alternative: GoalAlternative, to goal: GoalSpec) -> GoalSpec {
+        let neededHours: Decimal = GoalPlanner.roundUpToHalf(alternative.hoursPerDay)
+        let wholeHours: Int = Int(NSDecimalNumber(decimal: neededHours).doubleValue.rounded(.up))
+        let hours: Decimal = min(16, max(goal.maxHoursPerDay, Decimal(wholeHours)))
+        let days: Int = min(7, max(1, alternative.daysPerWeek))
+        let weekdays: [Int]?
+        if goal.period == .day {
+            weekdays = nil
+        } else if days == goal.daysPerWeek, let current = goal.workWeekdays {
+            weekdays = current
+        } else {
+            weekdays = GoalSpec.defaultWeekdays(count: days)
+        }
+        var amount: Money = goal.amount
+        var night: Decimal? = goal.nightShare
+        switch alternative.kind {
+        case .nextTier:
+            let monthWorkDays: Int = GoalSpec.monthWorkDays(daysPerWeek: days)
+            let monthly: Decimal = alternative.net.value
+            let periodValue: Decimal
+            switch goal.period {
+            case .month: periodValue = monthly
+            case .week: periodValue = monthly * Decimal(days) / Decimal(max(1, monthWorkDays))
+            case .day: periodValue = monthly / Decimal(max(1, monthWorkDays))
+            }
+            let floored: Decimal = NSDecimalNumber(decimal: periodValue / 10).rounding(accordingToBehavior:
+                NSDecimalNumberHandler(roundingMode: .down, scale: 0, raiseOnExactness: false, raiseOnOverflow: false,
+                                       raiseOnUnderflow: false, raiseOnDivideByZero: false)).decimalValue * 10
+            if floored > amount.value { amount = Money(floored) }
+        case .evening:
+            night = Decimal(string: "0.5")
+        case .days, .bonusPace:
+            break
+        }
+        return GoalSpec(amount: amount, period: goal.period, daysPerWeek: days, maxHoursPerDay: hours,
+                        workWeekdays: weekdays, nightShare: night)
     }
 
     private static func alternative(_ id: String, _ kind: GoalAlternative.Kind, _ title: String, _ detail: String,

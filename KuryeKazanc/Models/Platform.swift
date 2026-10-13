@@ -1,12 +1,12 @@
 import Foundation
 import SwiftData
 
-/// Kurye platformu (Trendyol GO, Getir, Yemeksepeti, ...).
+/// Kurye platformu (Yemeksepeti Express, Paket Taxi kollari).
 @Model
 final class Platform {
     @Attribute(.unique) var id: UUID
     var name: String
-    /// Sabit, dile bagimsiz anahtar (or. "trendyol_go"). OCR sablon eslestirmesi ve
+    /// Sabit, dile bagimsiz anahtar (or. "yemeksepeti"). OCR sablon eslestirmesi ve
     /// ileride anonim havuzda platform bazli toplama icin isim yerine bu kullanilir.
     @Attribute(.unique) var code: String
     var sortOrder: Int
@@ -26,14 +26,11 @@ final class Platform {
 
 extension Platform {
     /// Ilk acilista eklenen varsayilan platformlar.
+    /// 1.9: yalnizca iki firma (Paket Taxi'nin uc kolu ayri).
     static let defaults: [(code: String, name: String)] = [
-        ("trendyol_go", "Trendyol GO"),
-        ("getir", "Getir"),
-        ("yemeksepeti", "Yemeksepeti"),
-        ("migros_hemen", "Migros Hemen"),
-        ("uber", "Uber"),
-        ("thekurye", "TheKurye"),
-        ("banabikurye", "Banabikurye"),
-        ("other", "Diğer"),
+        ("yemeksepeti", "Yemeksepeti Express"),
+        ("pt_restoran", "Paket Taxi Restoran"),
+        ("pt_migros", "Paket Taxi Migros"),
+        ("migros_hemen", "Paket Taxi Migros Hemen"),
     ]
 }

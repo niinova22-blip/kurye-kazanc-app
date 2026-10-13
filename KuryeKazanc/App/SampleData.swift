@@ -16,12 +16,12 @@ enum SampleData {
         func at(_ hour: Int) -> Date { calendar.date(byAdding: .hour, value: hour, to: today)! }
 
         context.insert(EarningRecord(
-            startTime: at(9), endTime: at(13), platform: platform("trendyol_go"),
+            startTime: at(9), endTime: at(13), platform: platform("yemeksepeti"),
             province: "İstanbul", district: "Kadıköy",
             grossEarning: 600, bonus: 50, distanceKm: 40, packageCount: 14, source: .manual
         ))
         context.insert(EarningRecord(
-            startTime: at(12), endTime: at(15), platform: platform("getir"),
+            startTime: at(12), endTime: at(15), platform: platform("migros_hemen"),
             province: "İstanbul", district: "Ataşehir",
             grossEarning: 400, bonus: 0, distanceKm: 20, packageCount: 9, source: .ocr, verification: .ocrUnverified
         ))
@@ -30,7 +30,7 @@ enum SampleData {
         if (try? context.fetchCount(FetchDescriptor<Courier>())) == 0 {
             context.insert(Courier(
                 name: "Örnek Kurye", vehicleType: .motorcycle,
-                defaultPlatforms: [platform("trendyol_go"), platform("getir")].compactMap { $0 }
+                defaultPlatforms: [platform("yemeksepeti"), platform("migros_hemen")].compactMap { $0 }
             ))
         }
         try? context.save()

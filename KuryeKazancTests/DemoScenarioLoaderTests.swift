@@ -32,7 +32,7 @@ final class DemoScenarioLoaderTests: XCTestCase {
         context.insert(real)
         try context.save()
         let payroll = makeModel()
-        payroll.chooseFirm("getir", regionTier: nil, seniorityYears: nil, vehicleType: "motorcycle", flags: [])
+        payroll.chooseFirm("yemeksepeti", regionTier: "ys_istanbul", seniorityYears: nil, vehicleType: nil, flags: [])
         let loader = DemoScenarioLoader(payroll: payroll, context: context, defaults: defaults)
         XCTAssertTrue(loader.hasRealData)
 
@@ -48,7 +48,7 @@ final class DemoScenarioLoaderTests: XCTestCase {
         XCTAssertTrue(payroll.state.demoLogIDs.isEmpty)
         XCTAssertTrue(payroll.state.logs.isEmpty)
         // Senaryo oncesi firma geri gelir
-        XCTAssertEqual(payroll.tariffProfile?.platformCode, "getir")
+        XCTAssertEqual(payroll.tariffProfile?.platformCode, "yemeksepeti")
         XCTAssertTrue(payroll.state.fuel.entries.isEmpty)
     }
 
