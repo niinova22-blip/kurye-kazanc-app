@@ -41,7 +41,7 @@ final class PayrollUITests: XCTestCase {
         let save = app.buttons["manual.save"]
         if !save.isHittable { app.swipeUp() }
         save.tap()
-        let add = app.alerts.buttons["Evet, ekle"]
+        let add = app.alerts.buttons["Evet, ekle"].firstMatch
         XCTAssertTrue(add.waitForExistence(timeout: 5), "Hesap bitince bugune eklensin mi diye sorulmali")
         add.tap()
 
@@ -73,7 +73,7 @@ final class PayrollUITests: XCTestCase {
         let save = app.buttons["manual.save"]
         if !save.isHittable { app.swipeUp() }
         save.tap()
-        let skip = app.alerts.buttons["Hayır, yalnızca hesapladım"]
+        let skip = app.alerts.buttons["Hayır, yalnızca hesapladım"].firstMatch
         XCTAssertTrue(skip.waitForExistence(timeout: 5))
         skip.tap()
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 8))
@@ -118,6 +118,10 @@ final class PayrollUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["payroll.platformName"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Kendi değerlerinle hesaplanıyor"].waitForExistence(timeout: 5))
         edit.tap()
-        XCTAssertTrue(app.buttons["tariffEdit.reset"].waitForExistence(timeout: 5))
+        // "Firma değerlerine dön" uzun kalem listesinin altinda: kaydirarak bulunur
+        XCTAssertTrue(app.buttons["tariffEdit.save"].waitForExistence(timeout: 5))
+        let reset = app.buttons["tariffEdit.reset"]
+        for _ in 0..<12 where !reset.exists { app.swipeUp() }
+        XCTAssertTrue(reset.waitForExistence(timeout: 5))
     }
 }
