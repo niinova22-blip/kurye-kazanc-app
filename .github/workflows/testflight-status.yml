@@ -1,0 +1,24 @@
+name: TestFlight durumu
+
+# Son buildlerin App Store Connect durumu (isleme, beta, sifreleme beyani) ve beta gruplari.
+# add_to_group: en yeni build'i "tum buildler" acik olmayan ic test gruplarina ekler.
+on:
+  workflow_dispatch:
+    inputs:
+      add_to_group:
+        description: "En yeni build'i ic test gruplarina ekle"
+        type: boolean
+        default: true
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    env:
+      APP_STORE_APPLE_ID: "6819440649"
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyjwt cryptography
+      - run: python3 scripts/ci/testflight_status.py ${{ inputs.add_to_group && '--add' || '' }}
