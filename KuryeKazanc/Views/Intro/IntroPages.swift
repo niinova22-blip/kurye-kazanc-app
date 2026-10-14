@@ -253,7 +253,7 @@ private struct GoalIllustration: View {
                 .frame(width: 200, height: 200)
             Circle()
                 .trim(from: 0, to: fraction)
-                .stroke(AngularGradient(colors: [Color(hex: 0x9FB0FF), Theme.positive, Color(hex: 0x9FB0FF)], center: .center),
+                .stroke(AngularGradient(colors: [Theme.brandGlow, Theme.positive, Theme.brandGlow], center: .center),
                         style: StrokeStyle(lineWidth: 20, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .frame(width: 200, height: 200)

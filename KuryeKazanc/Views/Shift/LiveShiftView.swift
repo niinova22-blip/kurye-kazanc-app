@@ -185,7 +185,7 @@ struct LiveShiftView: View {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title)
-                    .foregroundStyle(Color(hex: 0x6EE7B7))
+                    .foregroundStyle(Theme.mintOnDark)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(feedback.zone.title) · 1 paket eklendi")
                         .font(.headline)

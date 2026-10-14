@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 /// Ilk acilisin ilk ekrani: "Hangi firmayla calisiyorsun?" — Yemeksepeti Express ya da Paket Taxi. Paket Taxi secilince
 /// kol (Restoran / Migros / Migros Hemen) sorulur; her kolun tarifesi ayridir. Secim tanitimdan ve kurulumdan once yapilir.
@@ -9,11 +8,7 @@ struct FirmWelcomeView: View {
     @State private var brand: String?
     @State private var branch: String?
     @State private var appeared = false
-    /// Apple ile giris sonrasi yedekten geri yukleme sonucu (ya da hata) kisa metin olarak.
-    @State private var accountMessage: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AccountService.self) private var account
 
     /// Secilen tarife kodu (kolu olmayan firmada firmanin tek kolu).
     private var chosenCode: String? {
@@ -166,42 +161,6 @@ struct FirmWelcomeView: View {
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.75))
                 .multilineTextAlignment(.center)
-            accountRow
-        }
-    }
-
-    /// Istege bagli Apple ile Giris: daha once yedek aldiysa kayitlari geri gelir. Atlanabilir.
-    @ViewBuilder private var accountRow: some View {
-        if account.isServerAvailable {
-            if account.isSignedInWithApple {
-                Label(accountMessage ?? "Apple ile giriş yapıldı", systemImage: "checkmark.seal.fill")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .accessibilityIdentifier("welcome.signedIn")
-            } else {
-                VStack(spacing: 6) {
-                    AppleSignInButton(style: .white, onSignedIn: restoreBackup, onFailure: { accountMessage = $0 })
-                    Text(accountMessage ?? "İsteğe bağlı: kayıtların yedeklenir, telefon değiştirince geri gelir.")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.75))
-                        .multilineTextAlignment(.center)
-                }
-            }
-        }
-    }
-
-    /// Girisli kullanicinin yedegi varsa kayitlar bu cihaza eklenir; yedek yoksa sessizce devam edilir.
-    private func restoreBackup() {
-        let service: AccountService = account
-        let context: ModelContext = modelContext
-        Task { @MainActor in
-            let platforms: [Platform] = (try? context.fetch(FetchDescriptor<Platform>())) ?? []
-            do {
-                let result: (added: Int, skipped: Int) = try await service.restore(context: context, platforms: platforms)
-                accountMessage = result.added > 0 ? "Giriş yapıldı · \(result.added) kayıt geri yüklendi" : "Apple ile giriş yapıldı"
-            } catch {
-                accountMessage = "Apple ile giriş yapıldı"
-            }
         }
     }
 
@@ -259,9 +218,9 @@ struct AnimatedBrandBackground: View {
                 let size: CGSize = proxy.size
                 ZStack {
                     Theme.brandGradient
-                    blob(Color(hex: 0x7C8CFF), size: size.width * 1.1,
+                    blob(Theme.brandGlow, size: size.width * 1.1,
                          x: size.width * (0.15 + 0.12 * sin(t / 6)), y: size.height * (0.12 + 0.06 * cos(t / 7)))
-                    blob(Color(hex: 0xB04BFF), size: size.width * 0.9,
+                    blob(Color(hex: 0x14B8C8), size: size.width * 0.9,
                          x: size.width * (0.95 + 0.1 * cos(t / 8)), y: size.height * (0.55 + 0.08 * sin(t / 5)))
                     blob(Color(hex: 0x2BD9A6), size: size.width * 0.7,
                          x: size.width * (0.2 + 0.1 * sin(t / 9)), y: size.height * (1.0 + 0.05 * cos(t / 6)))

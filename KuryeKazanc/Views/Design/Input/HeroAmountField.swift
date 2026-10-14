@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Buyuk TL girisi: odakta vurgu parlamasi + titresim, gecersiz degerde sallanma, rakam gecis animasyonu.
+/// 1.11: yazarken binlik ayracla gosterilir ("100000" -> "100.000"); kurus icin virgul yazilabilir.
 struct HeroAmountField: View {
     let title: String
     @Binding var value: Decimal?
@@ -18,7 +19,7 @@ struct HeroAmountField: View {
                 .foregroundStyle(.secondary)
             field
         }
-        .onAppear { text = value.map { Formatters.decimalText($0) } ?? "" }
+        .onAppear { text = value.map(Self.display) ?? "" }
         .onChange(of: focused) { _, isFocused in
             if isFocused { Haptics.selection() }
         }
@@ -26,7 +27,7 @@ struct HeroAmountField: View {
         .onChange(of: value) { _, newValue in
             // Disaridan gelen deger (kayitli hedef yuklendi) odak disindayken metne yansir
             guard !focused else { return }
-            let formatted: String = newValue.map { Formatters.decimalText($0) } ?? ""
+            let formatted: String = newValue.map(Self.display) ?? ""
             if Money.parse(text) != newValue { text = formatted }
         }
     }
@@ -58,12 +59,38 @@ struct HeroAmountField: View {
         .animation(.easeOut(duration: 0.2), value: focused)
     }
 
+    /// Gosterim: tam kisim binlik ayracli, varsa kurus virgulle ("100.000", "1.250,5").
+    static func display(_ amount: Decimal) -> String {
+        let text: String = Formatters.decimalText(amount)
+        let parts: [Substring] = text.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false)
+        let whole: String = grouped(String(parts[0]))
+        return parts.count > 1 ? whole + "," + parts[1] : whole
+    }
+
+    /// Yalnizca rakamlardan olusan tam kismi "100.000" bicimine getirir.
+    static func grouped(_ digits: String) -> String {
+        let clean: String = digits.filter(\.isNumber)
+        guard let number = Int(clean) else { return clean }
+        return Formatters.groupedInt(number)
+    }
+
+    /// Yazilan metin: noktalar binlik ayraci sayilir, virgulden sonrasi kurus. Bicim degisirse metin yeniden yazilir.
     private func parse(_ newText: String) {
         if newText.isEmpty {
             value = nil
             return
         }
-        if let parsed = Money.parse(newText), parsed >= 0 {
+        let parts: [Substring] = newText.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false)
+        let wholeDigits: String = parts[0].replacingOccurrences(of: ".", with: "")
+        var reformatted: String = Self.grouped(wholeDigits)
+        if parts.count > 1 { reformatted += "," + parts[1].filter(\.isNumber).prefix(2) }
+        if !wholeDigits.isEmpty, wholeDigits.allSatisfy(\.isNumber), reformatted != newText {
+            text = reformatted
+            return
+        }
+        // Virgul yeni yazildi ("1.000,"): kurus henuz yok, tutar tam kisimdir
+        let normalized: String = wholeDigits + (parts.count > 1 && !parts[1].isEmpty ? "," + parts[1] : "")
+        if let parsed = Money.parse(normalized), parsed >= 0 {
             value = parsed
         } else {
             Haptics.warning()

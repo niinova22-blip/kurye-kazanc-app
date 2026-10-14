@@ -136,7 +136,7 @@ struct GoalRing: View {
             Circle().stroke(Theme.accent.opacity(0.15), lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: progress.fraction)
-                .stroke(AngularGradient(colors: [Theme.accent, Color(hex: 0x8E3BFF), Theme.positive, Theme.accent],
+                .stroke(AngularGradient(colors: [Theme.accent, Theme.brandBright, Theme.positive, Theme.accent],
                                         center: .center),
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
@@ -160,7 +160,7 @@ struct PrimaryActionButtonStyle: ButtonStyle {
             .background(background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.15), lineWidth: 1))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .shadow(color: (isDestructive ? Theme.negative : Color(hex: 0x3B2BD9)).opacity(configuration.isPressed ? 0.1 : 0.3),
+            .shadow(color: (isDestructive ? Theme.negative : Theme.brandDeep).opacity(configuration.isPressed ? 0.1 : 0.3),
                     radius: configuration.isPressed ? 3 : 12, y: configuration.isPressed ? 2 : 6)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
             .onChange(of: configuration.isPressed) { _, pressed in

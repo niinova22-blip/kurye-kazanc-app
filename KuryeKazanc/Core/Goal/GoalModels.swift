@@ -97,6 +97,31 @@ struct GoalSpec: Codable, Equatable {
         case .month: monthWorkDays
         }
     }
+
+    /// Plan ekraninda gunde en fazla secilebilecek saat (1.11: 16'dan 20'ye).
+    static let maxDailyHours: Int = 20
+
+    /// Bu sinirin ustundeki gunluk karsilik olagan disi sayilir (yanlis donemde yazilmis tutar: aylik 100.000 -> "gunluk").
+    static let unusualDailyAmount: Decimal = 15_000
+
+    /// Ayni hedefin baska donemdeki karsiligi (calisilan gun sayisiyla), 10 TL'ye yuvarlanmis.
+    /// Donem degistirilirken tutar korunursa (aylik 100.000 -> gunluk 100.000) sonuc anlamsiz olur.
+    func amount(in target: GoalPeriod) -> Money {
+        guard target != period else { return amount }
+        let monthly: Decimal = monthlyTarget().value
+        let value: Decimal
+        switch target {
+        case .month: value = monthly
+        case .week: value = monthly * Decimal(daysPerWeek) / Decimal(monthWorkDays)
+        case .day: value = monthly / Decimal(monthWorkDays)
+        }
+        return Money(Money.round(value / 10, scale: 0) * 10)
+    }
+
+    /// Gunluk karsiligi olagan disi yuksek mi (kullaniciya hesaplamadan once sorulur).
+    var isUnusuallyHigh: Bool {
+        amount(in: .day).value > GoalSpec.unusualDailyAmount
+    }
 }
 
 /// Secilen firmanin tarifesinin ihtiyac duydugu kisisel bilgiler.

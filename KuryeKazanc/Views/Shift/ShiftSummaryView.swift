@@ -22,7 +22,7 @@ struct ShiftSummaryView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Vardiya tamamlandı", systemImage: "checkmark.seal.fill")
                         .font(.headline)
-                        .foregroundStyle(Color(hex: 0x6EE7B7))
+                        .foregroundStyle(Theme.mintOnDark)
                     Text("Cebine kalan")
                         .font(.subheadline)
                         .opacity(0.8)
@@ -65,7 +65,7 @@ struct ShiftSummaryView: View {
                     Label("\(progress.label): \(progress.remaining) paket kaldı (\(PayFormat.tl(progress.reward)))",
                           systemImage: "gift.fill")
                         .font(.subheadline)
-                        .foregroundStyle(Color(hex: 0xFCD34D))
+                        .foregroundStyle(Theme.amberOnDark)
                 }
 
                 Text("Kayıt Kazanç ekranına eklendi; Bugün'deki hedef çubuğu da güncellendi.")

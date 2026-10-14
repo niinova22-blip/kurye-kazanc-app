@@ -1,10 +1,10 @@
 import SwiftUI
 import UIKit
 
-/// Tek tasarim kaynagi (1.8). Marka: derin indigo → elektrik mor. Para / basari: nane yesili. Bonus / ipucu: kehribar.
+/// Tek tasarim kaynagi. 1.11: marka lacivert → okyanus mavisi (mor kalkti). Para / basari: nane yesili. Bonus / ipucu: kehribar.
 /// Kirmizi yalnizca gider ve "bitir". Acik ve koyu gorunumde ayri tonlar.
 enum Theme {
-    /// Marka rengi (AccentColor: acikta #5A3FF5, koyuda #8D7DFF).
+    /// Marka rengi (AccentColor: acikta #1F5FE0, koyuda #6EA8FF).
     static let accent = Color.accentColor
     /// Kazanc, net, hedefe ulasildi.
     static let positive = dynamic(light: 0x0F9F6E, dark: 0x34D399)
@@ -18,9 +18,19 @@ enum Theme {
 
     /// Kahraman kartlarinin zemini (Bugun neti, Plan sonucu, tanitim).
     static let brandGradient = LinearGradient(
-        colors: [Color(hex: 0x3B2BD9), Color(hex: 0x6D3BF0), Color(hex: 0x8E3BFF)],
+        colors: [brandDeep, brandMid, brandBright],
         startPoint: .topLeading, endPoint: .bottomTrailing
     )
+
+    /// Marka tonlari (ikonla ayni): lacivert, kobalt, okyanus mavisi ve acik isik.
+    static let brandDeep = Color(hex: 0x0B2A6B)
+    static let brandMid = Color(hex: 0x1E5BD8)
+    static let brandBright = Color(hex: 0x2F8CFF)
+    static let brandGlow = Color(hex: 0x8CC4FF)
+    /// Koyu zeminde para / basari vurgusu.
+    static let mintOnDark = Color(hex: 0x6EE7B7)
+    /// Koyu zeminde bonus vurgusu.
+    static let amberOnDark = Color(hex: 0xFCD34D)
 
     /// Para / basari vurgusu icin yumusak gecis.
     static let positiveGradient = LinearGradient(
@@ -61,7 +71,7 @@ struct BrandCardStyle: ViewModifier {
                 RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                     .strokeBorder(.white.opacity(0.18), lineWidth: 1)
             )
-            .shadow(color: Color(hex: 0x3B2BD9).opacity(0.35), radius: 18, y: 10)
+            .shadow(color: Theme.brandDeep.opacity(0.35), radius: 18, y: 10)
     }
 }
 

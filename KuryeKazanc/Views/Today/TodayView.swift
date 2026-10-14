@@ -20,6 +20,8 @@ struct TodayView: View {
     @Query private var couriers: [Courier]
     /// Hedef ilerlemesi icin tum kazanc kayitlari.
     @Query private var allEarnings: [EarningRecord]
+    /// Donem temposu (gun dokumu) icin tum giderler.
+    @Query private var allExpenses: [ExpenseRecord]
 
     @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
     @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
@@ -32,6 +34,8 @@ struct TodayView: View {
     @State private var showsShiftReplay = false
 
     @State private var activeSheet: Sheet?
+    /// 1.11: ust karta dokununca tam ekran gun dokumu.
+    @State private var showsBreakdown = false
     @State private var showsHelp = false
 
     private let manualTip = ManualCalcTip()
@@ -99,6 +103,12 @@ struct TodayView: View {
         return payroll.fixedShareToday()
     }
 
+    /// Suren vardiyanin su ana kadarki brutu (ust kart ve dokum bunu da gosterir).
+    private var liveGross: Double {
+        guard liveShift.isActive, let live = liveShift.liveEstimate() else { return 0 }
+        return live.gross.doubleValue
+    }
+
     var body: some View {
         let summary: EarningsSummary = TodayViewModel.summary(
             earnings: todaysEarnings,
@@ -126,6 +136,9 @@ struct TodayView: View {
                     if fraction >= 1 { ReminderScheduler.shared.goalReached(day: payroll.today) }
                 }
                 .fullScreenCover(isPresented: $showsLiveShift) { LiveShiftView() }
+                .fullScreenCover(isPresented: $showsBreakdown) {
+                    TodayBreakdownView(content: breakdownContent(summary)) { showsBreakdown = false }
+                }
                 .fullScreenCover(isPresented: $showsShiftTutorial) {
                     ShiftTutorialView(mode: .firstRun) {
                         hasSeenShiftTutorial = true
@@ -275,49 +288,126 @@ struct TodayView: View {
     }
 
     private func heroSection(_ summary: EarningsSummary) -> some View {
+        // Kartin tamami dokununca dokumu acar; icindeki metinler (testler ve VoiceOver) ayri kalsin diye Button degil
         Section {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Label(PayrollModel.platformName(payroll.tariffProfile?.platformCode ?? ""), systemImage: "building.2.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    Spacer()
-                    if workSession.isWorking || liveShift.isActive {
-                        Label("Vardiyada", systemImage: "dot.radiowaves.left.and.right")
-                            .font(.caption.weight(.bold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Theme.positive.opacity(0.35), in: Capsule())
-                            .symbolEffect(.pulse)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    HeroAmount(title: "Bugün cebine kalan", value: summary.netEarnings + fixedShareToday.doubleValue,
-                               identifier: "dashboard.netEarnings")
-                    NetBreakdownLine(gross: summary.totalEarnings + fixedShareToday.doubleValue, expenses: summary.totalExpenses)
-                    if fixedShareToday.value > 0 {
-                        Text("Sabit ücretin bugüne düşen payı dahil: \(PayFormat.tl(fixedShareToday))")
-                            .font(.footnote)
-                            .opacity(0.8)
-                            .accessibilityIdentifier("dashboard.fixedShare")
-                    }
-                }
-                MetricStrip(metricItems(summary, extraNet: fixedShareToday.doubleValue))
-                    .padding(12)
-                    .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                if summary.usesEstimatedExpenses {
-                    Text("Yakıt (km × tüketim × fiyat): \(Formatters.currency(summary.estimatedExpenses))")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .brandCard()
-            .environment(\.colorScheme, .dark)
-            .padding(.vertical, 4)
+            heroCard(summary)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: openBreakdown)
+                .accessibilityAction(named: "Bugünün dökümünü aç", openBreakdown)
         }
         .listRowInsets(EdgeInsets())
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
+    }
+
+    private func heroCard(_ summary: EarningsSummary) -> some View {
+        let extra: Double = fixedShareToday.doubleValue + liveGross
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label(PayrollModel.platformName(payroll.tariffProfile?.platformCode ?? ""), systemImage: "building.2.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Spacer()
+                if workSession.isWorking || liveShift.isActive {
+                    Label("Vardiyada", systemImage: "dot.radiowaves.left.and.right")
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.positive.opacity(0.35), in: Capsule())
+                        .symbolEffect(.pulse)
+                }
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                HeroAmount(title: "Bugün cebine kalan", value: summary.netEarnings + extra,
+                           identifier: "dashboard.netEarnings")
+                NetBreakdownLine(gross: summary.totalEarnings + extra, expenses: summary.totalExpenses)
+                if fixedShareToday.value > 0 {
+                    Text("Sabit ücretin bugüne düşen payı dahil: \(PayFormat.tl(fixedShareToday))")
+                        .font(.footnote)
+                        .opacity(0.8)
+                        .accessibilityIdentifier("dashboard.fixedShare")
+                }
+            }
+            MetricStrip(metricItems(summary, extraNet: fixedShareToday.doubleValue))
+                .padding(12)
+                .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            Button(action: openBreakdown) {
+                HStack {
+                    Label("Kalem kalem döküm ve hedefe göre durum", systemImage: "list.bullet.rectangle.portrait")
+                        .font(.footnote.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.footnote.weight(.bold))
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
+                .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("today.breakdown")
+        }
+        .brandCard()
+        .environment(\.colorScheme, .dark)
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Gun dokumu
+
+    private func openBreakdown() {
+        Haptics.selection()
+        showsBreakdown = true
+    }
+
+    private func breakdownContent(_ summary: EarningsSummary) -> TodayBreakdownView.Content {
+        let recordIDs: Set<UUID> = Set(todaysEarnings.map(\.id))
+        let todayLogs: [WorkLog] = payroll.logs.filter { log in
+            guard log.isDaily, log.startDay == payroll.today, let id = log.earningRecordID else { return false }
+            return recordIDs.contains(id)
+        }
+        let linked: Set<UUID> = Set(todayLogs.compactMap(\.earningRecordID))
+        let logInputs: [(detail: PayDetail, recordTotal: Money?)] = todayLogs.map { log in
+            let record: EarningRecord? = todaysEarnings.first { $0.id == log.earningRecordID }
+            let total: Money? = record.map { Money(Money.round(Decimal($0.grossEarning + $0.bonus))) }
+            return (PayDetailBuilder.make(breakdown: log.result, days: 1), total)
+        }
+        let unlinked: Double = todaysEarnings.filter { !linked.contains($0.id) }.map { $0.grossEarning + $0.bonus }.reduce(0, +)
+        let worked: Bool = !todaysEarnings.isEmpty || liveShift.isActive
+        let breakdown = DayBreakdown.make(logs: logInputs, unlinkedRecords: Money(Money.round(Decimal(unlinked))),
+                                          liveShift: Money(Money.round(Decimal(liveGross))),
+                                          fixedShare: worked ? payroll.fixedShareRowsToday() : [])
+        let manual: [(label: String, amount: Double)] = todaysExpenses.map { ($0.type.displayName, $0.amount) }
+        let net: Double = summary.netEarnings + fixedShareToday.doubleValue + liveGross
+        let packages: Int = todaysEarnings.compactMap(\.packageCount).reduce(0, +) + liveShift.packageCount
+        return TodayBreakdownView.Content(
+            breakdown: breakdown, packages: packages, workDuration: summary.workDuration, distanceKm: summary.distanceKm,
+            fuelEstimate: summary.estimatedExpenses, manualExpenses: manual, net: net,
+            dailyTarget: dailyProgress?.targetNet, pace: goalPace(todayNet: net), goal: payroll.goal
+        )
+    }
+
+    /// Hedef doneminde calisilan gunlerin netleri (gecmis gunlere sabit ucret payi eklenir; bugun ust karttaki net).
+    private func goalPace(todayNet: Double) -> GoalPace? {
+        guard let goal = payroll.goal else { return nil }
+        let todayMoney = Money(Money.round(Decimal(todayNet)))
+        guard goal.period != .day else { return GoalPace.project(goal: goal, dailyNets: [todayMoney]) }
+        let range: (start: String, end: String) = goal.period == .week
+            ? payroll.weekRange(containing: .now)
+            : payroll.monthRange(containing: .now)
+        let calculator = EarningsCalculator(costPerKm: effectiveCostPerKm, autoEstimateEnabled: autoEstimate)
+        let earnings: [(day: Date, entry: EarningEntry)] = allEarnings.compactMap { record in
+            let key: String = payroll.day(record.date)
+            guard key >= range.start, key < payroll.today else { return nil }
+            return (record.date, record.entry)
+        }
+        let expenses: [(day: Date, entry: ExpenseEntry)] = allExpenses.compactMap { record in
+            let key: String = payroll.day(record.date)
+            guard key >= range.start, key < payroll.today else { return nil }
+            return (record.date, record.entry)
+        }
+        let share: Double = payroll.fixedShareToday().doubleValue
+        let days: [EarningsSummary] = Array(calculator.summarizeByDay(earnings: earnings, expenses: expenses).values)
+        let past: [Money] = days.filter { $0.totalEarnings > 0 }
+            .map { Money(Money.round(Decimal($0.netEarnings + share))) }
+        return GoalPace.project(goal: goal, dailyNets: past + [todayMoney])
     }
 
     /// Yakit fiyati 7 gunden eskiyse (ya da hic girilmediyse) guncelleme satiri.

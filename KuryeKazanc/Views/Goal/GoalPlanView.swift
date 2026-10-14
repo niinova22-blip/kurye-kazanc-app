@@ -15,6 +15,10 @@ struct GoalPlanView: View {
     @State private var maxHours = 10
     @State private var showsHelp = false
     @State private var saved = false
+    /// 1.11: tutar yazilmisken donem degisirse once sorulur (aylik 100.000 "gunluk 100.000" olmasin).
+    @State private var pendingPeriod: GoalPeriod?
+    /// Gunluk karsiligi olagan disi yuksek hedef: hesaplamadan once onay.
+    @State private var confirmsHighGoal = false
 
     var body: some View {
         let entries: [EarningEntry] = records.map(\.entry)
@@ -31,6 +35,31 @@ struct GoalPlanView: View {
                 VerificationFootnote(items: unverified(result))
             }
             .dismissesKeyboard()
+            .confirmationDialog(periodQuestion, isPresented: periodDialogShown, titleVisibility: .visible,
+                                presenting: pendingPeriod) { target in
+                if let converted = convertedAmount(to: target) {
+                    Button("\(PayFormat.tl(converted)) ile yeniden hesapla") {
+                        amount = converted.value
+                        withAnimation(.snappy) { period = target }
+                        save(proxy: proxy, confirmed: true)
+                    }
+                    .accessibilityIdentifier("plan.convert")
+                }
+                Button("Tutarı kendim yazacağım") {
+                    withAnimation(.snappy) { period = target }
+                    amount = nil
+                }
+                .accessibilityIdentifier("plan.retype")
+                Button("Vazgeç", role: .cancel) {}
+            } message: { target in
+                Text(periodMessage(target))
+            }
+            .alert("Bu hedef çok yüksek görünüyor", isPresented: $confirmsHighGoal) {
+                Button("Yine de hesapla") { save(proxy: proxy, confirmed: true) }
+                Button("Tutarı düzelt", role: .cancel) {}
+            } message: {
+                Text(highGoalMessage)
+            }
         }
         .navigationTitle("Plan")
         .toolbar { HelpBubble(screen: .plan, showsScreenHelp: $showsHelp, showIntro: showIntro) }
@@ -46,7 +75,7 @@ struct GoalPlanView: View {
 
     private func inputSection(proxy: ScrollViewProxy) -> some View {
         Section {
-            Picker("Hedef dönemi", selection: $period.animation(.snappy)) {
+            Picker("Hedef dönemi", selection: periodBinding) {
                 ForEach(GoalPeriod.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -55,7 +84,7 @@ struct GoalPlanView: View {
             if period != .day {
                 WeekdayPicker(selection: $weekdays, identifier: "plan.days")
             }
-            CountStepper(title: "Günde en fazla", value: $maxHours, range: 2...16, unit: "saat", identifier: "plan.hours")
+            CountStepper(title: "Günde en fazla", value: $maxHours, range: 2...GoalSpec.maxDailyHours, unit: "saat", identifier: "plan.hours")
             Button {
                 save(proxy: proxy)
             } label: {
@@ -101,14 +130,60 @@ struct GoalPlanView: View {
         maxHours = NSDecimalNumber(decimal: goal.maxHoursPerDay).intValue
     }
 
-    private func save(proxy: ScrollViewProxy) {
-        guard let amount, amount > 0 else { return }
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    /// Ekrandaki girdilerle hedef (kaydedilmeden).
+    private var draftSpec: GoalSpec? {
+        guard let amount, amount > 0 else { return nil }
         let days: [Int]? = period == .day ? nil : weekdays.sorted()
-        let previous: GoalSpec? = payroll.goal
-        let dayCount: Int = period == .day ? (previous?.daysPerWeek ?? 6) : weekdays.count
-        payroll.setGoal(GoalSpec(amount: Money(amount), period: period, daysPerWeek: dayCount,
-                                 maxHoursPerDay: Decimal(maxHours), workWeekdays: days))
+        let dayCount: Int = period == .day ? (payroll.goal?.daysPerWeek ?? 6) : weekdays.count
+        return GoalSpec(amount: Money(amount), period: period, daysPerWeek: dayCount,
+                        maxHoursPerDay: Decimal(maxHours), workWeekdays: days)
+    }
+
+    /// Tutar yazilmissa donem degisikligi onaya gider; bos ise dogrudan degisir.
+    private var periodBinding: Binding<GoalPeriod> {
+        Binding(get: { period }, set: { newValue in
+            guard newValue != period else { return }
+            if (amount ?? 0) > 0 {
+                Haptics.selection()
+                pendingPeriod = newValue
+            } else {
+                withAnimation(.snappy) { period = newValue }
+            }
+        })
+    }
+
+    private var periodDialogShown: Binding<Bool> {
+        Binding(get: { pendingPeriod != nil }, set: { if !$0 { pendingPeriod = nil } })
+    }
+
+    private var periodQuestion: String {
+        "Hedef dönemi değişecek, plan yeniden hesaplanacak. Emin misin?"
+    }
+
+    private func convertedAmount(to target: GoalPeriod) -> Money? {
+        draftSpec?.amount(in: target)
+    }
+
+    private func periodMessage(_ target: GoalPeriod) -> String {
+        guard let spec = draftSpec, let converted = convertedAmount(to: target) else { return "" }
+        return "\(spec.period.displayName) \(PayFormat.tl(spec.amount)) ≈ \(target.displayName.lowercased()) \(PayFormat.tl(converted)) "
+            + "(haftada \(spec.daysPerWeek) gün). Aynı tutarı \(target.displayName.lowercased()) hedef olarak hesaplamak çok farklı sonuç verir."
+    }
+
+    private var highGoalMessage: String {
+        guard let spec = draftSpec else { return "" }
+        return "\(spec.period.displayName) \(PayFormat.tl(spec.amount)) hedef, günde yaklaşık \(PayFormat.tl(spec.amount(in: .day))) demek. "
+            + "Tutarı doğru dönemde yazdığından emin misin?"
+    }
+
+    private func save(proxy: ScrollViewProxy, confirmed: Bool = false) {
+        guard let spec = draftSpec else { return }
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        if !confirmed, spec.isUnusuallyHigh {
+            confirmsHighGoal = true
+            return
+        }
+        payroll.setGoal(spec)
         withAnimation { saved = true }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(350))

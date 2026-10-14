@@ -126,10 +126,15 @@ final class PayrollModel {
 
     /// Aylik sabit ucretin (ve kidem priminin) bugune dusen payi: Paket Taxi'de calisilan gun bir kez eklenir.
     func fixedShareToday() -> Money {
-        guard let version = currentVersion() else { return .zero }
+        fixedShareRowsToday().map(\.perDay).sum()
+    }
+
+    /// Sabit ucret kalemleri ve bugune dusen paylari (Bugun dokumu kalem kalem gosterir).
+    func fixedShareRowsToday() -> [PayDetailRow] {
+        guard let version = currentVersion() else { return [] }
         return PayDetailBuilder.fixedShares(version: version, day: today, regionTier: state.regionTier, days: 1,
                                             monthWorkDays: state.goal?.monthWorkDays ?? 26, contractHours: state.contractHours,
-                                            seniorityYears: state.seniorityYears).map(\.perDay).sum()
+                                            seniorityYears: state.seniorityYears)
     }
 
     /// Konumdan gelen bolge onerisini profile yazar (yalnizca degisiklik varsa).

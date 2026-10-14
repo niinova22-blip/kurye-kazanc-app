@@ -29,12 +29,6 @@ struct ProfileView: View {
                 profileSection
                 locationSection
                 AutoShiftSection()
-                if BuildEnvironment.showsTesterTools {
-                    Section("Test araçları") {
-                        NavigationLink("Test senaryoları") { DemoScenarioView() }
-                        NavigationLink("Veritabanı") { DatabaseInspectorView() }
-                    }
-                }
                 dataSection
                 aboutSection
             }

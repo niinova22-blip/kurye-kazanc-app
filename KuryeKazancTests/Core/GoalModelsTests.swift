@@ -20,6 +20,22 @@ final class GoalModelsTests: XCTestCase {
         XCTAssertEqual(GoalSpec(amount: Money(4_000), period: .day, daysPerWeek: 6).monthlyTarget(), Money(104_000))
     }
 
+    /// 1.11: donem degisince tutar karsiligina cevrilir (aylik 100.000 gunluk 100.000 olmaz).
+    func testAmountInOtherPeriod() {
+        let monthly = GoalSpec(amount: Money(100_000), period: .month, daysPerWeek: 6)
+        XCTAssertEqual(monthly.amount(in: .day), Money(3_850))     // 100.000 / 26 = 3.846 -> 3.850
+        XCTAssertEqual(monthly.amount(in: .week), Money(23_080))   // 100.000 × 6 / 26 = 23.077 -> 23.080
+        XCTAssertEqual(monthly.amount(in: .month), Money(100_000))
+        XCTAssertEqual(GoalSpec(amount: Money(4_000), period: .day, daysPerWeek: 6).amount(in: .month), Money(104_000))
+        XCTAssertEqual(GoalSpec(amount: Money(24_000), period: .week, daysPerWeek: 6).amount(in: .day), Money(4_000))
+    }
+
+    func testUnusuallyHighGoal() {
+        XCTAssertTrue(GoalSpec(amount: Money(100_000), period: .day).isUnusuallyHigh)
+        XCTAssertFalse(GoalSpec(amount: Money(100_000), period: .month).isUnusuallyHigh)
+        XCTAssertFalse(GoalSpec(amount: Money(4_000), period: .day).isUnusuallyHigh)
+    }
+
     func testPeriodWorkDays() {
         XCTAssertEqual(GoalSpec(amount: Money(1), period: .day).periodWorkDays(), 1)
         XCTAssertEqual(GoalSpec(amount: Money(1), period: .week, daysPerWeek: 5).periodWorkDays(), 5)

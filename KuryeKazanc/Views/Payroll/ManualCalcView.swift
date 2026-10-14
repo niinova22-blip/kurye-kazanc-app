@@ -35,18 +35,23 @@ struct ManualCalcView: View {
 
     var body: some View {
         Form {
-            inputSection
+            introSection
+            whenSection
+            whatSection
             if let input, input.totalPackages > 0 || input.hours > 0 {
                 switch model.calculate(input) {
                 case let .success(breakdown):
                     resultSection(breakdown, input: input)
                     saveSection(input)
+                    detailSection(breakdown)
                     VerificationFootnote(items: UnverifiedItems.from(breakdown, platformName: PayrollModel.platformName(code)))
                 case let .failure(error):
                     Section {
                         Label(error.message, systemImage: "xmark.octagon").foregroundStyle(Theme.negative)
                     }
                 }
+            } else {
+                emptyResultSection
             }
         }
         .navigationTitle("Elle hesapla")
@@ -64,7 +69,60 @@ struct ManualCalcView: View {
         }
     }
 
-    private var inputSection: some View {
+    // MARK: - Ust kart (1.11)
+
+    /// Ekranin ne ise yaradigi ve uc adim: donemi sec, hatirladiklarini yaz, bitir ve kayda ekleyip eklemeyecegini sec.
+    private var introSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.and.pencil")
+                        .font(.title2.weight(.semibold))
+                        .frame(width: 48, height: 48)
+                        .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Vardiyayı başlatmayı mı unuttun?")
+                            .font(.headline)
+                        Text("Hatırladığın kadarını yaz; \(PayrollModel.platformName(code)) tarifesi gerisini hesaplar.")
+                            .font(.subheadline)
+                            .opacity(0.85)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                HStack(spacing: 8) {
+                    stepChip(1, "Dönemi seç")
+                    stepChip(2, "Paketleri yaz")
+                    stepChip(3, "Bitir ve ekle")
+                }
+            }
+            .brandCard()
+            .padding(.vertical, 4)
+        }
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
+    }
+
+    private func stepChip(_ number: Int, _ title: String) -> some View {
+        HStack(spacing: 6) {
+            Text("\(number)")
+                .font(.caption.weight(.heavy))
+                .frame(width: 20, height: 20)
+                .background(.white, in: Circle())
+                .foregroundStyle(Theme.accent)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .background(.white.opacity(0.14), in: Capsule())
+    }
+
+    // MARK: - Girdiler
+
+    private var whenSection: some View {
         Section {
             Picker("Dönem", selection: $span.animation(.snappy)) {
                 Text("Günlük").tag(PaySpan.day)
@@ -73,57 +131,123 @@ struct ManualCalcView: View {
             }
             .pickerStyle(.segmented)
             .accessibilityIdentifier("manual.span")
-            DatePicker(span == .day ? "Gün" : span == .week ? "Hafta (bir günü)" : "Ay (bir günü)",
-                       selection: $date, in: ...Date(), displayedComponents: .date)
+            DatePicker(selection: $date, in: ...Date(), displayedComponents: .date) {
+                Label(span == .day ? "Hangi gün" : span == .week ? "Hangi hafta (bir günü)" : "Hangi ay (bir günü)",
+                      systemImage: "calendar")
+            }
             if span != .day {
-                LabeledContent("Aralık", value: "\(PayFormat.day(range.start)) – \(PayFormat.day(range.end))")
+                LabeledContent {
+                    Text("\(PayFormat.day(range.start)) – \(PayFormat.day(range.end))")
+                } label: {
+                    Label("Aralık", systemImage: "arrow.left.and.right")
+                }
             }
-            NumberField(title: hasNightBand ? dayTitle : "Paket sayısı", text: $packages, identifier: "manual.packages")
-            if hasNightBand {
-                NumberField(title: nightTitle, text: $nightPackages, identifier: "manual.night")
-            }
-            NumberField(title: "Toplam km (biliyorsan)", text: $km, decimal: true, identifier: "manual.km")
-            NumberField(title: "Çalışma süresi (saat)", text: $hours, decimal: true, identifier: "manual.hours")
-            if span != .day {
-                NumberField(title: "Kaç gün çalıştın", text: $days, identifier: "manual.days")
-            }
-
         } header: {
-            Text(PayrollModel.platformName(code))
-        } footer: {
-            Text("Vardiya başlatmayı unuttuğun günler için. Hatırladığın kadarını gir; km boşsa yakıt ve km ücreti hesaba girmez.")
+            Text("Ne zaman?")
         }
     }
 
-    private let dayTitle: String = "Gündüz paketi (18:00 öncesi)"
-    private let nightTitle: String = "Akşam paketi (18:00 sonrası)"
+    private var whatSection: some View {
+        Section {
+            ManualInputRow(symbol: "shippingbox.fill", title: hasNightBand ? dayTitle : "Paket sayısı",
+                           hint: hasNightBand ? "18:00'den önce bıraktıkların" : "Teslim ettiğin toplam paket",
+                           unit: "paket", text: $packages, identifier: "manual.packages")
+            if hasNightBand {
+                ManualInputRow(symbol: "moon.stars.fill", title: nightTitle, hint: "Akşam bandı daha yüksek ödenir",
+                               unit: "paket", text: $nightPackages, identifier: "manual.night")
+            }
+            ManualInputRow(symbol: "road.lanes", title: "Toplam km", hint: "Biliyorsan; yakıt ve km ücreti için",
+                           unit: "km", text: $km, decimal: true, identifier: "manual.km")
+            ManualInputRow(symbol: "clock.fill", title: "Çalışma süresi", hint: "Saatlik net bununla hesaplanır",
+                           unit: "saat", text: $hours, decimal: true, identifier: "manual.hours")
+            if span != .day {
+                ManualInputRow(symbol: "calendar.badge.clock", title: "Kaç gün çalıştın",
+                               hint: "Boşsa planındaki gün sayısı", unit: "gün", text: $days, identifier: "manual.days")
+            }
+        } header: {
+            Text("Ne yaptın?")
+        } footer: {
+            Text("Km boş kalırsa yakıt gideri ve km ücreti hesaba girmez. Sonuç yazdıkça güncellenir.")
+        }
+    }
+
+    /// Paket yazilmadan once sonucun nerede gorunecegini anlatan bos durum.
+    private var emptyResultSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundStyle(Theme.accent)
+                Text("Paket sayısını yazınca firmadan alacağın, yakıt gideri ve cebine kalan burada görünür.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 6)
+        }
+    }
+
+    private let dayTitle: String = "Gündüz paketi"
+    private let nightTitle: String = "Akşam paketi"
 
     private func resultSection(_ breakdown: PayBreakdown, input: PayInput) -> some View {
         let workDays: Int = span == .day ? 1 : entry.days
         let detail: PayDetail = model.detail(for: breakdown, days: workDays)
         let fuel: Money = model.fuelModel(fallbackCostPerKm: costPerKm).cost(km: input.totalKm ?? 0, on: input.startDay)
-        return Section {
-            LabeledContent("Firmadan alacağın", value: PayFormat.tl(detail.periodTotal))
-                .accessibilityIdentifier("manual.total")
-            if fuel.value > 0 {
-                LabeledContent("Yakıt gideri", value: "−" + PayFormat.tl(fuel))
+        return Group {
+            Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(span == .day ? "Bu gün cebine kalan" : span == .week ? "Bu hafta cebine kalan" : "Bu ay cebine kalan")
+                        .font(.subheadline)
+                        .opacity(0.85)
+                    Text(PayFormat.tl(detail.periodTotal - fuel))
+                        .font(.system(size: 44, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .contentTransition(.numericText())
+                        .accessibilityIdentifier("manual.net")
+                    VStack(spacing: 8) {
+                        resultRow("arrow.down.circle.fill", "Firmadan alacağın", PayFormat.tl(detail.periodTotal),
+                                  identifier: "manual.total")
+                        resultRow("fuelpump.fill", "Yakıt gideri", fuel.value > 0 ? "−" + PayFormat.tl(fuel) : "km girilmedi")
+                        if span != .day {
+                            resultRow("calendar", "Günde ortalama", PayFormat.tl(detail.perDayTotal))
+                        }
+                    }
+                    .padding(12)
+                    .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    if detail.hasEstimates {
+                        Label("Aylık sabit ücretin çalıştığın günlere düşen payı dahil (ay sonunda ödenir).",
+                              systemImage: "banknote")
+                            .font(.caption)
+                            .opacity(0.85)
+                    }
+                }
+                .brandCard()
+                .padding(.vertical, 4)
             }
-            LabeledContent("Cebine kalan") {
-                Text(PayFormat.tl(detail.periodTotal - fuel))
-                    .font(.headline)
-                    .foregroundStyle(Theme.positive)
-                    .accessibilityIdentifier("manual.net")
-            }
-            if span != .day {
-                LabeledContent("Günde ortalama", value: PayFormat.tl(detail.perDayTotal))
-            }
-            PayDetailDisclosure(detail: detail, periodTitle: periodTitle, identifier: "manual.detail")
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    /// Kalem kalem dokum ("Hesabı bitir"in altinda; once sonuc ve karar, sonra ayrinti).
+    private func detailSection(_ breakdown: PayBreakdown) -> some View {
+        Section {
+            PayDetailDisclosure(detail: model.detail(for: breakdown, days: span == .day ? 1 : entry.days),
+                                periodTitle: periodTitle, identifier: "manual.detail")
         } header: {
-            Text("Sonuç")
-        } footer: {
-            if detail.hasEstimates {
-                Text("Aylık sabit ücret, çalıştığın günlere bölünerek eklendi (ay sonunda tek seferde ödenir).")
-            }
+            Text("Nereden geldi?")
+        }
+    }
+
+    private func resultRow(_ symbol: String, _ title: String, _ value: String, identifier: String? = nil) -> some View {
+        HStack {
+            Label(title, systemImage: symbol).font(.subheadline)
+            Spacer()
+            Text(value)
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .accessibilityIdentifier(identifier ?? "")
         }
     }
 
@@ -203,6 +327,55 @@ struct ManualCalcView: View {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(700))
             dismiss()
+        }
+    }
+}
+
+/// Elle hesap girdisi: renkli simge, baslik + kisa ipucu ve birimli sayi alani (odakta vurgu).
+private struct ManualInputRow: View {
+    let symbol: String
+    let title: String
+    let hint: String
+    let unit: String
+    @Binding var text: String
+    var decimal: Bool = false
+    let identifier: String
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(Theme.brandGradient, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.subheadline.weight(.semibold))
+                Text(hint).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            HStack(spacing: 4) {
+                TextField("0", text: $text)
+                    .keyboardType(decimal ? .decimalPad : .numberPad)
+                    .multilineTextAlignment(.trailing)
+                    .font(.body.weight(.semibold).monospacedDigit())
+                    .focused($focused)
+                    .frame(minWidth: 44, maxWidth: 80)
+                    .accessibilityLabel(title)
+                    .accessibilityIdentifier(identifier)
+                Text(unit).font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .background(RoundedRectangle(cornerRadius: 10).fill(focused ? Theme.accent.opacity(0.08) : Theme.groupedBackground))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(focused ? Theme.accent : Color.clear, lineWidth: 1.5))
+            .animation(.easeOut(duration: 0.18), value: focused)
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onTapGesture { focused = true }
+        .onChange(of: focused) { _, isFocused in
+            if isFocused { Haptics.selection() }
         }
     }
 }
