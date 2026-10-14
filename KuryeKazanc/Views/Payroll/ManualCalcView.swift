@@ -43,6 +43,7 @@ struct ManualCalcView: View {
                 case let .success(breakdown):
                     resultSection(breakdown, input: input)
                     saveSection(input)
+                    detailSection(breakdown)
                     VerificationFootnote(items: UnverifiedItems.from(breakdown, platformName: PayrollModel.platformName(code)))
                 case let .failure(error):
                     Section {
@@ -227,11 +228,16 @@ struct ManualCalcView: View {
             }
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
-            Section {
-                PayDetailDisclosure(detail: detail, periodTitle: periodTitle, identifier: "manual.detail")
-            } header: {
-                Text("Nereden geldi?")
-            }
+        }
+    }
+
+    /// Kalem kalem dokum ("Hesabı bitir"in altinda; once sonuc ve karar, sonra ayrinti).
+    private func detailSection(_ breakdown: PayBreakdown) -> some View {
+        Section {
+            PayDetailDisclosure(detail: model.detail(for: breakdown, days: span == .day ? 1 : entry.days),
+                                periodTitle: periodTitle, identifier: "manual.detail")
+        } header: {
+            Text("Nereden geldi?")
         }
     }
 
