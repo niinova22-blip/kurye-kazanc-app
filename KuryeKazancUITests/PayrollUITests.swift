@@ -16,6 +16,16 @@ final class PayrollUITests: XCTestCase {
         return app
     }
 
+    /// Klavye acikken liste kaydirilamiyor: once "Bitti" ile kapatilir, sonra oge gorunene kadar liste kaydirilir.
+    private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
+        let done = app.buttons["keyboard.done"].firstMatch
+        if done.exists { done.tap() }
+        let list = app.collectionViews.firstMatch
+        for _ in 0..<8 where !(element.exists && element.isHittable) {
+            if list.exists { list.swipeUp() } else { app.swipeUp() }
+        }
+    }
+
     /// 1.10: "Elle hesapla" Bugun'de; "Hesabı bitir" gunluk kazanca eklensin mi diye sorar.
     private func openManualFromToday(_ app: XCUIApplication) {
         let manual = app.buttons["today.manualCalc"]
@@ -39,8 +49,7 @@ final class PayrollUITests: XCTestCase {
         XCTAssertTrue(net.label.contains("4.483"), "gelen: \(net.label)")
 
         let save = app.buttons["manual.save"]
-        // Form tembel yuklenir; klavye de alt kismi kapatir: dugme gorunene kadar kaydirilir
-        for _ in 0..<6 where !(save.exists && save.isHittable) { app.swipeUp() }
+        scrollTo(save, in: app)
         save.tap()
         let add = app.alerts.buttons["Evet, ekle"].firstMatch
         XCTAssertTrue(add.waitForExistence(timeout: 5), "Hesap bitince bugune eklensin mi diye sorulmali")
@@ -72,8 +81,7 @@ final class PayrollUITests: XCTestCase {
         packages.typeText("20")
         XCTAssertTrue(app.staticTexts["manual.net"].waitForExistence(timeout: 5))
         let save = app.buttons["manual.save"]
-        // Form tembel yuklenir; klavye de alt kismi kapatir: dugme gorunene kadar kaydirilir
-        for _ in 0..<6 where !(save.exists && save.isHittable) { app.swipeUp() }
+        scrollTo(save, in: app)
         save.tap()
         let skip = app.alerts.buttons["Hayır, yalnızca hesapladım"].firstMatch
         XCTAssertTrue(skip.waitForExistence(timeout: 5))
@@ -95,7 +103,7 @@ final class PayrollUITests: XCTestCase {
         // DisclosureGroup basligi Form'da dugme olarak gorunur: etiketle aranir
         let detail = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS %@", "Ayrıntılı döküm")).firstMatch
-        for _ in 0..<8 where !(detail.exists && detail.isHittable) { app.swipeUp() }
+        scrollTo(detail, in: app)
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
     }
 
