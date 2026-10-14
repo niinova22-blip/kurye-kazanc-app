@@ -61,7 +61,7 @@ struct FirmsView: View {
     private var workloadSection: some View {
         Section {
             CountStepper(title: "Günde paket", value: $packagesPerDay, range: 1...120, identifier: "firms.packages")
-            CountStepper(title: "Günde saat", value: $hoursPerDay, range: 1...16, identifier: "firms.hours")
+            CountStepper(title: "Günde saat", value: $hoursPerDay, range: 1...GoalSpec.maxDailyHours, identifier: "firms.hours")
             DecimalStepper(title: "Paket başı km", value: $kmPerPackage, range: Decimal(string: "0.5")!...20,
                            step: Decimal(string: "0.5")!, identifier: "firms.km")
             CountStepper(title: "Ayda gün", value: $days, range: 1...31, identifier: "firms.days")

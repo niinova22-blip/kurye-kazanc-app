@@ -10,6 +10,10 @@ final class IntroFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing", "-reset-defaults"]
         app.launch()
+        // 1.11: once hesap secimi; misafir aninda firma secimine gecer
+        XCTAssertTrue(app.buttons["welcome.guest"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["account.title"].exists)
+        app.buttons["welcome.guest"].tap()
         // 1.9: iki firma; Paket Taxi secilince kol sorulur
         XCTAssertTrue(app.buttons["firm.pakettaxi"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["firm.yemeksepeti"].exists)
@@ -84,6 +88,16 @@ final class IntroFlowUITests: XCTestCase {
         XCTAssertTrue(waitUntilGone(app.keyboards.firstMatch), "Klavye kapanmali")
 
         app.buttons["plan.save"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["goal.result"].firstMatch.waitForExistence(timeout: 5))
+
+        // 1.11: tutar yazilmisken donem degisirse once sorulur; karsiligina cevrilerek yeniden hesaplanir
+        let period = app.segmentedControls["plan.period"]
+        for _ in 0..<4 where !period.isHittable { app.swipeDown() }
+        period.buttons["Aylık"].tap()
+        // Onay sayfasi dugmelerinde kimlik her iOS surumunde gorunmeyebilir: etiketle aranir
+        let convert = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "ile yeniden hesapla")).firstMatch
+        XCTAssertTrue(convert.waitForExistence(timeout: 5), "Donem degisince onay sorulmali")
+        convert.tap()
         XCTAssertTrue(app.descendants(matching: .any)["goal.result"].firstMatch.waitForExistence(timeout: 5))
     }
 

@@ -8,13 +8,17 @@ struct RootView: View {
     @AppStorage(AppPreferences.hasCompletedOnboardingKey) private var hasCompletedOnboarding = false
     @AppStorage(AppPreferences.hasSeenIntroV18Key) private var hasSeenIntro = false
     @AppStorage(AppPreferences.startFirmKey) private var startFirm = ""
+    @AppStorage(AppPreferences.hasChosenAccountModeKey) private var hasChosenAccountMode = false
     @State private var showsIntroReplay = false
 
-    /// Akis: firma secimi (ilk ekran) -> tanitim (bir kez, firmaya gore) -> tarife sorulari, yakit, hedef ->
+    /// Akis: hesap (Apple ile giris / misafir, 1.11) -> firma secimi -> tanitim (bir kez, firmaya gore) -> tarife sorulari, yakit, hedef ->
     /// konum -> sekmeler. Daha once firma secmis kullanici yeni tanitimi bir kez gorur.
     var body: some View {
         Group {
-            if !payroll.state.hasChosenFirm && startFirm.isEmpty {
+            if !hasChosenAccountMode && !payroll.state.hasChosenFirm && startFirm.isEmpty {
+                AccountWelcomeView { hasChosenAccountMode = true }
+                    .transition(.opacity)
+            } else if !payroll.state.hasChosenFirm && startFirm.isEmpty {
                 FirmWelcomeView { startFirm = $0 }
                     .transition(.opacity)
             } else if !hasSeenIntro {
@@ -30,6 +34,7 @@ struct RootView: View {
         }
         .animation(.easeInOut, value: hasSeenIntro)
         .animation(.easeInOut, value: startFirm)
+        .animation(.easeInOut, value: hasChosenAccountMode)
         .environment(\.showIntro, ShowIntroAction { showsIntroReplay = true })
         .fullScreenCover(isPresented: $showsIntroReplay) {
             IntroView(mode: .replay, firmCode: payroll.tariffProfile?.platformCode) { showsIntroReplay = false }

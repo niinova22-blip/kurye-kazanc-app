@@ -20,6 +20,7 @@ enum HelpScreen {
              "Uygulama paketin saat ve mesafe bandını bulur; bitirince hesap kendiliğinden kaydedilir.",
              "Hedef halkası her dokunuşta dolar; altındaki \"Plan oluştur\" ile hedefini ve günlük paket sayını ayarla.",
              "Vardiyayı başlatmayı unuttuysan \"Elle hesapla\" ile paket, km ve saati gir; bitince bugüne eklensin mi diye sorarız.",
+             "Üstteki karta dokun: kazancın kalem kalem, giderlerin ve bu tempoyla hedefinin ilerisinde mi gerisinde mi olduğun görünür.",
              "Net = kazanç − yakıt (km × tüketim × yakıt fiyatı). Saatlik net en az yarım saat çalışınca gösterilir."]
         case .earnings:
             ["Bitirdiğin vardiyalar ve eklediğin hesaplar buraya kendiliğinden düşer; ayın brütü ve neti güncellenir.",

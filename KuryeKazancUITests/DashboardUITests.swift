@@ -61,6 +61,23 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["dashboard.distance"].label.hasPrefix("60"))
     }
 
+    /// 1.11: ust kart tam ekran gun dokumunu acar; net ust kartla ayni.
+    func testHeroOpensDayBreakdown() {
+        let app = launch(sampleData: true)
+        let net = app.staticTexts["dashboard.netEarnings"]
+        XCTAssertTrue(net.waitForExistence(timeout: 10))
+        let open = app.buttons["today.breakdown"]
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+        open.tap()
+        let dayNet = app.staticTexts["dayBreakdown.net"]
+        XCTAssertTrue(dayNet.waitForExistence(timeout: 5))
+        XCTAssertTrue(dayNet.label.contains("850"), "gelen: \(dayNet.label)")
+        let close = app.buttons["dayBreakdown.close"]
+        for _ in 0..<5 where !close.isHittable { app.swipeUp() }
+        close.tap()
+        XCTAssertTrue(net.waitForExistence(timeout: 5))
+    }
+
     // MARK: - Kayit duzenleme
 
     /// Kayda dokununca form acilir; vazgecince net degismez.
@@ -176,6 +193,9 @@ final class OnboardingUITests: XCTestCase {
         app.launchArguments = ["-ui-testing", "-reset-defaults"]
         app.launch()
 
+        // 1.11: ilk ekran hesap secimi (Apple / misafir), sonra firma secimi
+        XCTAssertTrue(app.buttons["welcome.guest"].waitForExistence(timeout: 10))
+        app.buttons["welcome.guest"].tap()
         // Ilk ekran firma secimi, sonra tanitim (gecilir), firma sorulari (Getir: arac), yakit, hedef, konum
         XCTAssertTrue(app.buttons["firm.yemeksepeti"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["welcome.next"].isEnabled, "Firma secmeden devam edilmemeli")

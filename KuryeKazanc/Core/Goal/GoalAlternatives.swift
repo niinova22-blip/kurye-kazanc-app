@@ -216,7 +216,7 @@ enum GoalAlternatives {
     static func applied(_ alternative: GoalAlternative, to goal: GoalSpec) -> GoalSpec {
         let neededHours: Decimal = GoalPlanner.roundUpToHalf(alternative.hoursPerDay)
         let wholeHours: Int = Int(NSDecimalNumber(decimal: neededHours).doubleValue.rounded(.up))
-        let hours: Decimal = min(16, max(goal.maxHoursPerDay, Decimal(wholeHours)))
+        let hours: Decimal = min(Decimal(GoalSpec.maxDailyHours), max(goal.maxHoursPerDay, Decimal(wholeHours)))
         let days: Int = min(7, max(1, alternative.daysPerWeek))
         let weekdays: [Int]?
         if goal.period == .day {

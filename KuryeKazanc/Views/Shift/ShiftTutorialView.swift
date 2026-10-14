@@ -274,7 +274,7 @@ private struct ReceiptScene: View {
                 Spacer()
                 Text("4.243 TL")
                     .font(.title2.bold())
-                    .foregroundStyle(Color(hex: 0x6EE7B7))
+                    .foregroundStyle(Theme.mintOnDark)
                     .monospacedDigit()
             }
             .opacity(done ? 1 : 0)

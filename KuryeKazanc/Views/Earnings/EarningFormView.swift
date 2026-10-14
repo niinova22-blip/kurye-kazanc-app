@@ -256,13 +256,6 @@ struct EarningFormView: View {
                 calibrationRow
             }
 
-            if BuildEnvironment.showsTesterTools, let report = viewModel.ocrDiagnosticReport {
-                ShareLink(item: report, subject: Text("Kurye Kazanç OCR raporu")) {
-                    Label("Yanlış okuduysa: okunan metni geliştiriciye gönder", systemImage: "ladybug")
-                        .font(.subheadline)
-                }
-                .accessibilityIdentifier("earningForm.ocrReport")
-            }
         } footer: {
             Text("Yemeksepeti Express ve Paket Taxi (Migros Hemen) kazanç ekranları tanınır. Görüntü cihazında işlenir; görselin kendisi saklanmaz.")
         }

@@ -21,6 +21,8 @@ enum AppPreferences {
     static let hasSeenIntroV17Key = "hasSeenIntroV17"
     /// 1.8 yenilenen tanitim (herkes bir kez gorur).
     static let hasSeenIntroV18Key = "hasSeenIntroV18"
+    /// 1.11 ilk ekran: Apple ile giris ya da misafir secildi.
+    static let hasChosenAccountModeKey = "hasChosenAccountMode"
     /// Ilk acilista karsilama ekraninda secilen firma (kurulum bitene kadar).
     static let startFirmKey = "setup.startFirm"
     /// 1.9 canli vardiya (her teslimde dokunma): suren vardiya (JSON) ve ilk kullanim tanitimi.
