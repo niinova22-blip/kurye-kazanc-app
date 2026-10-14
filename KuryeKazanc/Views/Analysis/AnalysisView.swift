@@ -186,8 +186,8 @@ private struct AnalysisContentView: View {
 
     private func primaryMetrics(_ summary: EarningsSummary) -> [MetricStrip.Item] {
         [
-            MetricStrip.Item(title: "Net ₺/saat", value: Formatters.perHour(summary.netPerHour), identifier: "history.netPerHour"),
-            MetricStrip.Item(title: "Çalışma", value: Formatters.duration(summary.workDuration), identifier: "history.workDuration"),
+            MetricStrip.Item(title: "Saatlik net", value: Formatters.perHour(summary.netPerHour), identifier: "history.netPerHour"),
+            MetricStrip.Item(title: "Çalışma süresi", value: Formatters.duration(summary.workDuration), identifier: "history.workDuration"),
             MetricStrip.Item(title: "Mesafe", value: Formatters.distance(summary.distanceKm), identifier: "history.distance"),
         ]
     }
@@ -195,8 +195,8 @@ private struct AnalysisContentView: View {
     private func secondaryMetrics(_ summary: EarningsSummary) -> [MetricStrip.Item] {
         [
             MetricStrip.Item(title: "Brüt", value: Formatters.currency(summary.totalEarnings), identifier: "history.gross"),
-            MetricStrip.Item(title: "Gider", value: Formatters.currency(summary.totalExpenses), identifier: "history.expenses"),
-            MetricStrip.Item(title: "Tahmini gider", value: Formatters.currency(summary.estimatedExpenses), identifier: "history.estimated"),
+            MetricStrip.Item(title: "Toplam gider", value: Formatters.currency(summary.totalExpenses), identifier: "history.expenses"),
+            MetricStrip.Item(title: "Yakıt (tahmini)", value: Formatters.currency(summary.estimatedExpenses), identifier: "history.estimated"),
         ]
     }
 

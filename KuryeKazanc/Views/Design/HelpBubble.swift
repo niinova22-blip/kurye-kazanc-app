@@ -18,11 +18,12 @@ enum HelpScreen {
         case .today:
             ["\"Vardiya başlat\" ile işe çık; her paketi bırakınca ekrana bir kez dokun.",
              "Uygulama paketin saat ve mesafe bandını bulur; bitirince hesap kendiliğinden kaydedilir.",
-             "Hedef çubuğu her dokunuşta dolar. Net = kazanç − yakıt (km × tüketim × yakıt fiyatı).",
-             "+ ile ekran görüntüsünden ya da elle kazanç ve gider de ekleyebilirsin."]
+             "Hedef halkası her dokunuşta dolar; altındaki \"Plan oluştur\" ile hedefini ve günlük paket sayını ayarla.",
+             "Vardiyayı başlatmayı unuttuysan \"Elle hesapla\" ile paket, km ve saati gir; bitince bugüne eklensin mi diye sorarız.",
+             "Net = kazanç − yakıt (km × tüketim × yakıt fiyatı). Saatlik net en az yarım saat çalışınca gösterilir."]
         case .earnings:
-            ["Bitirdiğin vardiyalar buraya kendiliğinden düşer; ayın brütü ve neti güncellenir.",
-             "Vardiyayı başlatmayı unuttuysan \"Elle hesapla\" ile paket, km ve süreyi gün, hafta ya da ay olarak gir.",
+            ["Bitirdiğin vardiyalar ve eklediğin hesaplar buraya kendiliğinden düşer; ayın brütü ve neti güncellenir.",
+             "Tutarlar sözleşmenden farklıysa \"Tutarları düzenle\" (kalem) ile kendi değerini gir.",
              "\"Ayrıntılı döküm\" paketleri, km'yi, bonusları ve sabit ücretin güne düşen payını ayrı gösterir."]
         case .firms:
             ["Aynı işi diğer firmalarda yapsaydın ne kazanırdın?",

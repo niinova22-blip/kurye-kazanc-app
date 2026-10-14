@@ -14,6 +14,14 @@ struct TariffInfoView: View {
 
     var body: some View {
         List {
+            if model.hasEditedTariff {
+                Section {
+                    Label("Kendi değerlerin kullanılıyor. Değiştirmek ya da firma değerlerine dönmek için kaleme dokun.",
+                          systemImage: "pencil.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.highlight)
+                }
+            }
             if let version = model.currentVersion() {
                 VersionSummarySection(version: version)
                 TariffItemsSection(version: version, today: model.today)
@@ -43,6 +51,9 @@ struct TariffInfoView: View {
         }
         .navigationTitle("Tarife")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { TariffEditButton() }
+        }
     }
 }
 

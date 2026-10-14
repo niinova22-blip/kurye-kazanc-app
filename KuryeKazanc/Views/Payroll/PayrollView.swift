@@ -1,63 +1,12 @@
 import SwiftUI
 import SwiftData
 
-/// Dort platform karti. Secim uygulama genelinde tektir; eski kayitlar kendi platformlarinda kalir.
-struct PlatformPickerView: View {
-    @Environment(PayrollModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    var isFirstRun: Bool = false
-
-    var body: some View {
-        List {
-            Section {
-                ForEach(PayPlatform.all) { platform in
-                    Button {
-                        model.select(platform: platform.code)
-                        if !isFirstRun { dismiss() }
-                    } label: {
-                        PlatformCard(platform: platform, isSelected: model.state.activePlatform == platform.code)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("platform.\(platform.code)")
-                }
-            } header: {
-                Text("Çalıştığın platform")
-            } footer: {
-                Text("Hakediş bu platformun tarifesiyle hesaplanır. Platform değiştirirsen eski kayıtların kendi platformu ve tarife sürümüyle kalır. Platform adları yalnızca tanımlama içindir; resmî ortaklık yoktur.")
-            }
-        }
-        .navigationTitle(isFirstRun ? "Hakediş" : "Platform seç")
-        .navigationBarTitleDisplayMode(isFirstRun ? .large : .inline)
-    }
-}
-
-private struct PlatformCard: View {
-    let platform: PayPlatform
-    let isSelected: Bool
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            PlatformMonogram(platform: platform)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(platform.name).font(.headline)
-                Text(platform.modelSummary).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isSelected ? Theme.accent : Color.secondary)
-                .font(.title3)
-        }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-}
-
-/// Aylik hakedis panosu: ortak kartlar, platforma ozgu kart, dort hesaplama yontemi, son kayitlar.
+/// Aylik hakedis panosu: firma ve tarife (kalemle duzenleme), ay kartlari, firmaya ozgu kart, son kayitlar, donem ve odeme.
 struct PayrollDashboardView: View {
     @Environment(PayrollModel.self) private var model
     @Query(sort: \ExpenseRecord.date, order: .reverse) private var expenseRecords: [ExpenseRecord]
+    @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
+    @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
 
     /// Sayfa altindaki tek not: aktif tarifenin dogrulanmamis kalemleri.
     private var unverifiedItems: [UnverifiedItem] {
@@ -67,7 +16,7 @@ struct PayrollDashboardView: View {
 
     var body: some View {
         let expenses: [DatedExpense] = expenseRecords.map(\.datedExpense)
-        let dashboard: PayrollDashboard? = model.dashboard(expenses: expenses)
+        let dashboard: PayrollDashboard? = model.dashboard(expenses: expenses, fallbackCostPerKm: autoEstimate ? costPerKm : nil)
         List {
             if let platform = model.activePlatform {
                 PlatformHeaderSection(platform: platform)
@@ -100,16 +49,25 @@ private struct PlatformHeaderSection: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(platform.name).font(.headline).accessibilityIdentifier("payroll.platformName")
                     if let version = model.currentVersion() {
-                        Text("Tarife \(version.label) · yürürlük \(PayFormat.day(version.effectiveFrom))")
+                        Text(model.hasEditedTariff
+                             ? "Kendi değerlerinle hesaplanıyor"
+                             : "Tarife \(version.label) · yürürlük \(PayFormat.day(version.effectiveFrom))")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(model.hasEditedTariff ? Theme.highlight : .secondary)
                     } else {
                         Text("Yayında tarife yok").font(.caption).foregroundStyle(Theme.negative)
                     }
                 }
             }
+            NavigationLink {
+                TariffInfoView()
+            } label: {
+                Label("Tarifeyi gör", systemImage: "list.bullet.rectangle")
+            }
+            .accessibilityIdentifier("payroll.tariff")
+            TariffEditButton(title: "Tutarları düzenle")
         } footer: {
-            Text("Firmanı Profil > Çalıştığım firma'dan değiştirebilirsin.")
+            Text("Tutarlar sözleşmenden farklıysa kalemle değiştir; istediğinde firma değerlerine dönersin.")
         }
     }
 }
@@ -122,16 +80,20 @@ private struct DashboardCardsSection: View {
     var body: some View {
         Section {
             LazyVGrid(columns: columns, spacing: 10) {
-                PayMetricTile(title: "Bu ay tahmini brüt", value: PayFormat.tl(dashboard.estimatedGross),
-                              caption: nil, identifier: "dashboard.monthGross")
-                PayMetricTile(title: "Tahmini net", value: PayFormat.tl(dashboard.estimatedNet), caption: "Brüt − gider",
+                PayMetricTile(title: "Ay sonu tahmini brüt", value: PayFormat.tl(dashboard.estimatedGross),
+                              caption: dashboard.period.monthlyPart.isZero ? nil : "Aylık sabit ücret dahil",
+                              identifier: "dashboard.monthGross")
+                PayMetricTile(title: "Tahmini net", value: PayFormat.tl(dashboard.estimatedNet),
+                              caption: dashboard.fuel.isZero ? "Brüt − gider" : "Brüt − yakıt − gider",
                               identifier: "dashboard.monthNet")
+                PayMetricTile(title: "Şu ana kadar hak edilen", value: PayFormat.tl(dashboard.earnedSoFar),
+                              caption: "\(dashboard.period.daysWithLogs) gün çalıştın", identifier: "dashboard.earnedSoFar")
                 PayMetricTile(title: "Paket", value: "\(dashboard.packages)", identifier: "dashboard.packages")
                 PayMetricTile(title: "Bonusa kalan", value: bonusValue, caption: dashboard.nextBonus?.label,
                               identifier: "dashboard.bonusRemaining")
-                PayMetricTile(title: "Saat başına", value: dashboard.grossPerHour.map { PayFormat.tl($0) } ?? "—",
-                              caption: dashboard.netPerHour.map { "Net \(PayFormat.tl($0))" }, identifier: "dashboard.perHour")
-                PayMetricTile(title: "Toplam gider", value: PayFormat.tl(dashboard.expenses), identifier: "dashboard.expenses")
+                PayMetricTile(title: "Saatlik brüt", value: dashboard.grossPerHour.map { PayFormat.tl($0) } ?? "—",
+                              caption: dashboard.netPerHour.map { "Net \(PayFormat.tl($0))" } ?? "En az yarım saat çalışınca",
+                              identifier: "dashboard.perHour")
             }
             .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
             .listRowBackground(Color.clear)
@@ -216,10 +178,6 @@ private struct LiveShiftBanner: View {
 private struct MethodsSection: View {
     var body: some View {
         Section {
-            NavigationLink { ManualCalcView() } label: {
-                Label("Elle hesapla", systemImage: "square.and.pencil")
-            }
-            .accessibilityIdentifier("payroll.manual")
             NavigationLink { PeriodSummaryView() } label: {
                 Label("Hafta / ay özeti", systemImage: "calendar")
             }
@@ -229,9 +187,9 @@ private struct MethodsSection: View {
             }
             .accessibilityIdentifier("payroll.payment")
         } header: {
-            Text("Hesapla")
+            Text("Dönem ve ödeme")
         } footer: {
-            Text("Vardiya başlatmayı unuttuysan paket, km ve süreyi elle gir; günlük, haftalık ya da aylık hesaplanır.")
+            Text("Vardiya başlatmayı unuttuğun günler için Bugün > “Elle hesapla”yı kullan.")
         }
     }
 }
@@ -244,7 +202,7 @@ private struct RecentLogsSection: View {
         let recent: [WorkLog] = Array(model.logs(platform: code).prefix(5))
         Section("Vardiyalar ve kayıtlar") {
             if recent.isEmpty {
-                Text("Henüz kayıt yok. Bugün ekranından vardiya başlat; bitirince hesap buraya kendiliğinden düşer.")
+                Text("Henüz kayıt yok. Bugün ekranından vardiya başlat ya da “Elle hesapla”yı kullan; hesap buraya kendiliğinden düşer.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -285,7 +243,7 @@ private struct MoreSection: View {
     var body: some View {
         Section {
             NavigationLink { PayrollHistoryView() } label: {
-                Label("Geçmiş ve platform karşılaştırma", systemImage: "clock.arrow.circlepath")
+                Label("Tüm kayıtlar", systemImage: "clock.arrow.circlepath")
             }
             NavigationLink { TariffNoticesView() } label: {
                 HStack {

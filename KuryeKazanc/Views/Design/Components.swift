@@ -65,7 +65,7 @@ struct NetBreakdownLine: View {
     }
 }
 
-/// Yan yana kucuk metrikler: deger ustte, baslik altta. Kart degil; ayraclarla bolunmus tek satir.
+/// Yan yana kucuk metrikler: baslik ustte, deger altta. Kart degil; ayraclarla bolunmus tek satir.
 struct MetricStrip: View {
     struct Item: Identifiable {
         var title: String
@@ -84,16 +84,19 @@ struct MetricStrip: View {
                 if index > 0 {
                     Divider().frame(height: 28).padding(.horizontal, 12)
                 }
+                // 1.10: baslik ustte, deger altta (pano kartlariyla ayni okuma sirasi)
                 VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     Text(item.value)
                         .font(.headline)
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .accessibilityIdentifier(item.identifier)
-                    Text(item.title)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

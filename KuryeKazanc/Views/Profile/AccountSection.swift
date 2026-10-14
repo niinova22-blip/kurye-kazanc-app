@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import AuthenticationServices
 
 /// Profil > Hesap ve yedek: Apple ile Giris, yedekle / geri yukle, cikis, "Verilerimi sil".
 struct AccountSection: View {
@@ -9,8 +8,6 @@ struct AccountSection: View {
 
     @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
 
-    /// Apple istegine `hashed` gider; tamamlaninca `raw` Supabase'e gonderilir.
-    @State private var rawNonce: String?
     @State private var showRestoreConfirmation = false
     @State private var showFirstBackupConfirmation = false
     @State private var showDeleteConfirmation = false
@@ -33,7 +30,7 @@ struct AccountSection: View {
                     .accessibilityIdentifier("profile.serverUnavailable")
             }
         } header: {
-            Text("Hesap ve yedek")
+            Text("Hesap")
         } footer: {
             if account.isServerAvailable {
                 footerText
@@ -42,28 +39,21 @@ struct AccountSection: View {
     }
 
     private var footerText: some View {
-        Text("Apple ile giriş yaparsan kayıtların ve ayarların sunucuya yedeklenir; yeni telefonda geri yükleyebilirsin. Otomatik yedek, ilk “Şimdi yedekle”den veya geri yüklemeden sonra başlar. Giriş yapmazsan uygulama aynen çalışır.")
+        Text("Apple ile giriş yaparsan kayıtların ve ayarların yedeklenir; telefon değiştirince geri yüklersin. Ad ve e-posta istenmez. Giriş yapmazsan uygulama aynen çalışır.")
     }
 
     // MARK: - Satirlar
 
     private var signInButton: some View {
-        SignInWithAppleButton(.signIn) { request in
-            let nonce: (raw: String, hashed: String) = account.makeNonce()
-            rawNonce = nonce.raw
-            // Ad / e-posta istenmez: yedek icin kimlik yeterli
-            request.requestedScopes = []
-            request.nonce = nonce.hashed
-        } onCompletion: { result in
-            handleSignIn(result)
-        }
-        .signInWithAppleButtonStyle(.black)
-        .frame(height: 44)
-        .accessibilityIdentifier("profile.appleSignIn")
+        AppleSignInButton(onFailure: showFailure)
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
 
     @ViewBuilder
     private var signedInRows: some View {
+        Label("Apple hesabınla giriş yaptın", systemImage: "checkmark.seal.fill")
+            .foregroundStyle(Theme.positive)
+            .accessibilityIdentifier("profile.signedIn")
         Button("Şimdi yedekle", action: backupTapped)
             .disabled(account.isBusy)
             .accessibilityIdentifier("profile.backupNow")
@@ -133,36 +123,6 @@ struct AccountSection: View {
     }
 
     // MARK: - Eylemler
-
-    /// Kullanici iptal ederse sessiz; diger hatalar gosterilir. Her durumda anonim oturum surer.
-    private func handleSignIn(_ result: Result<ASAuthorization, Error>) {
-        let pendingNonce: String? = rawNonce
-        rawNonce = nil
-        let authorization: ASAuthorization
-        switch result {
-        case .success(let value):
-            authorization = value
-        case .failure(let error):
-            if let authError = error as? ASAuthorizationError, authError.code == .canceled { return }
-            showError(error)
-            return
-        }
-        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-              let tokenData = credential.identityToken,
-              let idToken = String(data: tokenData, encoding: .utf8),
-              let nonce = pendingNonce else {
-            showFailure("Apple ile giriş tamamlanamadı, tekrar dene.")
-            return
-        }
-        let service: AccountService = account
-        Task {
-            do {
-                try await service.completeAppleSignIn(idToken: idToken, rawNonce: nonce)
-            } catch {
-                showError(error)
-            }
-        }
-    }
 
     /// Yedek tabani yoksa (yeni telefon / ilk yedek) once sunucudaki yedegi ezme uyarisi.
     private func backupTapped() {

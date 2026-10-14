@@ -16,19 +16,19 @@ final class PayrollUITests: XCTestCase {
         return app
     }
 
-    func testManualCalculationAndSave() {
-        let app = launch()
-        // 1.9: hizli tahmin / detayli kayit yerine "Elle hesapla" (gun / hafta / ay)
-        XCTAssertTrue(app.tabBars.buttons["Kazanç"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Kazanç"].tap()
-        XCTAssertTrue(app.staticTexts["payroll.platformName"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["payroll.platformName"].label, "Paket Taxi Migros")
-        XCTAssertFalse(app.buttons["payroll.quick"].exists)
-
-        let manual = app.buttons["payroll.manual"]
-        if !manual.waitForExistence(timeout: 3) { app.swipeUp() }
+    /// 1.10: "Elle hesapla" Bugun'de; "Hesabı bitir" gunluk kazanca eklensin mi diye sorar.
+    private func openManualFromToday(_ app: XCUIApplication) {
+        let manual = app.buttons["today.manualCalc"]
+        XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
+        for _ in 0..<3 where !manual.exists { app.swipeUp() }
+        XCTAssertTrue(manual.waitForExistence(timeout: 5))
         manual.tap()
         XCTAssertTrue(app.segmentedControls["manual.span"].waitForExistence(timeout: 5))
+    }
+
+    func testManualCalculationAsksBeforeAddingToToday() {
+        let app = launch()
+        openManualFromToday(app)
         let packages = app.textFields["manual.packages"]
         XCTAssertTrue(packages.waitForExistence(timeout: 5))
         packages.tap()
@@ -41,23 +41,48 @@ final class PayrollUITests: XCTestCase {
         let save = app.buttons["manual.save"]
         if !save.isHittable { app.swipeUp() }
         save.tap()
-        // Kayit sonrasi Kazanc ekranina donulur (liste asagi kaydirilmis kalabilir), pano bu ayin brutunu gosterir
-        XCTAssertTrue(app.buttons["payroll.manual"].waitForExistence(timeout: 8))
+        let add = app.alerts.buttons["Evet, ekle"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5), "Hesap bitince bugune eklensin mi diye sorulmali")
+        add.tap()
+
+        // Bugun'e donulur; kayit listede
+        XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 8))
+        let row = app.buttons["dashboard.earningRow"]
+        for _ in 0..<4 where !row.exists { app.swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+
+        // Kazanc panosu bu ayin brutunu gosterir; "Elle hesapla" artik orada degil
+        app.tabBars.buttons["Kazanç"].tap()
+        XCTAssertTrue(app.staticTexts["payroll.platformName"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["payroll.platformName"].label, "Paket Taxi Migros")
+        XCTAssertFalse(app.buttons["payroll.manual"].exists)
         let monthGross = app.staticTexts["dashboard.monthGross"]
-        if !monthGross.exists { app.swipeDown() }
         XCTAssertTrue(monthGross.waitForExistence(timeout: 5))
         // Ay: sabit 55.223 + gunluk prim 2.360
         XCTAssertTrue(monthGross.label.contains("57.583"), "gelen: \(monthGross.label)")
     }
 
+    func testManualCalculationNotAddedWhenDeclined() {
+        let app = launch()
+        openManualFromToday(app)
+        let packages = app.textFields["manual.packages"]
+        XCTAssertTrue(packages.waitForExistence(timeout: 5))
+        packages.tap()
+        packages.typeText("20")
+        XCTAssertTrue(app.staticTexts["manual.net"].waitForExistence(timeout: 5))
+        let save = app.buttons["manual.save"]
+        if !save.isHittable { app.swipeUp() }
+        save.tap()
+        let skip = app.alerts.buttons["Hayır, yalnızca hesapladım"]
+        XCTAssertTrue(skip.waitForExistence(timeout: 5))
+        skip.tap()
+        XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["dashboard.earningRow"].exists, "Reddedilen hesap kaydedilmemeli")
+    }
+
     func testManualWeekShowsDailyAverageAndDetail() {
         let app = launch()
-        XCTAssertTrue(app.tabBars.buttons["Kazanç"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Kazanç"].tap()
-        let manual = app.buttons["payroll.manual"]
-        if !manual.waitForExistence(timeout: 3) { app.swipeUp() }
-        manual.tap()
-        XCTAssertTrue(app.segmentedControls["manual.span"].waitForExistence(timeout: 5))
+        openManualFromToday(app)
         app.segmentedControls["manual.span"].buttons["Haftalık"].tap()
         XCTAssertTrue(app.textFields["manual.days"].waitForExistence(timeout: 5))
         let packages = app.textFields["manual.packages"]
@@ -70,5 +95,29 @@ final class PayrollUITests: XCTestCase {
             .matching(NSPredicate(format: "label CONTAINS %@", "Ayrıntılı döküm")).firstMatch
         for _ in 0..<4 where !(detail.exists && detail.isHittable) { app.swipeUp() }
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
+    }
+
+    /// 1.10: Kazanc > "Tutarları düzenle" (kalem) firma tutarini degistirir; sonra firma degerlerine donulebilir.
+    func testTariffPencilEditsAmounts() {
+        let app = launch()
+        XCTAssertTrue(app.tabBars.buttons["Kazanç"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Kazanç"].tap()
+        let edit = app.buttons["tariff.edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        edit.tap()
+        XCTAssertTrue(app.buttons["tariffEdit.save"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["tariffEdit.reset"].exists, "Duzenleme yokken firma degerine donus gosterilmez")
+        let field = app.textFields.element(boundBy: 0)
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        // Imleci sona alip mevcut tutari silerek yeni deger yazilir
+        let current: String = (field.value as? String) ?? ""
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
+        field.typeText("999")
+        app.buttons["tariffEdit.save"].tap()
+        XCTAssertTrue(app.staticTexts["payroll.platformName"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Kendi değerlerinle hesaplanıyor"].waitForExistence(timeout: 5))
+        edit.tap()
+        XCTAssertTrue(app.buttons["tariffEdit.reset"].waitForExistence(timeout: 5))
     }
 }

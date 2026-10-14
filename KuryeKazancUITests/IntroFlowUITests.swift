@@ -65,8 +65,10 @@ final class IntroFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-testing", "-reset-defaults", "-hasCompletedOnboarding", "YES",
                                "-hasSeenIntroV18", "YES", "-firm", "yemeksepeti"]
         app.launch()
-        let card = app.buttons["today.goalCard"]
-        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        // 1.10: hedef halkasinin altinda acik "Plan oluştur" dugmesi
+        let card = app.buttons["today.planButton"]
+        if !card.waitForExistence(timeout: 10) { app.swipeUp() }
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
         card.tap()
 
         let amount = app.textFields["plan.amount"]

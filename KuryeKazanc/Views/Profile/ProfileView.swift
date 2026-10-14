@@ -2,49 +2,37 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 
-/// Profil sekmesi: profil, hedefler, gider hesabi, konum izni, paylasim rizalari, hesap ve yedek, kalibrasyon, veri.
+/// Profil sekmesi: hesap (Apple ile giris), ayarlar (firma, yakit, hedef, bildirimler), profil, konum, otomatik vardiya, veri.
+/// 1.10: ekran goruntusu taramasi, kalibrasyon ve eski "Platformlarım" kaldirildi; gider tahmini Gelismis'e tasindi.
 struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
     @Environment(LocationService.self) private var location
-    @Environment(ScreenshotScanner.self) private var scanner
     @Environment(SyncCoordinator.self) private var sync
     @Environment(AccountService.self) private var account
     @Environment(PayrollModel.self) private var payroll
     @Environment(\.showIntro) private var showIntro
 
     @Query private var couriers: [Courier]
-    @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
 
-    @AppStorage(AppPreferences.costPerKmKey) private var costPerKm = AppPreferences.defaultCostPerKm
-    @AppStorage(AppPreferences.autoEstimateExpensesKey) private var autoEstimate = true
-
-    @State private var costText = ""
     @State private var showsFirmSetup = false
     @State private var showsShiftTutorial = false
     @State private var showDeleteConfirmation = false
-    @AppStorage("scanTestWindow") private var scanTestWindow = false
 
     private var courier: Courier? { couriers.first }
 
     var body: some View {
         NavigationStack {
             Form {
+                AccountSection()
                 settingsSection
                 profileSection
-                expenseSection
                 locationSection
                 AutoShiftSection()
-                screenshotSection
-                AccountSection()
-                CalibrationSection()
                 if BuildEnvironment.showsTesterTools {
                     Section("Test araçları") {
                         NavigationLink("Test senaryoları") { DemoScenarioView() }
                         NavigationLink("Veritabanı") { DatabaseInspectorView() }
-                        NavigationLink("Tarama günlüğü") { ScanLogView() }
-                        Toggle("Test: son 30 gün ve tüm fotoğraflar", isOn: $scanTestWindow)
-                            .accessibilityIdentifier("profile.scanTestWindow")
                     }
                 }
                 dataSection
@@ -52,11 +40,6 @@ struct ProfileView: View {
             }
             .dismissesKeyboard()
             .navigationTitle("Profil")
-            .onAppear(perform: loadFieldTexts)
-            // Geri yukleme ayarlari degistirir (taban tarihi de degisir): alanlar yeniden okunur.
-            .onChange(of: account.lastBackupDate) { _, _ in
-                loadFieldTexts()
-            }
             .sheet(isPresented: $showsFirmSetup) {
                 SetupFlowView(firmOnly: true) { showsFirmSetup = false }
             }
@@ -86,13 +69,6 @@ struct ProfileView: View {
                 )) {
                     ForEach(VehicleType.allCases) { Text($0.displayName).tag($0) }
                 }
-                NavigationLink {
-                    DefaultPlatformsView(courier: courier, platforms: platforms)
-                } label: {
-                    LabeledContent("Platformlarım", value: courier.defaultPlatforms
-                        .sorted { $0.sortOrder < $1.sortOrder }
-                        .map(\.name).joined(separator: ", "))
-                }
             } else {
                 Text("Profil bulunamadı").foregroundStyle(.secondary)
             }
@@ -119,6 +95,10 @@ struct ProfileView: View {
                 Label("Hedef ve plan", systemImage: "target")
             }
             .accessibilityIdentifier("profile.goal")
+            NavigationLink { NotificationSettingsView() } label: {
+                Label("Bildirimler", systemImage: "bell.badge")
+            }
+            .accessibilityIdentifier("profile.notifications")
             Button { showIntro() } label: {
                 Label("Tanıtımı izle", systemImage: "play.circle")
             }
@@ -133,46 +113,11 @@ struct ProfileView: View {
             NavigationLink { AdvancedView() } label: {
                 Label("Gelişmiş", systemImage: "gearshape.2")
             }
+            .accessibilityIdentifier("profile.advanced")
         } header: {
             Text("Ayarlar")
         } footer: {
             Text("Tüm hesaplar çalıştığın firmanın tarifesine göre yapılır.")
-        }
-    }
-
-    // MARK: - Gider
-
-    private var expenseSection: some View {
-        Section {
-            Toggle("Otomatik gider tahmini", isOn: $autoEstimate)
-                .accessibilityIdentifier("settings.autoEstimate")
-            HStack {
-                Text("Km başına maliyet (yedek)")
-                Spacer()
-                TextField("0", text: $costText)
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 90)
-                    .onChange(of: costText) { _, newValue in
-                        if let value = TurkishNumberParser.parseDecimal(newValue), value >= 0 {
-                            costPerKm = value
-                        }
-                    }
-                    .accessibilityIdentifier("settings.costPerKm")
-                Text("₺").foregroundStyle(.secondary)
-            }
-            .disabled(!autoEstimate)
-            if let courier {
-                Button("\(courier.vehicleType.displayName) varsayılanını kullan (\(Formatters.currency(courier.vehicleType.defaultCostPerKm)))") {
-                    costPerKm = courier.vehicleType.defaultCostPerKm
-                    costText = TurkishNumberParser.format(costPerKm)
-                }
-                .disabled(!autoEstimate)
-            }
-        } header: {
-            Text("Gider hesaplama")
-        } footer: {
-            Text("Yakıt fiyatı girdiysen gider km × tüketim × fiyattır; girmediysen km × bu tutar.")
         }
     }
 
@@ -194,9 +139,9 @@ struct ProfileView: View {
                 EmptyView()
             }
         } header: {
-            Text("Arka plan konumu")
+            Text("Konum")
         } footer: {
-            Text("Konum yalnızca otomatik vardiya sırasında (mesafe ve ilçe için) kullanılır; vardiya bitince durur. “Uygulamayı kullanırken” izni de yeterlidir. Tam konum saklanmaz.")
+            Text("Konum yalnızca vardiya sırasında km, bölge ve mesafe bandı için kullanılır; vardiya bitince durur. Tam konum saklanmaz.")
         }
     }
 
@@ -211,53 +156,6 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Ekran goruntuleri
-
-    private var screenshotSection: some View {
-        Section {
-            Toggle("Ekran görüntülerini otomatik bul", isOn: autoScanBinding)
-                .accessibilityIdentifier("profile.autoScan")
-            if scanner.isPermissionMissing {
-                Button("Fotoğraf izni kapalı — Ayarlar'dan aç") { openSystemSettings() }
-                    .accessibilityIdentifier("profile.photoPermission")
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Kazanç taraması")
-                Text("Firma uygulamasında kazanç ekranının görüntüsünü al; Bugün > “Kazanç taraması” son 24 saatin görüntülerini okur.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("profile.scanInfo")
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Kısayollar ile")
-                Text("Kısayollar > Otomasyon > + > Uygulama > (platform uygulaması) > Açıldığında > Hemen Çalıştır > eylemler: Bekle (3 sn) → Ekran Görüntüsü Al → Kurye Kazanç'a ekran görüntüsü gönder.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("profile.shortcutsRecipe")
-        } header: {
-            Text("Ekran görüntüleri")
-        } footer: {
-            Text("Görüntüler yalnızca telefonunda işlenir.")
-        }
-    }
-
-    /// Acmak fotograf izni ister (verilmezse kapali kalir); kapatmak taramayi durdurur.
-    private var autoScanBinding: Binding<Bool> {
-        Binding(
-            get: { scanner.isEnabled },
-            set: { newValue in
-                if newValue {
-                    Task { _ = await scanner.enable() }
-                } else {
-                    scanner.disable()
-                }
-            }
-        )
-    }
-
     // MARK: - Veri
 
     private var dataSection: some View {
@@ -265,7 +163,7 @@ struct ProfileView: View {
             Button("Tüm kayıtları sil", role: .destructive) { showDeleteConfirmation = true }
                 .accessibilityIdentifier("settings.deleteAll")
         } footer: {
-            Text("Yalnızca telefondaki kayıtları siler. Sunucudaki yedek için Hesap ve yedek > “Verilerimi sil”.")
+            Text("Yalnızca telefondaki kayıtları siler. Sunucudaki yedek için Hesap > “Verilerimi sil”.")
         }
     }
 
@@ -292,45 +190,11 @@ struct ProfileView: View {
         }
     }
 
-    private func loadFieldTexts() {
-        costText = TurkishNumberParser.format(costPerKm)
-    }
-
     private func deleteAllRecords() {
         try? modelContext.deleteAllRecords()
         // Silinen kayitlarin bekleyen gonderimleri de dusulur (sunucudakiler icin "Verilerimi sil")
         sync.allRecordsDeleted()
         // Bos veri otomatik yedekle sunucudaki yedegi ezmesin
         account.localRecordsCleared()
-    }
-}
-
-/// Profildeki varsayilan platform secimi.
-private struct DefaultPlatformsView: View {
-    @Environment(\.modelContext) private var modelContext
-    let courier: Courier
-    let platforms: [Platform]
-
-    var body: some View {
-        List(platforms) { platform in
-            let isSelected = courier.defaultPlatforms.contains { $0.id == platform.id }
-            Button {
-                if isSelected {
-                    courier.defaultPlatforms.removeAll { $0.id == platform.id }
-                } else {
-                    courier.defaultPlatforms.append(platform)
-                }
-                try? modelContext.save()
-            } label: {
-                HStack {
-                    Text(platform.name).foregroundStyle(.primary)
-                    Spacer()
-                    if isSelected {
-                        Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
-                    }
-                }
-            }
-        }
-        .navigationTitle("Platformlarım")
     }
 }

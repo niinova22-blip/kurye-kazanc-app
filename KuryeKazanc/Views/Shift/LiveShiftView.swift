@@ -223,9 +223,9 @@ struct LiveShiftView: View {
         TimelineView(.periodic(from: .now, by: 30)) { _ in
             let estimate: PayBreakdown? = controller.liveEstimate()
             HStack {
-                stat("Şu ana kadar", estimate.map { PayFormat.tl($0.gross) } ?? "—", identifier: "shift.estimate")
+                stat("Şu ana kadar (brüt)", estimate.map { PayFormat.tl($0.gross) } ?? "—", identifier: "shift.estimate")
                 Divider().frame(height: 30).overlay(.white.opacity(0.4))
-                stat("Bugün", "\(controller.packageCount) paket", identifier: "shift.packages")
+                stat("Bu vardiya", "\(controller.packageCount) paket", identifier: "shift.packages")
             }
             .padding(12)
             .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))

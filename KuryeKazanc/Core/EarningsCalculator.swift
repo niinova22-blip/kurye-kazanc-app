@@ -31,10 +31,17 @@ struct EarningsSummary: Equatable {
     var netEarnings: Double { totalEarnings - totalExpenses }
     var workHours: Double { workDuration / 3600 }
 
-    /// Net TL/saat. Calisma suresi yoksa `nil` (sifira bolme yerine "—" gosterilir).
-    var netPerHour: Double? {
-        guard workDuration > 0 else { return nil }
-        return netEarnings / workHours
+    /// Saat basi hesap icin en az calisma suresi. Daha kisa surede (or. 3 dakikalik deneme vardiyasi)
+    /// saat basi deger anlamsiz derecede buyur; "—" gosterilir.
+    static let minimumRatedDuration: TimeInterval = 30 * 60
+
+    /// Net TL/saat. Calisma suresi yarim saatten azsa `nil` (anlamsiz buyuk deger yerine "—" gosterilir).
+    var netPerHour: Double? { netPerHour(adding: 0) }
+
+    /// Ekrandaki net rakama eklenen ek tutarla (or. sabit ucretin gunluk payi) ayni nete gore saat basi.
+    func netPerHour(adding extra: Double) -> Double? {
+        guard workDuration >= Self.minimumRatedDuration else { return nil }
+        return (netEarnings + extra) / workHours
     }
 
     var usesEstimatedExpenses: Bool { estimatedExpenses > 0 }
