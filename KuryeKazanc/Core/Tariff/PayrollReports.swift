@@ -8,18 +8,27 @@ struct DatedExpense: Equatable {
 }
 
 /// Ayin hakedis panosu (ortak kartlar).
+///
+/// 1.10 duzeltmesi: "Bu ay tahmini brüt" aylik sabit ucretin tamamini icerir; saat basi degerler ise yalnizca
+/// calisilan gunlere dusen payi kullanir (yoksa 1 gunluk saate 55.000 TL bolunup "61.000 TL/sa" cikiyordu).
+/// Net, elle yakit gideri yoksa km'den yakit tahminini de duser (Bugun ekraniyla ayni kural).
 struct PayrollDashboard: Equatable {
     var period: PeriodResult
     var expenses: Money
     var paymentDifference: Money?
+    /// Km'den yakit tahmini (elle yakit gideri girildiyse sifir).
+    var fuel: Money = .zero
+    var monthWorkDays: Int = 26
 
     var estimatedGross: Money { period.gross }
-    var estimatedNet: Money { period.gross - expenses }
+    var estimatedNet: Money { period.gross - expenses - fuel }
     var packages: Int { period.packages }
-    var grossPerHour: Money? { period.grossPerHour }
+    /// Su ana kadar hak edilen brut: aylik kalemlerin calisilan gunlere dusen payi dahil.
+    var earnedSoFar: Money { period.earnedGross(monthWorkDays: monthWorkDays) }
+    var grossPerHour: Money? { period.grossPerHour(monthWorkDays: monthWorkDays) }
     var netPerHour: Money? {
-        guard period.hours > 0 else { return nil }
-        return Money(estimatedNet.value / period.hours)
+        guard period.hours >= PeriodResult.minimumRatedHours else { return nil }
+        return Money(Money.round((earnedSoFar - expenses - fuel).value / period.hours))
     }
     /// En yakin bonus hedefi.
     var nextBonus: BonusProgress? {

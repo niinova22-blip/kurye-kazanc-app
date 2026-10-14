@@ -42,10 +42,24 @@ struct PeriodResult: Equatable {
     var prePayment: Money { gross + tips + extraPayments - deductions - advances }
     var prePaymentUpper: Money { grossUpper + tips + extraPayments - deductions - advances }
 
-    var grossPerHour: Money? {
-        guard hours > 0 else { return nil }
-        return Money(gross.value / hours)
+    /// Saat basi hesap icin en az sure (yarim saat); daha kisasi anlamsiz buyuk deger uretir.
+    static let minimumRatedHours: Decimal = Decimal(string: "0.5")!
+
+    /// Calisilan gunlere gore hak edilen brut: aylik kalemler (sabit ucret, aylik kademe) saate degil aya baglidir;
+    /// calisilan gun sayisi / aylik is gunu oraninda sayilir (en fazla tamami).
+    func earnedGross(monthWorkDays: Int) -> Money {
+        guard !monthlyPart.isZero, monthWorkDays > 0 else { return gross }
+        let ratio: Decimal = min(1, Decimal(daysWithLogs) / Decimal(monthWorkDays))
+        return gross - monthlyPart + Money(Money.round(monthlyPart.value * ratio))
     }
+
+    /// Saat basi brut (aylik kalemlerin calisilan gunlere dusen payiyla). Yarim saatten kisa surede nil.
+    func grossPerHour(monthWorkDays: Int) -> Money? {
+        guard hours >= Self.minimumRatedHours else { return nil }
+        return Money(Money.round(earnedGross(monthWorkDays: monthWorkDays).value / hours))
+    }
+
+    var grossPerHour: Money? { grossPerHour(monthWorkDays: 26) }
 
     var needsVerification: Bool { weakestConfidence == .needsVerification }
 

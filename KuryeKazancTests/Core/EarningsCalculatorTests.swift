@@ -44,6 +44,19 @@ final class EarningsCalculatorTests: XCTestCase {
         XCTAssertEqual(summary, .empty)
     }
 
+    /// 1.10: 3 dakikalik vardiyada 3.000 TL "61.000 TL/sa" gibi anlamsiz bir deger uretiyordu.
+    func testNetPerHour_isNilBelowHalfAnHour() {
+        let summary = EarningsCalculator(costPerKm: 0).summarize(earnings: [entry(0, 0.05, gross: 3_000)], expenses: [])
+        XCTAssertNil(summary.netPerHour)
+        XCTAssertNil(summary.netPerHour(adding: 500))
+    }
+
+    /// Sabit ucretin gune dusen payi ana rakama eklendiginde saat basi da ayni neti kullanir.
+    func testNetPerHour_addingFixedShare() {
+        let summary = EarningsCalculator(costPerKm: 0).summarize(earnings: [entry(0, 4, gross: 800)], expenses: [])
+        XCTAssertEqual(try XCTUnwrap(summary.netPerHour(adding: 400)), 300, accuracy: 0.001)
+    }
+
     func testNetPerHour_canBeNegative() {
         let summary = EarningsCalculator(costPerKm: 0).summarize(
             earnings: [entry(0, 2, gross: 100)],

@@ -114,6 +114,35 @@ final class TariffChangesTests: XCTestCase {
         XCTAssertTrue(version.items.contains { $0.key == "bonus.daily.82" }, "taban surumun diger kalemleri korunur")
     }
 
+    /// 1.10: tarife ekranindaki kalem — yalnizca degisen tutarlar kullanici degeri olur, gerisi firma tarifesinden kalir.
+    func testEditedVersionChangesOnlyEditedAmounts() throws {
+        let base = TariffFixtures.bundled("trendyol_go-esnaf-v1")
+        let edited = try XCTUnwrap(TariffImport.editedVersion(base: base, amounts: ["package.day": money("80")],
+                                                              today: "2026-10-14", id: "user-edit-1"))
+        XCTAssertEqual(edited.items.first { $0.key == "package.day" }?.amount, money("80"))
+        XCTAssertNil(edited.items.first { $0.key == "package.day" }?.amountUpper)
+        XCTAssertEqual(edited.items.first { $0.key == "package.day" }?.confidence, .userEntered)
+        XCTAssertEqual(edited.items.first { $0.key == "bonus.daily.82" }?.amount,
+                       base.items.first { $0.key == "bonus.daily.82" }?.amount)
+        XCTAssertEqual(edited.effectiveFrom, base.effectiveFrom, "gecmis gunler de ayni degerle hesaplanir")
+        XCTAssertEqual(edited.sourceNote, "Kendi değerlerim")
+
+        // Onaylaninca resmi tarifenin onune gecer
+        var approved = edited
+        approved.approvalStatus = .published
+        let catalog = TariffCatalog.merged(bundled: TariffFixtures.all, remote: [], user: [approved])
+        var input = TariffFixtures.input("trendyol_go")
+        input.dayPackages = 1
+        XCTAssertEqual(TariffFixtures.calc(input, engine: TariffFixtures.engine(catalog: catalog)).gross, money("80"))
+    }
+
+    func testEditedVersionIsNilWithoutChanges() {
+        let base = TariffFixtures.bundled("trendyol_go-esnaf-v1")
+        let same: Money = base.items.first { $0.key == "package.day" }!.amount
+        XCTAssertNil(TariffImport.editedVersion(base: base, amounts: ["package.day": same], today: "2026-10-14", id: "x"))
+        XCTAssertNil(TariffImport.editedVersion(base: base, amounts: [:], today: "2026-10-14", id: "x"))
+    }
+
     func testEconomicIndicatorOnlyWarns() {
         let tariff = TariffFixtures.bundled("trendyol_go-esnaf-v1")
         let before = tariff

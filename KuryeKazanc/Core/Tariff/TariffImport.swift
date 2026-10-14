@@ -201,6 +201,26 @@ enum TariffImport {
         return String(text[r])
     }
 
+    /// Tarife ekranindaki kalem (1.10): kullanicinin degistirdigi tutarlarla taban surumun kopyasi.
+    /// Yalnizca farkli olan kalemler "kullanıcı girdi" olur; tutar araligi tek degere iner. Degisiklik yoksa nil.
+    /// Yururluk taban surumle ayni: bu donemin gecmis gunleri de kullanicinin degeriyle hesaplanir.
+    static func editedVersion(base: TariffVersion, amounts: [String: Money], today: String, id: String) -> TariffVersion? {
+        var drafts: [DraftTariffItem] = []
+        for item in base.items where !item.withdrawn {
+            guard let amount = amounts[item.key], amount != item.amount || (item.amountUpper != nil && item.amountUpper != amount) else {
+                continue
+            }
+            var copy = item
+            copy.amount = amount
+            copy.amountUpper = nil
+            copy.confidence = .userEntered
+            drafts.append(DraftTariffItem(item: copy, score: 1, sourceLine: "Kalem"))
+        }
+        guard !drafts.isEmpty else { return nil }
+        return userVersion(platform: base.platformCode, drafts: drafts, base: base, sourceNote: "Kendi değerlerim",
+                           effectiveFrom: base.effectiveFrom, today: today, id: id)
+    }
+
     /// Taslak kalemlerden kullanici tarifesi (taslak durumunda; kaynak zorunlu).
     static func userVersion(platform: String, drafts: [DraftTariffItem], base: TariffVersion?, sourceNote: String,
                             effectiveFrom: String, today: String, id: String) -> TariffVersion {

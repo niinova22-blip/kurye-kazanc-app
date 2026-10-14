@@ -50,6 +50,12 @@ struct FirmDetailView: View {
         }
         .navigationTitle(PayrollModel.platformName(row.platformCode))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Yalnizca calistigi firmanin tutarlari duzenlenir (diger firmalar karsilastirma icin firma degeriyle kalir)
+            if row.isCurrent {
+                ToolbarItem(placement: .topBarTrailing) { TariffEditButton() }
+            }
+        }
     }
 
     private var unverified: [UnverifiedItem] {

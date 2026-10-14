@@ -201,7 +201,9 @@ final class PayrollModel {
         guard parts.count == 3 else { return nil }
         let localDay: Date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 9)) ?? clock()
         let hours: Double = log.input.hours.doubleValue
-        let recordStart: Date = start ?? localDay
+        // Elle eklenen kayitlar ayni saate (09:00) yigilmasin: o gunun son kaydinin bitisinden baslar.
+        // Ust uste binen araliklar calisma suresinde bir kez sayildigindan saat basi kazanc sisiyordu.
+        let recordStart: Date = start ?? nextFreeStart(day: localDay, context: context)
         let recordEnd: Date = end ?? recordStart.addingTimeInterval(max(hours, 0) * 3600)
         let code: String = log.platformCode
         let platform: Platform? = try? context.fetch(FetchDescriptor<Platform>(predicate: #Predicate { $0.code == code })).first
@@ -215,6 +217,16 @@ final class PayrollModel {
         context.insert(record)
         try? context.save()
         return record.id
+    }
+
+    /// Gunun kayitlarinin en gec bitisi (09:00'dan once degil); kayit yoksa 09:00.
+    private func nextFreeStart(day localDay: Date, context: ModelContext) -> Date {
+        let dayStart: Date = calendar.startOfDay(for: localDay)
+        let descriptor = FetchDescriptor<EarningRecord>(predicate: #Predicate { $0.date == dayStart })
+        let records: [EarningRecord] = (try? context.fetch(descriptor)) ?? []
+        let latestEnd: Date? = records.map(\.endTime).max()
+        guard let latestEnd, latestEnd > localDay else { return localDay }
+        return latestEnd
     }
 
     func delete(_ log: WorkLog, context: ModelContext?) {
@@ -269,13 +281,20 @@ final class PayrollModel {
                                     includeMonthly: isMonth)
     }
 
-    func dashboard(expenses: [DatedExpense], month date: Date = Date()) -> PayrollDashboard? {
+    /// - Parameter fallbackCostPerKm: verilirse (otomatik gider tahmini acik) ve ayda elle yakit gideri yoksa km'den yakit dusulur.
+    func dashboard(expenses: [DatedExpense], month date: Date = Date(), fallbackCostPerKm: Double? = nil) -> PayrollDashboard? {
         guard let code = state.activePlatform else { return nil }
         let range = monthRange(containing: date)
         let result: PeriodResult = period(platform: code, start: range.start, end: range.end)
-        let monthExpenses: Money = expenses.filter { $0.day >= range.start && $0.day <= range.end }.map(\.amount).sum()
+        let inMonth: [DatedExpense] = expenses.filter { $0.day >= range.start && $0.day <= range.end }
+        let monthExpenses: Money = inMonth.map(\.amount).sum()
         let lastPayment: PaymentRecord? = store.payments(platform: code).first { $0.periodEnd >= range.start }
-        return PayrollDashboard(period: result, expenses: monthExpenses, paymentDifference: lastPayment?.difference)
+        var fuel: Money = .zero
+        if let fallbackCostPerKm, !inMonth.contains(where: { $0.category == .fuel }) {
+            fuel = fuelModel(fallbackCostPerKm: fallbackCostPerKm).cost(km: result.km, on: today)
+        }
+        return PayrollDashboard(period: result, expenses: monthExpenses, paymentDifference: lastPayment?.difference,
+                                fuel: fuel, monthWorkDays: state.goal?.monthWorkDays ?? 26)
     }
 
     // MARK: - Odeme kontrolu
@@ -322,6 +341,44 @@ final class PayrollModel {
 
     func deleteUserTariff(_ version: TariffVersion) {
         store.deleteUserTariff(id: version.id)
+        reload()
+    }
+
+    /// Aktif firmanin kullanici degerleriyle degistirilmis (onayli) tarifesi var mi.
+    var hasEditedTariff: Bool {
+        guard let code = state.activePlatform else { return false }
+        return state.userTariffs.contains { $0.platformCode == code && $0.approvalStatus.isUsableForCalculation }
+    }
+
+    /// Firmanin yayimladigi (kullanici degeri karismamis) guncel tarife: kalem ekraninda "Firma: X" olarak gosterilir.
+    func firmVersion() -> TariffVersion? {
+        guard let code = state.activePlatform else { return nil }
+        return TariffCatalog.merged(bundled: BundledTariffs.all, remote: tariffs.remoteVersions, user: [])
+            .current(platform: code, day: today)
+    }
+
+    /// Kalem ekrani: degisen tutarlarla yeni kullanici tarifesi kaydedilir ve hemen kullanilir; onceki duzenleme yerini alir.
+    /// Degisiklik yoksa (ya da hepsi firma degerine donduyse) firma tarifesine donulur.
+    func applyTariffEdits(_ amounts: [String: Money]) -> Bool {
+        guard let code = state.activePlatform, let base = firmVersion() else { return false }
+        let id: String = "user-edit-\(code)-\(Int(clock().timeIntervalSince1970))"
+        let edited: TariffVersion? = TariffImport.editedVersion(base: base, amounts: amounts, today: today, id: id)
+        for version in state.userTariffs where version.platformCode == code {
+            store.deleteUserTariff(id: version.id)
+        }
+        guard let edited else {
+            reload()
+            return true
+        }
+        return saveUserTariff(edited, activate: true)
+    }
+
+    /// Kullanici degerleri silinir; firmanin tarifesi kullanilir.
+    func resetToFirmTariff() {
+        guard let code = state.activePlatform else { return }
+        for version in state.userTariffs where version.platformCode == code {
+            store.deleteUserTariff(id: version.id)
+        }
         reload()
     }
 

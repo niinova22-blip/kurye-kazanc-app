@@ -37,14 +37,17 @@ final class DashboardUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["dashboard.netPerHour"].label, "—")
     }
 
-    func testTodayShowsScanButton() {
+    /// 1.10: tarama ve + menusu kalkti; yerine Bugun'de "Elle hesapla" ve hedef halkasinin altinda plan dugmesi.
+    func testTodayShowsManualCalcInsteadOfScanAndAddMenu() {
         let app = launch(sampleData: false)
 
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
-        // 1.9: "Vardiya başlat" kartı eklendi; tarama düğmesi küçük ekranda aşağıda kalabilir
-        let scan = app.buttons["scan.button"]
-        if !scan.waitForExistence(timeout: 3) { app.swipeUp() }
-        XCTAssertTrue(scan.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["dashboard.addMenu"].exists)
+        let manual = app.buttons["today.manualCalc"]
+        for _ in 0..<3 where !manual.exists { app.swipeUp() }
+        XCTAssertTrue(manual.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["today.planButton"].exists)
+        XCTAssertFalse(app.buttons["scan.button"].exists)
     }
 
     func testDashboardSummarizesSampleData() {
@@ -58,68 +61,21 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["dashboard.distance"].label.hasPrefix("60"))
     }
 
-    // MARK: - Kazanc / gider ekleme
+    // MARK: - Kayit duzenleme
 
-    func testAddEarningManually_updatesNet() {
+    /// Kayda dokununca form acilir; vazgecince net degismez.
+    func testEditFormCancelKeepsNet() {
         let app = launch(sampleData: true)
-        XCTAssertTrue(app.buttons["dashboard.addMenu"].waitForExistence(timeout: 10))
-        app.buttons["dashboard.addMenu"].tap()
-        app.buttons["Elle kazanç"].tap()
-
-        let gross = app.textFields["earningForm.gross"]
-        XCTAssertTrue(gross.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["form.save"].isEnabled, "Tutar girilmeden kaydedilmemeli")
-        gross.tap()
-        gross.typeText("500")
-
-        let save = app.buttons["form.save"]
-        XCTAssertTrue(save.isEnabled)
-        save.tap()
-
-        // 850 + 500 = 1.350
         let net = app.staticTexts["dashboard.netEarnings"]
-        XCTAssertTrue(net.waitForExistence(timeout: 5))
-        let predicate = NSPredicate(format: "label CONTAINS %@", "1.350")
-        expectation(for: predicate, evaluatedWith: net)
-        waitForExpectations(timeout: 5)
-    }
-
-    func testAddFuelExpense_replacesEstimate() {
-        let app = launch(sampleData: true)
-        XCTAssertTrue(app.buttons["dashboard.addMenu"].waitForExistence(timeout: 10))
-        app.buttons["dashboard.addMenu"].tap()
-        app.buttons["Gider"].tap()
-
-        let amount = app.textFields["expenseForm.amount"]
-        XCTAssertTrue(amount.waitForExistence(timeout: 5))
-        amount.tap()
-        amount.typeText("100")
-        app.buttons["form.save"].tap()
-
-        // Yakit girildi -> km tahmini (150) duser: 1050 - 50 - 100 = 900
-        let net = app.staticTexts["dashboard.netEarnings"]
-        let predicate = NSPredicate(format: "label CONTAINS %@", "900")
-        expectation(for: predicate, evaluatedWith: net)
-        waitForExpectations(timeout: 5)
-    }
-
-    func testCancelFormDoesNotSave() {
-        let app = launch(sampleData: false)
-        XCTAssertTrue(app.buttons["dashboard.addMenu"].waitForExistence(timeout: 10))
-        app.buttons["dashboard.addMenu"].tap()
-        app.buttons["Elle kazanç"].tap()
+        XCTAssertTrue(net.waitForExistence(timeout: 10))
+        let before: String = net.label
+        let row = app.buttons.matching(identifier: "dashboard.earningRow").firstMatch
+        for _ in 0..<4 where !row.isHittable { app.swipeUp() }
+        row.tap()
         XCTAssertTrue(app.buttons["form.cancel"].waitForExistence(timeout: 5))
         app.buttons["form.cancel"].tap()
-        XCTAssertFalse(app.buttons["dashboard.earningRow"].exists)
-    }
-
-    func testAddMenuOffersScreenshotFirst() {
-        let app = launch(sampleData: false)
-        XCTAssertTrue(app.buttons["dashboard.addMenu"].waitForExistence(timeout: 10))
-        app.buttons["dashboard.addMenu"].tap()
-        XCTAssertTrue(app.buttons["Ekran görüntüsü"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Elle kazanç"].exists)
-        XCTAssertTrue(app.buttons["Gider"].exists)
+        for _ in 0..<4 where !net.isHittable { app.swipeDown() }
+        XCTAssertEqual(net.label, before)
     }
 
     func testSampleRecordsShowVerificationBadges() {
@@ -154,14 +110,16 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(net.waitForExistence(timeout: 5))
         XCTAssertTrue(net.label.contains("850"), "Gunluk net 850 olmali, gelen: \(net.label)")
 
+        // 1.10: gider tahmini Profil > Gelismis'te; Profil'de Bildirimler var, tarama ve kalibrasyon yok
         app.tabBars.buttons["Profil"].tap()
+        let notifications = app.buttons["profile.notifications"]
+        for _ in 0..<3 where !notifications.exists { app.swipeUp() }
+        XCTAssertTrue(notifications.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.switches["profile.autoScan"].exists)
+        let advanced = app.buttons["profile.advanced"]
+        for _ in 0..<3 where !advanced.isHittable { app.swipeUp() }
+        advanced.tap()
         XCTAssertTrue(app.switches["settings.autoEstimate"].waitForExistence(timeout: 5))
-        // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
-        let autoScan = app.switches["profile.autoScan"]
-        for _ in 0..<6 where !autoScan.exists {
-            app.swipeUp()
-        }
-        XCTAssertTrue(autoScan.exists)
     }
 
     func testAnalysisShowsPlatformComparison() {
@@ -175,16 +133,14 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(platforms.exists)
     }
 
-    func testProfileOffersAutoScanToggle() {
+    /// 1.10: Hesap (Apple ile giris) Profil'in en ustunde.
+    func testProfileShowsAccountFirst() {
         let app = launch(sampleData: false)
         XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Profil"].tap()
-        // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
-        let autoScan = app.switches["profile.autoScan"]
-        for _ in 0..<5 where !autoScan.exists { app.swipeUp() }
-        XCTAssertTrue(autoScan.exists)
-        // UI testlerinde tarama tercihi bos alandan okunur: kapali baslar (izin istenmez)
-        XCTAssertEqual(autoScan.value as? String, "0")
+        let signIn = app.buttons["profile.appleSignIn"]
+        let unavailable = app.staticTexts["profile.serverUnavailable"]
+        XCTAssertTrue(signIn.waitForExistence(timeout: 5) || unavailable.exists, "Hesap bolumu en ustte gorunmeli")
     }
 
     func testProfileOffersAutoShift() {
@@ -197,17 +153,6 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(toggle.exists)
         // UI testlerinde tercih bos alandan okunur: kapali baslar (izin istenmez)
         XCTAssertEqual(toggle.value as? String, "0", "Varsayilan kapali")
-    }
-
-    func testProfileCalibrationIsOffByDefault() {
-        let app = launch(sampleData: false)
-        XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Profil"].tap()
-        // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
-        let toggle = app.switches["profile.calibration"]
-        for _ in 0..<8 where !toggle.exists { app.swipeUp() }
-        XCTAssertTrue(toggle.exists)
-        XCTAssertEqual(toggle.value as? String, "0", "Kalibrasyon varsayilan kapali olmali (opt-in)")
     }
 
     func testDashboardShowsGrossAndExpenseBreakdown() {

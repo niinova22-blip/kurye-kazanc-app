@@ -10,6 +10,7 @@ struct KuryeKazancApp: App {
 
     init() {
         environment = AppEnvironment.shared
+        KuryeTips.configure(isUITesting: LaunchOptions.current.isUITesting)
     }
 
     var body: some Scene {
@@ -27,6 +28,9 @@ struct KuryeKazancApp: App {
                 .environment(environment.tariffs)
                 .environment(environment.liveShift)
                 .task {
+                    // Hatirlatmalar ayarlara gore yeniden kurulur (izin geri alindiysa sessizce dusmez)
+                    await ReminderScheduler.shared.refreshStatus()
+                    ReminderScheduler.shared.reschedule()
                     // Acilis: sablonlar (12 saatte bir) ve bekleyen gonderimler. Riza yoksa ag yok.
                     await syncNow()
                 }
@@ -54,6 +58,7 @@ struct KuryeKazancApp: App {
         // Tarifeler: basarisizlikta son bilinen / gomulu tarife kullanilir; hesaplama aga bagli degil
         await environment.tariffs.refreshIfNeeded()
         await environment.payroll.refreshNotices()
+        ReminderScheduler.shared.tariffNotices(unread: environment.payroll.unreadNoticeCount)
         await notifyTariffSwitchIfNeeded()
         await sync.flush()
     }

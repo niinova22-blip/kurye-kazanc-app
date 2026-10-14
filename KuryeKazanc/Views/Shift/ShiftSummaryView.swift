@@ -39,7 +39,7 @@ struct ShiftSummaryView: View {
 
                 HStack(spacing: 10) {
                     tile("shippingbox.fill", "\(log.input.totalPackages)", "paket")
-                    tile("clock.fill", Formatters.decimalText(log.input.hours), "saat")
+                    tile("clock.fill", Formatters.duration(log.input.hours.doubleValue * 3600), "süre")
                     tile("road.lanes", Formatters.decimalText(log.input.totalKm ?? log.input.distanceKm), "km")
                 }
 

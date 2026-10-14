@@ -18,6 +18,9 @@ struct ManualCalcView: View {
     @State private var days: String = ""
     @State private var weekendPackages: String = ""
     @State private var saved = false
+    /// "Hesabı bitir" sorusu ve sorulan girdi.
+    @State private var asksToAdd = false
+    @State private var pendingInput: PayInput?
 
     private var code: String { model.state.activePlatform ?? "" }
 
@@ -50,6 +53,15 @@ struct ManualCalcView: View {
         .navigationBarTitleDisplayMode(.inline)
         .dismissesKeyboard()
         .saveConfirmation(isPresented: $saved)
+        .alert(addQuestion, isPresented: $asksToAdd, presenting: pendingInput) { input in
+            Button("Evet, ekle") { save(input) }
+                .accessibilityIdentifier("manual.confirmAdd")
+            Button("Hayır, yalnızca hesapladım") { dismiss() }
+                .accessibilityIdentifier("manual.skipAdd")
+            Button("Hesaba devam et", role: .cancel) {}
+        } message: { _ in
+            Text("Eklersen kazanç ekranları ve hedefin bu hesapla güncellenir.")
+        }
     }
 
     private var inputSection: some View {
@@ -123,12 +135,14 @@ struct ManualCalcView: View {
         }
     }
 
+    /// 1.10: hesap kendiliginden kayda donusmez; "Hesabı bitir" deyince gunluk kazanca eklensin mi diye sorulur.
     private func saveSection(_ input: PayInput) -> some View {
         Section {
             Button {
-                save(input)
+                pendingInput = input
+                asksToAdd = true
             } label: {
-                Label("Kayıt olarak ekle", systemImage: "tray.and.arrow.down.fill")
+                Label("Hesabı bitir", systemImage: "checkmark.circle.fill")
             }
             .buttonStyle(PrimaryActionButtonStyle())
             .disabled(input.totalPackages == 0)
@@ -140,8 +154,17 @@ struct ManualCalcView: View {
             }
         } footer: {
             Text(span == .day
-                 ? "Günlük kayıt Bugün ve Kazanç ekranlarına eklenir."
-                 : "Bu dönemde günlük kayıtların (vardiyaların) varsa çift sayılmasın diye dönem kaydı eklenmez.")
+                 ? "Bitirince bu hesabın o günün kazancına eklenip eklenmeyeceğini sorarız. Eklemezsen hiçbir yere kaydedilmez."
+                 : "Bitirince dönem kaydı olarak eklenip eklenmeyeceğini sorarız. Bu dönemde vardiya kayıtların varsa çift saymamak için ekleme.")
+        }
+    }
+
+    private var addQuestion: String {
+        switch span {
+        case .day:
+            Calendar.current.isDateInToday(date) ? "Bugünkü kazancına eklensin mi?" : "\(PayFormat.day(model.day(date))) kazancına eklensin mi?"
+        case .week, .month:
+            "Bu dönem hesabı kayıtlarına eklensin mi?"
         }
     }
 
@@ -173,8 +196,8 @@ struct ManualCalcView: View {
 
     private func save(_ input: PayInput) {
         let method: EntryMethod = span == .day ? .manual : .period
-        let start: Date? = span == .day ? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: date) : nil
-        guard model.save(input, method: method, start: start, context: span == .day ? context : nil) != nil else { return }
+        // Baslangic verilmez: kayit o gunun son kaydindan sonra baslar (saatler ust uste binmesin)
+        guard model.save(input, method: method, context: span == .day ? context : nil) != nil else { return }
         Haptics.success()
         withAnimation { saved = true }
         Task { @MainActor in

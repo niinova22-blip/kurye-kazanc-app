@@ -416,7 +416,8 @@ struct PayrollHistoryView: View {
         let comparison: [PlatformComparison] = PlatformComparison.build(logs)
         let groups: [MonthGroup] = monthGroups(logs)
         List {
-            if comparison.count > 0 {
+            // Firma degistirenlerde eski firmanin kayitlari da gorunur (tek firmada gereksiz tekrar olmasin)
+            if comparison.count > 1 {
                 Section {
                     ForEach(comparison) { item in
                         ComparisonRow(item: item)

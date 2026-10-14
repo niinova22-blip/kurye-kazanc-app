@@ -150,6 +150,31 @@ final class PeriodAggregatorTests: XCTestCase {
         XCTAssertEqual(dashboard.nextBonus?.remaining, 32)
     }
 
+    /// 1.10: aylik sabit ucret saat basina tamamiyla bolunmez; calisilan gunun payi kadar girer.
+    func testDashboardPerHourUsesFixedShareOfWorkedDays() {
+        var period = PeriodResult.empty(platform: "pt_restoran", start: "2026-10-01", end: "2026-10-31")
+        period.dailyPart = money("3000")
+        period.dailyPartUpper = money("3000")
+        period.monthlyPart = money("52000")
+        period.hours = 10
+        period.daysWithLogs = 1
+        let dashboard = PayrollDashboard(period: period, expenses: .zero, paymentDifference: nil, fuel: money("200"),
+                                         monthWorkDays: 26)
+        XCTAssertEqual(dashboard.estimatedGross, money("55000"), "ay sonu tahmini sabit ucretin tamamini icerir")
+        XCTAssertEqual(dashboard.estimatedNet, money("54800"))
+        XCTAssertEqual(dashboard.earnedSoFar, money("5000"))   // 3000 + 52000 / 26
+        XCTAssertEqual(dashboard.grossPerHour, money("500"))
+        XCTAssertEqual(dashboard.netPerHour, money("480"))      // (5000 - 200) / 10
+    }
+
+    func testPerHourIsNilBelowHalfAnHour() {
+        var period = PeriodResult.empty(platform: "yemeksepeti", start: "2026-10-01", end: "2026-10-31")
+        period.dailyPart = money("3000")
+        period.hours = Decimal(string: "0.05")!
+        XCTAssertNil(period.grossPerHour)
+        XCTAssertNil(PayrollDashboard(period: period, expenses: .zero, paymentDifference: nil).netPerHour)
+    }
+
     func testPlatformComparisonUsesFrozenResults() {
         let logs = [
             log("getir", "2026-08-10", packages: 20, vehicle: "motorcycle"),
