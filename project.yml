@@ -82,6 +82,7 @@ targets:
       - path: KuryeLiveActivity
         excludes:
           - "Info.plist"
+          - "*.entitlements"
       - path: Shared
       - path: KuryeKazanc/Core/Formatters.swift
     settings:
@@ -89,6 +90,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.kuryekazanc.app.liveactivity
         INFOPLIST_FILE: KuryeLiveActivity/Info.plist
         GENERATE_INFOPLIST_FILE: YES
+        # 1.12: widget uygulamanin yazdigi bugunku paket / bolge ozetini App Group'tan okur
+        CODE_SIGN_ENTITLEMENTS: KuryeLiveActivity/KuryeLiveActivity.entitlements
         INFOPLIST_KEY_CFBundleDisplayName: "Kurye Kazanç"
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES

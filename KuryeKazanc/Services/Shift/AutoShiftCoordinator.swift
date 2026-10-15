@@ -49,7 +49,7 @@ final class AutoShiftCoordinator {
     /// gelen ilk GPS hareketi bununla ayirt edilir. Acilista kayitli son hareketle baslar.
     @ObservationIgnored private var observedLastMovement: Date?
     /// 1.12: paket sayilan canli vardiyanin anlik durumu (Canli Etkinlikte paket sayisi ve brut). nil: canli vardiya yok.
-    @ObservationIgnored var liveShiftSnapshot: (() -> (packages: Int, gross: Double)?)?
+    @ObservationIgnored var liveShiftSnapshot: (() -> (packages: Int, gross: Double, region: String?)?)?
     /// Otomatik vardiya basladi: paket sayma (canli vardiya) da baslar, kilit ekranindan "+1 paket" calisir.
     @ObservationIgnored var onAutoShiftStarted: (() -> Void)?
     /// Otomatik vardiya duraganliktan bitti. true donerse canli vardiya kaydedildi: bekleyen vardiya olusturulmaz.
@@ -329,7 +329,7 @@ final class AutoShiftCoordinator {
         let live = liveShiftSnapshot?()
         return ShiftActivityAttributes.ContentState(
             distanceKm: workSession.sessionDistanceKm, todayNet: net, netPerHour: perHour, endedAt: endedAt,
-            packages: live?.packages, shiftGross: live?.gross
+            packages: live?.packages, shiftGross: live?.gross, region: live?.region
         )
     }
 

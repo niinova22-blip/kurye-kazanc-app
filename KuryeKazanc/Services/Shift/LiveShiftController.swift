@@ -93,10 +93,11 @@ final class LiveShiftController {
     }
 
     /// Canli Etkinlik icin anlik durum.
-    func activitySnapshot() -> (packages: Int, gross: Double)? {
+    func activitySnapshot() -> (packages: Int, gross: Double, region: String?)? {
         guard let shift else { return nil }
         let gross: Double = liveEstimate()?.gross.doubleValue ?? 0
-        return (shift.packageCount, gross)
+        let region: String = WidgetPublisher.regionText(place: shift.district ?? shift.province, tier: payroll.state.regionTier)
+        return (shift.packageCount, gross, region.isEmpty ? nil : region)
     }
 
     /// Otomatik vardiya 20 dk duraganlikla bitti. Paket varsa vardiya hesaplanip kaydedilir (true), yoksa canli vardiya
@@ -135,6 +136,7 @@ final class LiveShiftController {
         shift?.province = place.province
         shift?.district = place.district
         persist()
+        autoShift.liveShiftChanged()
         guard let profile = payroll.tariffProfile,
               let suggestion = RegionResolver.suggest(province: place.province, district: place.district,
                                                       neighborhood: place.neighborhood, profile: profile) else { return }
@@ -240,6 +242,23 @@ final class LiveShiftController {
             defaults.set(data, forKey: AppPreferences.liveShiftKey)
         } else {
             defaults.removeObject(forKey: AppPreferences.liveShiftKey)
+        }
+        publishWidget()
+    }
+
+    /// Widget: suren vardiyanin paketleri ve bolgesi (kilit ekranindan +1'de uygulama acilmadan da guncellenir).
+    private func publishWidget() {
+        let current: LiveShift? = shift
+        let tier: String? = payroll.state.regionTier
+        let firm: String = payroll.tariffProfile.map { PayrollModel.platformName($0.platformCode) } ?? ""
+        WidgetPublisher.publish { snapshot in
+            snapshot.isShiftActive = current != nil
+            snapshot.shiftPackages = current?.packageCount ?? 0
+            snapshot.shiftStart = current?.start
+            if !firm.isEmpty { snapshot.firm = firm }
+            if let current {
+                snapshot.region = WidgetPublisher.regionText(place: current.district ?? current.province, tier: tier)
+            }
         }
     }
 }

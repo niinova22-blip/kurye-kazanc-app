@@ -9,7 +9,8 @@ struct ShiftLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ShiftActivityAttributes.self) { context in
             ShiftLockScreenView(attributes: context.attributes, state: context.state)
-                .activityBackgroundTint(Color(.systemBackground))
+                .activityBackgroundTint(WidgetBrand.deep)
+                .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -96,7 +97,7 @@ private struct ShiftDetailRow: View {
         HStack {
             Text(verbatim: detail)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .opacity(0.8)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Spacer()
@@ -128,7 +129,7 @@ private struct PackageButtons: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 36)
             }
-            .tint(.blue)
+            .tint(WidgetBrand.bright)
             Button(intent: EndShiftIntent()) {
                 Text("Bitir")
                     .frame(minHeight: 36)
@@ -151,6 +152,7 @@ private struct ShiftLockScreenView: View {
 
     private var subtitle: String {
         var parts: [String] = []
+        if let region = state.region, !region.isEmpty { parts.append(region) }
         if let gross = state.shiftGross, gross > 0, gross.isFinite {
             parts.append("~\(Formatters.currency(gross.rounded())) brüt")
         }
@@ -163,7 +165,7 @@ private struct ShiftLockScreenView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: title)
                     .font(.headline)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(WidgetBrand.glow)
                     .monospacedDigit()
                 Spacer()
                 ShiftTimerText(start: attributes.start, endedAt: state.endedAt)
@@ -172,7 +174,8 @@ private struct ShiftLockScreenView: View {
             if state.packages != nil {
                 Text(verbatim: subtitle)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(1)
                     .monospacedDigit()
                 if state.endedAt == nil {
                     PackageButtons(state: state)
@@ -188,5 +191,6 @@ private struct ShiftLockScreenView: View {
             }
         }
         .padding(16)
+        .foregroundStyle(.white)
     }
 }

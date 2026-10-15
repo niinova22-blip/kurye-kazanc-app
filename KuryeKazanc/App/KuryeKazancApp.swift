@@ -35,6 +35,12 @@ struct KuryeKazancApp: App {
                     await syncNow()
                 }
                 .onChange(of: scenePhase) { _, phase in
+                    // 1.12: ekran kilitlenirken / arka plana gecerken suren vardiyanin Canli Etkinligi kesin acik olsun:
+                    // kilit ekranina kendiliginden duser (ActivityKit istegi yalnizca uygulama gorunurken basarili olur)
+                    if phase == .inactive {
+                        environment.autoShift.ensureLiveActivity()
+                        return
+                    }
                     // On plana donus: Ayarlar'da verilen izinler ve suren vardiya yeniden degerlendirilir
                     guard phase == .active else { return }
                     let autoShift = environment.autoShift

@@ -13,6 +13,8 @@ struct ShiftActivityAttributes: ActivityAttributes {
         var packages: Int? = nil
         /// Canli vardiyanin su ana kadarki brutu (tarifeyle).
         var shiftGross: Double? = nil
+        /// Konumdan / tarifeden bolge ("Kadıköy · 1. bölge").
+        var region: String? = nil
     }
 
     var start: Date

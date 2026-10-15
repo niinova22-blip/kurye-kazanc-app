@@ -140,6 +140,8 @@ struct TodayView: View {
                 }
                 // 1.12: her paket / kayitta "hedefe su kadar kaldi" hatirlatmalari guncel ilerlemeyle yeniden kurulur
                 .task(id: nudgeSignature(progress)) { scheduleGoalNudges(summary: summary, progress: progress, entries: entries) }
+                // 1.12: widget'taki bugunku paket, net, hedef ve bolge
+                .task(id: widgetSignature(summary, progress: progress)) { publishWidget(summary, progress: progress) }
                 .fullScreenCover(isPresented: $showsLiveShift) { LiveShiftView() }
                 // 1.12: widget'taki "Vardiya" dugmesi
                 .onChange(of: liveShift.presentationRequested, initial: true) { _, requested in
@@ -393,6 +395,30 @@ struct TodayView: View {
             fuelEstimate: summary.estimatedExpenses, manualExpenses: manual, net: net,
             dailyTarget: progress?.targetNet, pace: goalPace(todayNet: net), goal: payroll.goal
         )
+    }
+
+    private var savedPackagesToday: Int { todaysEarnings.compactMap(\.packageCount).reduce(0, +) }
+
+    private func widgetSignature(_ summary: EarningsSummary, progress: DailyGoalProgress?) -> String {
+        "\(payroll.today)|\(savedPackagesToday)|\(summary.netEarnings.isFinite ? Int(summary.netEarnings) : 0)|\(progress?.targetPackages ?? 0)|\(payroll.state.regionTier ?? "")"
+    }
+
+    private func publishWidget(_ summary: EarningsSummary, progress: DailyGoalProgress?) {
+        let day: String = WidgetSnapshot.dayKey(.now)
+        let saved: Int = savedPackagesToday
+        let net: Double = summary.netEarnings + fixedShareToday.doubleValue
+        let target: Int = progress?.targetPackages ?? 0
+        let place: String? = todaysEarnings.last(where: { $0.district != nil })?.district
+        let region: String = WidgetPublisher.regionText(place: liveShift.shift?.district ?? place, tier: payroll.state.regionTier)
+        let firm: String = payroll.tariffProfile.map { PayrollModel.platformName($0.platformCode) } ?? ""
+        WidgetPublisher.publish { snapshot in
+            snapshot.day = day
+            snapshot.savedPackages = saved
+            snapshot.todayNet = net
+            snapshot.targetPackages = target
+            snapshot.region = region
+            snapshot.firm = firm
+        }
     }
 
     /// Hatirlatmalari yeniden kurmayi gerektiren degerler.

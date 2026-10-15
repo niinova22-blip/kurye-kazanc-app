@@ -2,96 +2,203 @@ import SwiftUI
 import WidgetKit
 import AppIntents
 
-/// 1.12 ana ekran / kilit ekrani widget'i: "Paket bıraktım" (uygulama acilmadan sayar, vardiya yoksa baslatir) ve
-/// "Vardiya" (canli vardiya ekranini acar). Veri gostermez: canli sayi ve kazanc Canli Etkinlikte.
+/// Uygulamanin marka renkleri (Theme.brandDeep / brandMid / brandBright; eklenti Theme'i derlemez).
+enum WidgetBrand {
+    static let deep = Color(red: 0x0B / 255, green: 0x2A / 255, blue: 0x6B / 255)
+    static let mid = Color(red: 0x1E / 255, green: 0x5B / 255, blue: 0xD8 / 255)
+    static let bright = Color(red: 0x2F / 255, green: 0x8C / 255, blue: 0xFF / 255)
+    static let glow = Color(red: 0x8C / 255, green: 0xC4 / 255, blue: 0xFF / 255)
+    static let mint = Color(red: 0x6E / 255, green: 0xE7 / 255, blue: 0xB7 / 255)
+    static let gradient = LinearGradient(colors: [deep, mid, bright], startPoint: .topLeading, endPoint: .bottomTrailing)
+}
+
+/// 1.12 ana ekran / kilit ekrani widget'i: bugunku paket sayisi, bolge, hedef ilerlemesi; "+1 paket" (uygulama acilmadan
+/// sayar, vardiya yoksa baslatir) ve "Vardiya" (canli vardiya ekrani). Veri App Group'taki WidgetSnapshot'tan.
 struct QuickShiftWidget: Widget {
     static let kind = "com.kuryekazanc.app.quickShift"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: Self.kind, provider: QuickShiftProvider()) { _ in
-            QuickShiftWidgetView()
-                .containerBackground(for: .widget) { Color(.systemBackground) }
+        StaticConfiguration(kind: Self.kind, provider: QuickShiftProvider()) { entry in
+            QuickShiftWidgetView(entry: entry)
+                .containerBackground(for: .widget) { WidgetBrand.gradient }
         }
         .configurationDisplayName("Paket say")
-        .description("Paketi bırakınca dokun; vardiya yoksa başlar. Uygulamayı açmana gerek yok.")
-        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular])
+        .description("Bugünkü paketin ve bölgen; paketi bırakınca dokun, vardiya yoksa başlar.")
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
 
 struct QuickShiftEntry: TimelineEntry {
     var date: Date
+    var snapshot: WidgetSnapshot
 }
 
 struct QuickShiftProvider: TimelineProvider {
-    func placeholder(in context: Context) -> QuickShiftEntry { QuickShiftEntry(date: .now) }
-
-    func getSnapshot(in context: Context, completion: @escaping (QuickShiftEntry) -> Void) {
-        completion(QuickShiftEntry(date: .now))
+    func placeholder(in context: Context) -> QuickShiftEntry {
+        var sample = WidgetSnapshot()
+        sample.day = WidgetSnapshot.dayKey(.now)
+        sample.savedPackages = 18
+        sample.targetPackages = 30
+        sample.region = "Kadıköy · 1. bölge"
+        sample.firm = "Paket Taxi"
+        return QuickShiftEntry(date: .now, snapshot: sample)
     }
 
+    func getSnapshot(in context: Context, completion: @escaping (QuickShiftEntry) -> Void) {
+        completion(context.isPreview ? placeholder(in: context) : QuickShiftEntry(date: .now, snapshot: .load()))
+    }
+
+    /// Uygulama her degisiklikte yeniler; gece yarisi da gun sifirlansin diye bir giris daha.
     func getTimeline(in context: Context, completion: @escaping (Timeline<QuickShiftEntry>) -> Void) {
-        completion(Timeline(entries: [QuickShiftEntry(date: .now)], policy: .never))
+        let now = Date()
+        let snapshot = WidgetSnapshot.load()
+        var entries = [QuickShiftEntry(date: now, snapshot: snapshot)]
+        if let midnight = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: now)) {
+            entries.append(QuickShiftEntry(date: midnight, snapshot: snapshot))
+        }
+        completion(Timeline(entries: entries, policy: .never))
     }
 }
 
-private struct QuickShiftWidgetView: View {
+struct QuickShiftWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    let entry: QuickShiftEntry
+
+    private var snapshot: WidgetSnapshot { entry.snapshot }
+    private var packages: Int { snapshot.packages(now: entry.date) }
+    private var regionText: String { snapshot.region.isEmpty ? "Bölge seçilmedi" : snapshot.region }
 
     var body: some View {
         switch family {
-        case .accessoryCircular:
-            Button(intent: AddPackageIntent()) {
-                ZStack {
-                    AccessoryWidgetBackground()
-                    Image(systemName: "shippingbox.fill")
-                        .font(.title3)
-                    Image(systemName: "plus.circle.fill")
-                        .font(.caption)
-                        .offset(x: 12, y: 12)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Paket bıraktım")
-        case .accessoryRectangular:
-            Button(intent: AddPackageIntent()) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Label("Paket bıraktım", systemImage: "shippingbox.fill")
-                        .font(.headline)
-                    Text("Dokun: +1 paket")
-                        .font(.caption)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.plain)
-        case .systemMedium:
-            HStack(spacing: 12) {
-                addButton
-                Button(intent: OpenShiftIntent()) {
-                    VStack(spacing: 6) {
-                        Image(systemName: "hand.tap.fill").font(.title2)
-                        Text("Vardiya").font(.headline)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .tint(.indigo)
-                .buttonStyle(.borderedProminent)
-            }
-        default:
-            addButton
+        case .accessoryCircular: circular
+        case .accessoryRectangular: rectangular
+        case .accessoryInline:
+            Label("\(packages) paket · \(regionText)", systemImage: "shippingbox.fill")
+        case .systemMedium: medium
+        default: small
         }
     }
 
-    private var addButton: some View {
+    // MARK: - Kilit ekrani
+
+    private var circular: some View {
         Button(intent: AddPackageIntent()) {
-            VStack(spacing: 6) {
-                Image(systemName: "shippingbox.fill").font(.title)
-                Text("+1 paket").font(.headline)
-                Text("Kurye Kazanç").font(.caption2).opacity(0.8)
+            ZStack {
+                AccessoryWidgetBackground()
+                if snapshot.targetPackages > 0 {
+                    Gauge(value: snapshot.fraction(now: entry.date)) { EmptyView() }
+                        .gaugeStyle(.accessoryCircularCapacity)
+                }
+                VStack(spacing: 0) {
+                    Text("\(packages)")
+                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .monospacedDigit()
+                    Image(systemName: "plus").font(.caption2.weight(.bold))
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .tint(.blue)
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(packages) paket. Dokun: bir paket ekle")
+    }
+
+    private var rectangular: some View {
+        Button(intent: AddPackageIntent()) {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Image(systemName: snapshot.isShiftActive ? "record.circle" : "shippingbox.fill")
+                    Text(targetText).font(.headline).monospacedDigit()
+                }
+                Text(regionText).font(.caption).lineLimit(1)
+                Text("Dokun: +1 paket").font(.caption2).opacity(0.8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Ana ekran
+
+    private var targetText: String {
+        snapshot.targetPackages > 0 ? "\(packages) / \(snapshot.targetPackages) paket" : "\(packages) paket"
+    }
+
+    private var header: some View {
+        HStack(spacing: 4) {
+            Image(systemName: snapshot.isShiftActive ? "dot.radiowaves.left.and.right" : "mappin.and.ellipse")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(snapshot.isShiftActive ? WidgetBrand.mint : WidgetBrand.glow)
+            Text(snapshot.isShiftActive ? "Vardiya sürüyor" : regionText)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .foregroundStyle(.white.opacity(0.85))
+        }
+    }
+
+    private var countBlock: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(packages)")
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+            Text(snapshot.targetPackages > 0 ? "/ \(snapshot.targetPackages) paket bugün" : "paket bugün")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.8))
+            if snapshot.targetPackages > 0 {
+                ProgressView(value: snapshot.fraction(now: entry.date))
+                    .tint(WidgetBrand.mint)
+                    .padding(.top, 2)
+            }
+        }
+    }
+
+    private var small: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            header
+            Spacer(minLength: 0)
+            countBlock
+            Spacer(minLength: 0)
+            addButton(compact: true)
+        }
+    }
+
+    private var medium: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                header
+                Spacer(minLength: 0)
+                countBlock
+                if snapshot.isShiftActive {
+                    Text(regionText)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.75))
+                        .lineLimit(1)
+                }
+            }
+            VStack(spacing: 8) {
+                addButton(compact: false)
+                Button(intent: OpenShiftIntent()) {
+                    Label("Vardiya", systemImage: "hand.tap.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .foregroundStyle(.white)
+                        .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+            .frame(width: 128)
+        }
+    }
+
+    private func addButton(compact: Bool) -> some View {
+        Button(intent: AddPackageIntent()) {
+            Label(compact ? "+1 paket" : "Paket bıraktım", systemImage: "plus")
+                .font(.subheadline.weight(.bold))
+                .frame(maxWidth: .infinity, minHeight: compact ? 30 : nil, maxHeight: compact ? 30 : CGFloat.infinity)
+                .foregroundStyle(WidgetBrand.deep)
+                .background(.white, in: RoundedRectangle(cornerRadius: compact ? 10 : 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 
