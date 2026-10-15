@@ -216,6 +216,27 @@ final class PayrollModel {
         return store.log(id: log.id)
     }
 
+    // MARK: - Sayaclar (1.12.2)
+
+    /// Bugun / bu hafta (Pzt–Paz) / bu ay toplam paket ve bunlara bagli prim / bonus durumu (aktif firma).
+    /// - Parameter live: Suren vardiyanin gun gun paketleri.
+    func bonusTracks(live: [String: Int] = [:]) -> [BonusTrack] {
+        guard let code = state.activePlatform, let base = baseInput(day: today),
+              let version = currentVersion(platform: code) else { return [] }
+        let week = weekRange(containing: clock())
+        let month = monthRange(containing: clock())
+        var byDay: [String: Int] = live
+        for log in store.logs(platform: code) where log.isDaily && log.method != .period {
+            byDay[log.startDay, default: 0] += log.input.totalPackages
+        }
+        func sum(_ start: String, _ end: String) -> Int {
+            byDay.filter { $0.key >= start && $0.key <= end }.map(\.value).reduce(0, +)
+        }
+        let counts: [BonusTrack.Scope: Int] = [.day: byDay[today] ?? 0, .week: sum(week.start, week.end),
+                                               .month: sum(month.start, month.end)]
+        return BonusTracker.tracks(engine: engine, version: version, base: base, day: today, counts: counts)
+    }
+
     // MARK: - Gun paylasimi (1.12.1)
 
     /// Gunun gunluk kayitlari (olusturulma sirasiyla).

@@ -95,3 +95,72 @@ final class DaySplitTests: XCTestCase {
         XCTAssertEqual(combined.hours, 4)
     }
 }
+
+/// 1.12.2 gun dongusu: gece yarisini gecen vardiya gunlere bolunur.
+final class ShiftDayPartTests: XCTestCase {
+    private var calendar: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "Europe/Istanbul")!
+        return c
+    }()
+
+    private func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
+    }
+
+    func testMidnightShiftSplitsPackagesByDeliveryDay() {
+        var shift = LiveShift(platformCode: "pt_migros", start: at(15, 20))
+        for minute in stride(from: 0, to: 230, by: 10) {          // 20:00–23:50 arasi 23 paket
+            _ = shift.addDelivery(at: at(15, 20).addingTimeInterval(Double(minute) * 60), point: nil, calendar: calendar)
+        }
+        for minute in [10, 40, 70, 100, 130] {                      // 00:10–02:10 arasi 5 paket
+            _ = shift.addDelivery(at: at(16, 0).addingTimeInterval(Double(minute) * 60), point: nil, calendar: calendar)
+        }
+        var base = PayInput(platformCode: "pt_migros", startDay: "2026-10-15")
+        base.regionTier = "r23"
+        let parts = ShiftPayInput.makeByDay(shift: shift, end: at(16, 2, 30), gpsKm: 39, base: base, version: nil, calendar: calendar)
+        XCTAssertEqual(parts.map(\.day), ["2026-10-15", "2026-10-16"])
+        XCTAssertEqual(parts.map { $0.input.totalPackages }, [23, 5])
+        XCTAssertEqual(parts[0].input.startDay, "2026-10-15")
+        XCTAssertEqual(parts[1].input.startDay, "2026-10-16")
+        // 4 saat + 2,5 saat; km sureyle orantili
+        XCTAssertEqual(parts[0].input.hours, 4)
+        XCTAssertEqual(parts[1].input.hours, Decimal(string: "2.5")!)
+        XCTAssertEqual(parts.compactMap(\.input.totalKm).reduce(0, +), 39)
+    }
+
+    func testSameDayShiftIsOnePart() {
+        var shift = LiveShift(platformCode: "yemeksepeti", start: at(15, 10))
+        _ = shift.addDelivery(at: at(15, 11), point: nil, calendar: calendar)
+        let base = PayInput(platformCode: "yemeksepeti", startDay: "2026-10-15")
+        let parts = ShiftPayInput.makeByDay(shift: shift, end: at(15, 14), gpsKm: nil, base: base, version: nil, calendar: calendar)
+        XCTAssertEqual(parts.count, 1)
+        XCTAssertEqual(parts[0].input.totalPackages, 1)
+    }
+
+    func testEmptyShiftHasNoParts() {
+        let shift = LiveShift(platformCode: "yemeksepeti", start: at(15, 10))
+        let base = PayInput(platformCode: "yemeksepeti", startDay: "2026-10-15")
+        XCTAssertTrue(ShiftPayInput.makeByDay(shift: shift, end: at(15, 14), gpsKm: nil, base: base, version: nil, calendar: calendar).isEmpty)
+    }
+}
+
+final class DaySplitYemeksepetiTests: XCTestCase {
+    private let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [])
+    private var engine: PayEngine { PayEngine(catalog: catalog) }
+
+    /// Vardiya (saatli) + elle hesap (saatsiz) ayni gun: vardiyanin aksam saatleri korunur, gunluk bonus toplamdan.
+    func testShiftSlotsKeptWhenManualEntrySameDay() throws {
+        let day = "2026-10-13" // Sali
+        var shift = PayInput(platformCode: "yemeksepeti", startDay: day)
+        shift.regionTier = "ys_istanbul"
+        shift.deliverySlots = [DeliverySlot(weekday: 3, hour: 19, count: 12)]
+        shift.dayPackages = 12
+        var manual = PayInput(platformCode: "yemeksepeti", startDay: day)
+        manual.regionTier = "ys_istanbul"
+        manual.dayPackages = 10
+        let parts = try XCTUnwrap(DaySplit.shares(inputs: [shift, manual]) { combined, _ in try? self.engine.calculate(combined).get() })
+        // 12 × 70,50 (Pzt–Per 18:00) + 10 × 59 (12:00) + gunluk 20–22 bonusu 150
+        XCTAssertEqual(parts.map(\.gross).sum(), Money(Decimal(string: "846")! + 590 + 150))
+    }
+}

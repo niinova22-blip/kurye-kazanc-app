@@ -91,7 +91,7 @@ struct TodayView: View {
               let code = payroll.tariffProfile?.platformCode else { return nil }
         var progress = DailyGoalProgress.today(plan: plan, entries: entries, platform: code, day: payroll.today,
                                                fuel: payroll.fuelModel(fallbackCostPerKm: costPerKm), calendar: .current, now: .now)
-        progress.packages += liveShift.packageCount
+        progress.packages += liveShift.packagesToday
         if liveShift.isActive, let live = liveShift.liveEstimate() { progress.net = progress.net + live.gross }
         progress.net = progress.net + fixedShareToday
         // Sabit ucret haric tutuluyorsa gunluk hedef de sabit ucretin gunluk payi kadar azalir (yalnizca paket + bonus)
@@ -194,6 +194,8 @@ struct TodayView: View {
             Section {
                 TodayGoalCard(progress: progress, hasGoal: payroll.goal != nil)
             }
+            // 1.12.2: bugun / bu hafta / bu ay toplam paket ve prim kademesi
+            BonusTrackSection(tracks: payroll.bonusTracks(live: liveShift.packagesByDay()))
             manualCalcSection
             fuelReminderSection
             DailyHintSection(firmCode: payroll.tariffProfile?.platformCode, progress: progress)

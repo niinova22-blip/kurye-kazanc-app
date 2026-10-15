@@ -221,14 +221,21 @@ struct LiveShiftView: View {
 
     private var estimateStrip: some View {
         TimelineView(.periodic(from: .now, by: 30)) { _ in
-            let estimate: PayBreakdown? = controller.liveEstimate()
+            let estimate: Money? = controller.liveShiftGross()
             let fixed: Money = payroll.fixedShareToday()
             VStack(spacing: 8) {
                 HStack {
                     stat(fixed.isZero ? "Şu ana kadar (brüt)" : "Şu ana kadar (sabit pay dahil)",
-                         estimate.map { PayFormat.tl($0.gross + fixed) } ?? "—", identifier: "shift.estimate")
+                         estimate.map { PayFormat.tl($0 + fixed) } ?? "—", identifier: "shift.estimate")
                     Divider().frame(height: 30).overlay(.white.opacity(0.4))
                     stat("Bu vardiya", "\(controller.packageCount) paket", identifier: "shift.packages")
+                }
+                if let day = payroll.bonusTracks(live: controller.packagesByDay()).first(where: { $0.scope == .day }) {
+                    Text(dayLine(day))
+                        .font(.footnote.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .opacity(0.9)
+                        .accessibilityIdentifier("shift.dayTotal")
                 }
                 if payroll.hasFixedPay {
                     FixedPayToggle()
@@ -237,6 +244,14 @@ struct LiveShiftView: View {
             .padding(12)
             .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
+    }
+
+    /// "Bugün 25 paket · 24–27 primi 760 TL · 28. pakete 3 kaldı → 1.005 TL"
+    private func dayLine(_ track: BonusTrack) -> String {
+        var parts: [String] = ["Bugün toplam \(track.packages) paket"]
+        if !track.reached.isZero { parts.append("prim \(PayFormat.tl(track.reached))") }
+        if let next = track.next { parts.append("\(next.target). pakete \(next.remaining) kaldı → \(PayFormat.tl(next.reward))") }
+        return parts.joined(separator: " · ")
     }
 
     private func stat(_ title: String, _ value: String, identifier: String) -> some View {

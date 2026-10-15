@@ -54,6 +54,17 @@ final class LiveShiftController {
     }
 
     var isActive: Bool { shift != nil }
+
+    /// Suren vardiyanin paketleri gun gun (gece yarisini gecen vardiyada iki gun).
+    func packagesByDay() -> [String: Int] {
+        guard let shift else { return [:] }
+        var result: [String: Int] = [:]
+        for delivery in shift.deliveries { result[payroll.day(delivery.at), default: 0] += 1 }
+        return result
+    }
+
+    /// Suren vardiyanin bugune dusen paketleri.
+    var packagesToday: Int { packagesByDay()[payroll.day(clock())] ?? 0 }
     var packageCount: Int { shift?.packageCount ?? 0 }
 
     var platformCode: String { shift?.platformCode ?? payroll.tariffProfile?.platformCode ?? "" }
@@ -95,7 +106,7 @@ final class LiveShiftController {
     /// Canli Etkinlik icin anlik durum.
     func activitySnapshot() -> (packages: Int, gross: Double, region: String?)? {
         guard let shift else { return nil }
-        let gross: Double = liveEstimate()?.gross.doubleValue ?? 0
+        let gross: Double = liveShiftGross()?.doubleValue ?? 0
         let region: String = WidgetPublisher.regionText(place: shift.district ?? shift.province, tier: payroll.state.regionTier)
         return (shift.packageCount, gross, region.isEmpty ? nil : region)
     }
@@ -105,12 +116,10 @@ final class LiveShiftController {
     func handleAutoShiftFinished(_ summary: WorkSessionSummary) -> Bool {
         guard let current = shift else { return false }
         defer { clear() }
-        guard current.packageCount > 0, let context = contextProvider?(),
-              let input = input(end: summary.end, km: summary.distanceKm) else { return false }
-        let log: WorkLog? = payroll.save(input, method: .shift, start: current.start, end: summary.end,
-                                          recordKm: summary.distanceKm, context: context)
-        guard let log else { return false }
-        let gross: String = " · brüt \(PayFormat.tl(log.result.gross))"
+        guard current.packageCount > 0, let context = contextProvider?() else { return false }
+        let saved = saveParts(dayParts(end: summary.end, km: summary.distanceKm), context: context)
+        guard saved.last != nil else { return false }
+        let gross: String = " · brüt \(PayFormat.tl(saved.gross))"
         let content = UNMutableNotificationContent()
         content.title = "Vardiya bitti, kaydedildi"
         content.body = "\(current.packageCount) paket\(gross). 20 dakikadır durduğun için vardiya kendiliğinden kapandı."
@@ -186,18 +195,45 @@ final class LiveShiftController {
         payroll.currentVersion(platform: platformCode)
     }
 
-    private func input(end: Date, km: Double?) -> PayInput? {
-        guard let shift, let base = payroll.baseInput(day: payroll.day(shift.start)) else { return nil }
-        return ShiftPayInput.make(shift: shift, end: end, gpsKm: km.map { Decimal($0) }, base: base, version: currentVersion,
-                                  calendar: calendar)
+    /// 1.12.2 gun dongusu: vardiya takvim gunlerine bolunur (gece yarisini gecen paketler ertesi gunun primine).
+    private func dayParts(end: Date, km: Double?) -> [ShiftPayInput.DayPart] {
+        guard let shift, let base = payroll.baseInput(day: payroll.day(shift.start)) else { return [] }
+        return ShiftPayInput.makeByDay(shift: shift, end: end, gpsKm: km.map { Decimal($0) }, base: base,
+                                       version: currentVersion, calendar: calendar)
     }
 
-    /// Su ana kadarki paketlerle hesap (motor ayni; kayit yapilmaz).
+    /// Gun parcalarini ayri kayit olarak kaydeder (her biri kendi gununun diger vardiyalariyla paylastirilir).
+    private func saveParts(_ parts: [ShiftPayInput.DayPart], context: ModelContext) -> (last: WorkLog?, gross: Money) {
+        var last: WorkLog?
+        var gross: Money = .zero
+        for part in parts {
+            let km: Double? = part.input.totalKm.map { NSDecimalNumber(decimal: $0).doubleValue }
+            if let log = payroll.save(part.input, method: .shift, start: part.start, end: part.end, recordKm: km, context: context) {
+                last = log
+                gross = gross + log.result.gross
+            }
+        }
+        return (last, gross)
+    }
+
+    /// Bugune dusen kisim (bugunun diger kayitlariyla birlikte; deger bu vardiyanin bugunku payi). Bugun ekrani kullanir.
     func liveEstimate() -> PayBreakdown? {
-        // 1.12.1: bugunun diger kayitlariyla birlikte (gunluk prim kademesi gunun toplamina gore); deger bu vardiyanin payi
-        guard let input = input(end: clock(), km: workSession.sessionDistanceKm),
-              case let .success(result) = payroll.dayShare(input) else { return nil }
+        let today: String = payroll.day(clock())
+        guard let part = dayParts(end: clock(), km: workSession.sessionDistanceKm).last(where: { $0.day == today }),
+              case let .success(result) = payroll.dayShare(part.input) else { return nil }
         return result
+    }
+
+    /// Vardiyanin tamami (gece yarisini gectiyse iki gunun paylari toplami): vardiya ekrani ve kilit ekrani.
+    func liveShiftGross() -> Money? {
+        let parts = dayParts(end: clock(), km: workSession.sessionDistanceKm)
+        guard !parts.isEmpty else { return nil }
+        var total: Money = .zero
+        for part in parts {
+            guard case let .success(result) = payroll.dayShare(part.input) else { return nil }
+            total = total + result.gross
+        }
+        return total
     }
 
     var liveDistanceKm: Double { workSession.sessionDistanceKm }
@@ -209,8 +245,8 @@ final class LiveShiftController {
         let end: Date = summary?.end ?? clock()
         let km: Double? = summary?.distanceKm
         defer { clear() }
-        guard current.packageCount > 0, let input = input(end: end, km: km) else { return nil }
-        return payroll.save(input, method: .shift, start: current.start, end: end, recordKm: km, context: context)
+        guard current.packageCount > 0 else { return nil }
+        return saveParts(dayParts(end: end, km: km), context: context).last
     }
 
     /// Otomatik vardiya iptal edildi (vardiya altyapisi zaten kapandi): yalnizca paket durumu silinir.
