@@ -345,9 +345,6 @@ struct TodayView: View {
                         .opacity(0.8)
                         .accessibilityIdentifier("dashboard.fixedShare")
                 }
-                if payroll.hasFixedPay {
-                    FixedPayToggle()
-                }
             }
             MetricStrip(metricItems(summary, extraNet: fixedShareToday.doubleValue))
                 .padding(12)

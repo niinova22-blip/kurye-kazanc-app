@@ -4,6 +4,7 @@ import SwiftUI
 /// once kazanc kalem kalem (paketler, km, bonus, sabit ucretin bugune dusen payi...), sonra toplam, giderler ve net;
 /// en sonda bu tempoyla hedefin ilerisinde mi gerisinde mi kalinacagi.
 struct TodayBreakdownView: View {
+    @Environment(PayrollModel.self) private var payroll
     struct Content {
         var breakdown: DayBreakdown
         var packages: Int
@@ -35,6 +36,10 @@ struct TodayBreakdownView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     header
                     tiles
+                    // 1.12.1: sabit ucreti hesaba kat / cikar (onay soruyla); dokum yeniden hesaplanir
+                    if payroll.hasFixedPay {
+                        FixedPayToggle()
+                    }
                     earningsCard
                     expensesCard
                     netCard
