@@ -273,7 +273,9 @@ private struct AnalysisContentView: View {
         let records: [EarningRecord] = offsets.map { earnings[$0] }
         for record in records {
             let id: UUID = record.id
-            try? modelContext.deleteEarning(record)
+            if !payroll.deleteLog(linkedTo: id, context: modelContext) {
+                try? modelContext.deleteEarning(record)
+            }
             // Silinen kaydin bekleyen gonderimi de dusulur
             sync.recordDeleted(id: id)
         }

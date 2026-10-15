@@ -96,6 +96,8 @@ final class AppEnvironment {
                 _ = shiftCoordinator?.endShiftToPending()
             }
         }
+        ShiftIntentBridge.requestEnd = { [weak shiftCoordinator] in shiftCoordinator?.requestEndConfirmation() }
+        ShiftIntentBridge.cancelEnd = { [weak shiftCoordinator] in shiftCoordinator?.cancelEndConfirmation() }
         ShiftIntentBridge.addPackage = { [weak live] in live?.addPackageFromOutside() }
         ShiftIntentBridge.undoPackage = { [weak live] in live?.undoLast() }
         ShiftIntentBridge.openShift = { [weak live] in live?.openFromWidget() }

@@ -54,6 +54,8 @@ struct DayBreakdown: Equatable {
             merged.append(PayDetailRow(id: "day.live", category: .other, label: "Süren vardiya (şu ana kadar)",
                                        quantityText: nil, periodAmount: liveShift, perDay: liveShift, isEstimate: true))
         }
+        // Gun paylasiminda ust kademeye gecilince alt kademe satiri eksiyle dusulur: toplami sifir kalan satir gosterilmez
+        merged.removeAll { $0.periodAmount.isZero && $0.category != .fixed }
         let order: [PayDetailCategory] = PayDetailCategory.allCases
         merged.sort { (order.firstIndex(of: $0.category) ?? 0) < (order.firstIndex(of: $1.category) ?? 0) }
         return DayBreakdown(rows: merged)

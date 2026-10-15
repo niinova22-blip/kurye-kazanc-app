@@ -94,6 +94,14 @@ private struct ShiftDetailRow: View {
     }
 
     var body: some View {
+        if state.confirmingEnd == true {
+            ConfirmEndRow()
+        } else {
+            row
+        }
+    }
+
+    private var row: some View {
         HStack {
             Text(verbatim: detail)
                 .font(.subheadline)
@@ -111,11 +119,41 @@ private struct ShiftDetailRow: View {
     }
 }
 
+/// 1.12.1: "Bitir"e basilinca: hesaplanip kaydedilecegi soylenir, "Evet, bitir" / "Vazgeç".
+private struct ConfirmEndRow: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Vardiya bitirilip hesaplanacak ve kaydedilecek. Emin misin?")
+                .font(.subheadline.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Button(intent: CancelEndShiftIntent()) {
+                    Text("Vazgeç").frame(maxWidth: .infinity, minHeight: 34)
+                }
+                .tint(.gray)
+                Button(intent: ConfirmEndShiftIntent()) {
+                    Text("Evet, bitir").bold().frame(maxWidth: .infinity, minHeight: 34)
+                }
+                .tint(.red)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+}
+
 /// "+1 paket" (buyuk), "Geri al" ve "Bitir": kilit ekraninda tek elle.
 private struct PackageButtons: View {
     let state: ShiftActivityAttributes.ContentState
 
     var body: some View {
+        if state.confirmingEnd == true {
+            ConfirmEndRow()
+        } else {
+            buttons
+        }
+    }
+
+    private var buttons: some View {
         HStack(spacing: 8) {
             Button(intent: UndoPackageIntent()) {
                 Image(systemName: "arrow.uturn.backward")

@@ -5,6 +5,9 @@ import AppIntents
 /// (LiveActivityIntent uygulama surecinde calisir; gerekirse iOS uygulamayi arka planda baslatir).
 enum ShiftIntentBridge {
     @MainActor static var endShift: (@MainActor () -> Void)?
+    /// 1.12.1 kilit ekrani "Bitir": once onay istenir (Canli Etkinlik "Emin misin?" gorunumune gecer).
+    @MainActor static var requestEnd: (@MainActor () -> Void)?
+    @MainActor static var cancelEnd: (@MainActor () -> Void)?
     /// 1.12: kilit ekrani / widget / Denetim Merkezi "+1 paket". Donus: eklendikten sonraki paket sayisi (vardiya
     /// baslatilamadiysa nil, or. firma secilmemis).
     @MainActor static var addPackage: (@MainActor () -> Int?)?
@@ -27,7 +30,7 @@ struct OpenShiftIntent: AppIntent {
     }
 }
 
-/// Canli Etkinlikteki "Vardiyayi bitir" dugmesi.
+/// Canli Etkinlikteki "Vardiyayi bitir" dugmesi. 1.12.1: hemen bitirmez, onay ister.
 struct EndShiftIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Vardiyayı bitir"
 
@@ -35,7 +38,37 @@ struct EndShiftIntent: LiveActivityIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
+        if let request = ShiftIntentBridge.requestEnd {
+            request()
+        } else {
+            ShiftIntentBridge.endShift?()
+        }
+        return .result()
+    }
+}
+
+/// "Emin misin?" -> "Evet, bitir": vardiya hesaplanip kaydedilir.
+struct ConfirmEndShiftIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "Vardiyayı bitir ve hesapla"
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
         ShiftIntentBridge.endShift?()
+        return .result()
+    }
+}
+
+/// "Emin misin?" -> "Vazgeç": vardiya surer.
+struct CancelEndShiftIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "Vardiyaya devam et"
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ShiftIntentBridge.cancelEnd?()
         return .result()
     }
 }

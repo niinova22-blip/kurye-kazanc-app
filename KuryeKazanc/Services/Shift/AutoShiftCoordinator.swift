@@ -56,6 +56,8 @@ final class AutoShiftCoordinator {
     @ObservationIgnored var onAutoShiftFinished: ((WorkSessionSummary) -> Bool)?
     /// "Bu bir vardiya değil": otomatik baslayan canli vardiya da kayitsiz kapanir.
     @ObservationIgnored var onAutoShiftCancelled: (() -> Void)?
+    /// 1.12.1: kilit ekraninda "Bitir"e basildi, onay bekleniyor.
+    @ObservationIgnored private var isConfirmingEnd = false
     /// Son hareket bundan yeniyse (GPS hareketi zaten kanitliyor) hareket gecmisi sorgulanmaz.
     @ObservationIgnored private let motionRefreshMinAge: TimeInterval = 60
 
@@ -203,8 +205,24 @@ final class AutoShiftCoordinator {
     /// Paket eklendi / geri alindi: Canli Etkinlik kisitlamasiz hemen guncellenir (kilit ekranindaki sayi aninda artsin).
     func liveShiftChanged() {
         guard workSession.isWorking else { return }
+        isConfirmingEnd = false
         lastActivityUpdate = clock()
         lastActivityMeters = workSession.location.sessionDistanceMeters
+        ensureLiveActivity()
+    }
+
+    /// Kilit ekrani "Bitir": Canli Etkinlik "Emin misin?" gorunumune gecer.
+    func requestEndConfirmation() {
+        guard workSession.isWorking else { return }
+        isConfirmingEnd = true
+        lastActivityUpdate = clock()
+        ensureLiveActivity()
+    }
+
+    func cancelEndConfirmation() {
+        guard isConfirmingEnd else { return }
+        isConfirmingEnd = false
+        lastActivityUpdate = clock()
         ensureLiveActivity()
     }
 
@@ -218,6 +236,7 @@ final class AutoShiftCoordinator {
     @discardableResult
     func endShift() -> WorkSessionSummary? {
         guard workSession.isWorking else { return nil }
+        isConfirmingEnd = false
         let state = currentState(endedAt: clock())
         let summary = workSession.stop(now: clock())
         stopTimer()
@@ -264,6 +283,7 @@ final class AutoShiftCoordinator {
     // MARK: - Ic
 
     private func beginShift(at start: Date, origin: ShiftOrigin) {
+        isConfirmingEnd = false
         workSession.start(at: start, origin: origin)
         lastActivityUpdate = nil
         lastActivityMeters = 0
@@ -329,7 +349,8 @@ final class AutoShiftCoordinator {
         let live = liveShiftSnapshot?()
         return ShiftActivityAttributes.ContentState(
             distanceKm: workSession.sessionDistanceKm, todayNet: net, netPerHour: perHour, endedAt: endedAt,
-            packages: live?.packages, shiftGross: live?.gross, region: live?.region
+            packages: live?.packages, shiftGross: live?.gross, region: live?.region,
+            confirmingEnd: isConfirmingEnd && endedAt == nil ? true : nil
         )
     }
 

@@ -94,6 +94,11 @@ struct TodayView: View {
         progress.packages += liveShift.packageCount
         if liveShift.isActive, let live = liveShift.liveEstimate() { progress.net = progress.net + live.gross }
         progress.net = progress.net + fixedShareToday
+        // Sabit ucret haric tutuluyorsa gunluk hedef de sabit ucretin gunluk payi kadar azalir (yalnizca paket + bonus)
+        if !payroll.includesFixedPay {
+            let share: Money = payroll.fixedShareRowsToday(ignoringPreference: true).map(\.perDay).sum()
+            progress.targetNet = Money(max(0, (progress.targetNet - share).value))
+        }
         return progress
     }
 
@@ -339,6 +344,9 @@ struct TodayView: View {
                         .font(.footnote)
                         .opacity(0.8)
                         .accessibilityIdentifier("dashboard.fixedShare")
+                }
+                if payroll.hasFixedPay {
+                    FixedPayToggle()
                 }
             }
             MetricStrip(metricItems(summary, extraNet: fixedShareToday.doubleValue))
@@ -727,7 +735,10 @@ struct TodayView: View {
     private func delete(_ model: some PersistentModel) {
         if let record = model as? EarningRecord {
             let id: UUID = record.id
-            try? modelContext.deleteEarning(record)
+            // 1.12.1: bagli hakedis kaydi da silinir, gunun diger vardiyalari yeniden paylastirilir
+            if !payroll.deleteLog(linkedTo: id, context: modelContext) {
+                try? modelContext.deleteEarning(record)
+            }
             // Silinen kaydin bekleyen gonderimi de dusulur
             sync.recordDeleted(id: id)
             return

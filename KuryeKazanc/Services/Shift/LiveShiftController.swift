@@ -109,21 +109,17 @@ final class LiveShiftController {
               let input = input(end: summary.end, km: summary.distanceKm) else { return false }
         let log: WorkLog? = payroll.save(input, method: .shift, start: current.start, end: summary.end,
                                           recordKm: summary.distanceKm, context: context)
-        guard log != nil else { return false }
-        let gross: String = liveEstimateText(input)
+        guard let log else { return false }
+        let gross: String = " · brüt \(PayFormat.tl(log.result.gross))"
         let content = UNMutableNotificationContent()
         content.title = "Vardiya bitti, kaydedildi"
         content.body = "\(current.packageCount) paket\(gross). 20 dakikadır durduğun için vardiya kendiliğinden kapandı."
-        content.sound = .default
+        content.sound = AppSounds.notificationSound
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "shift.autoSaved.\(current.start.timeIntervalSince1970)",
                                                                      content: content, trigger: nil))
         return true
     }
 
-    private func liveEstimateText(_ input: PayInput) -> String {
-        guard case let .success(result) = payroll.calculate(input) else { return "" }
-        return " · brüt \(PayFormat.tl(result.gross))"
-    }
 
     /// Cikis noktasi ve il: bolgeye bagli tarife secimleri konumdan yapilir.
     private func locateStart() async {
@@ -198,8 +194,9 @@ final class LiveShiftController {
 
     /// Su ana kadarki paketlerle hesap (motor ayni; kayit yapilmaz).
     func liveEstimate() -> PayBreakdown? {
+        // 1.12.1: bugunun diger kayitlariyla birlikte (gunluk prim kademesi gunun toplamina gore); deger bu vardiyanin payi
         guard let input = input(end: clock(), km: workSession.sessionDistanceKm),
-              case let .success(result) = payroll.calculate(input) else { return nil }
+              case let .success(result) = payroll.dayShare(input) else { return nil }
         return result
     }
 

@@ -2,6 +2,11 @@ import Foundation
 
 /// UserDefaults / @AppStorage anahtarlari. Tek yerde toplanir ki yazim hatasi olmasin.
 enum AppPreferences {
+    /// 1.12.1 Profil > Ses ve titreşim (hepsi varsayilan acik).
+    static let hapticsEnabledKey = "feedback.haptics"
+    static let packageSoundKey = "feedback.packageSound"
+    static let notificationSoundKey = "feedback.notificationSound"
+
     /// Km basina yakit + bakim maliyeti (TL). Kullanici ayarlardan gunceller.
     static let costPerKmKey = "costPerKm"
     /// Otomatik gider tahmini acik mi?

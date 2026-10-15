@@ -39,7 +39,7 @@ struct ManualCalcView: View {
             whenSection
             whatSection
             if let input, input.totalPackages > 0 || input.hours > 0 {
-                switch model.calculate(input) {
+                switch model.dayShare(input) {
                 case let .success(breakdown):
                     resultSection(breakdown, input: input)
                     saveSection(input)

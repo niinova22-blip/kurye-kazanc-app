@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        NavigationHaptics.install()
         ShiftNotifications.registerCategories()
         // Arka planda soguk baslatmada SwiftUI sahnesi olmayabilir: ortam burada kurulur
         // (Canli Etkinlik koprusu dahil) ve izleme yeniden baslatilir.
@@ -38,6 +39,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
+        AppSounds.notificationSound == nil ? [.banner, .list] : [.banner, .list, .sound]
     }
 }

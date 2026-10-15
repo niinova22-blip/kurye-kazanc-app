@@ -109,6 +109,10 @@ struct ProfileView: View {
                 Label("Bildirimler", systemImage: "bell.badge")
             }
             .accessibilityIdentifier("profile.notifications")
+            NavigationLink { FeedbackSettingsView() } label: {
+                Label("Ses ve titreşim", systemImage: "speaker.wave.2")
+            }
+            .accessibilityIdentifier("profile.feedback")
             Button { showIntro() } label: {
                 Label("Tanıtımı izle", systemImage: "play.circle")
             }
