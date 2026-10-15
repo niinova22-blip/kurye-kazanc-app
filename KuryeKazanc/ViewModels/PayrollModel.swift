@@ -130,11 +130,22 @@ final class PayrollModel {
     }
 
     /// Sabit ucret kalemleri ve bugune dusen paylari (Bugun dokumu kalem kalem gosterir).
-    func fixedShareRowsToday() -> [PayDetailRow] {
+    func fixedShareRowsToday(ignoringPreference: Bool = false) -> [PayDetailRow] {
+        if !ignoringPreference, state.excludesFixedPay { return [] }
         guard let version = currentVersion() else { return [] }
         return PayDetailBuilder.fixedShares(version: version, day: today, regionTier: state.regionTier, days: 1,
                                             monthWorkDays: state.goal?.monthWorkDays ?? 26, contractHours: state.contractHours,
                                             seniorityYears: state.seniorityYears)
+    }
+
+    /// Firmanin tarifesinde aylik sabit ucret var mi (anahtar yalnizca o zaman gosterilir).
+    var hasFixedPay: Bool { !fixedShareRowsToday(ignoringPreference: true).isEmpty }
+
+    var includesFixedPay: Bool { !state.excludesFixedPay }
+
+    func setIncludesFixedPay(_ include: Bool) {
+        store.setExcludesFixedPay(!include)
+        reload()
     }
 
     /// Konumdan gelen bolge onerisini profile yazar (yalnizca degisiklik varsa).
@@ -193,12 +204,102 @@ final class PayrollModel {
             lastError = error.localizedDescription
             return nil
         }
-        if input.span == .day, let context {
+        // 1.12.1: ayni gunun diger kayitlariyla birlikte hesaplanir (gunluk prim kademesi gunun toplam paketine gore)
+        if input.span == .day {
+            rebalanceDay(platform: input.platformCode, day: input.startDay, context: context, skipRecordOf: log.id)
+        }
+        if input.span == .day, let context, let log = store.log(id: log.id) {
             let recordID: UUID? = createEarningRecord(for: log, start: start, end: end, km: recordKm, context: context)
             if let recordID { store.linkEarningRecord(recordID, to: log.id) }
         }
         reload()
         return store.log(id: log.id)
+    }
+
+    // MARK: - Gun paylasimi (1.12.1)
+
+    /// Gunun gunluk kayitlari (olusturulma sirasiyla).
+    private func dailyLogs(platform: String, day: String) -> [WorkLog] {
+        store.logs(platform: platform)
+            .filter { $0.isDaily && $0.startDay == day && $0.method != .period }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
+    /// Gunun kayitlarini DaySplit ile yeniden paylastirir; sonucu degisen kayitlarin kazanc kayitlarini gunceller.
+    /// Her kayit kendi tarife surumuyle hesaplanir (gecmis sessizce yeni tarifeye gecmez).
+    func rebalanceDay(platform: String, day: String, context: ModelContext?, skipRecordOf skipped: UUID? = nil) {
+        let logs: [WorkLog] = dailyLogs(platform: platform, day: day)
+        guard !logs.isEmpty else { return }
+        let engine: PayEngine = self.engine
+        let catalogVersions: [TariffVersion] = catalog.versions
+        guard let shares = DaySplit.shares(inputs: logs.map(\.input), calculate: { combined, index in
+            let versionID: String = logs[index].tariffVersionID
+            if let version = catalogVersions.first(where: { $0.id == versionID }),
+               case let .success(result) = engine.calculate(combined, version: version) {
+                return result
+            }
+            if case let .success(result) = engine.calculate(combined) { return result }
+            return nil
+        }) else { return }
+        for (log, share) in zip(logs, shares) where share != log.result {
+            store.setResult(share, logID: log.id)
+            guard log.id != skipped, let context, let recordID = log.earningRecordID,
+                  let updated = store.log(id: log.id) else { continue }
+            updateEarningRecord(recordID, from: updated, context: context)
+        }
+        reload()
+    }
+
+    /// Tum gunlerde birden fazla kayit varsa bir kez yeniden paylastirir (1.12.1 oncesi kayitlar).
+    func rebalanceAllDays(context: ModelContext?) {
+        var seen: Set<String> = []
+        for log in store.logs() where log.isDaily && log.method != .period {
+            let key: String = log.platformCode + "|" + log.startDay
+            guard !seen.contains(key) else { continue }
+            seen.insert(key)
+            if dailyLogs(platform: log.platformCode, day: log.startDay).count > 1 {
+                rebalanceDay(platform: log.platformCode, day: log.startDay, context: context)
+            }
+        }
+    }
+
+    /// Bugunku kayitlarla birlikte hesaplanan pay: suren vardiyanin / elle hesabin bugune EKLEDIGI tutar.
+    func dayShare(_ input: PayInput) -> Result<PayBreakdown, PayError> {
+        let existing: [WorkLog] = input.span == .day ? dailyLogs(platform: input.platformCode, day: input.startDay) : []
+        guard !existing.isEmpty else { return calculate(input) }
+        let inputs: [PayInput] = existing.map(\.input) + [input]
+        var failure: PayError?
+        let shares: [PayBreakdown]? = DaySplit.shares(inputs: inputs) { combined, _ in
+            switch self.calculate(combined) {
+            case let .success(result): return result
+            case let .failure(error): failure = error; return nil
+            }
+        }
+        guard let last = shares?.last else { return .failure(failure ?? .noTariff(platform: input.platformCode, day: input.startDay)) }
+        return .success(last)
+    }
+
+    private static func recordAmounts(_ log: WorkLog) -> (gross: Money, bonus: Money) {
+        let bonus: Money = log.result.bonusTotal
+        return (log.result.gross - bonus + log.result.tips + log.result.extraPayments, bonus)
+    }
+
+    private func updateEarningRecord(_ recordID: UUID, from log: WorkLog, context: ModelContext) {
+        let id: UUID = recordID
+        guard let record = try? context.fetch(FetchDescriptor<EarningRecord>(predicate: #Predicate { $0.id == id })).first else { return }
+        let amounts = Self.recordAmounts(log)
+        record.grossEarning = amounts.gross.doubleValue
+        record.bonus = amounts.bonus.doubleValue
+        try? context.save()
+    }
+
+    /// Bugun / Analiz'de kazanc kaydi silinince bagli hakedis kaydi da silinir ve gun yeniden paylastirilir.
+    /// - Returns: Bagli kayit bulunduysa true (kazanc kaydi da silindi).
+    @discardableResult
+    func deleteLog(linkedTo recordID: UUID, context: ModelContext) -> Bool {
+        guard let log = store.logs().first(where: { $0.earningRecordID == recordID }) else { return false }
+        delete(log, context: context)
+        return true
     }
 
     private func createEarningRecord(for log: WorkLog, start: Date?, end: Date?, km: Double?, context: ModelContext) -> UUID? {
@@ -212,8 +313,9 @@ final class PayrollModel {
         let recordEnd: Date = end ?? recordStart.addingTimeInterval(max(hours, 0) * 3600)
         let code: String = log.platformCode
         let platform: Platform? = try? context.fetch(FetchDescriptor<Platform>(predicate: #Predicate { $0.code == code })).first
-        let bonus: Money = log.result.bonusTotal
-        let gross: Money = log.result.gross - bonus + log.result.tips + log.result.extraPayments
+        let amounts = Self.recordAmounts(log)
+        let bonus: Money = amounts.bonus
+        let gross: Money = amounts.gross
         let record = EarningRecord(
             startTime: recordStart, endTime: recordEnd, platform: platform, grossEarning: gross.doubleValue,
             bonus: bonus.doubleValue, distanceKm: km ?? log.input.distanceKm.doubleValue,
@@ -243,6 +345,9 @@ final class PayrollModel {
             }
         }
         store.deleteLog(id: log.id)
+        if log.isDaily, log.method != .period {
+            rebalanceDay(platform: log.platformCode, day: log.startDay, context: context)
+        }
         reload()
     }
 

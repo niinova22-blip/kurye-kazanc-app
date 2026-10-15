@@ -222,10 +222,17 @@ struct LiveShiftView: View {
     private var estimateStrip: some View {
         TimelineView(.periodic(from: .now, by: 30)) { _ in
             let estimate: PayBreakdown? = controller.liveEstimate()
-            HStack {
-                stat("Şu ana kadar (brüt)", estimate.map { PayFormat.tl($0.gross) } ?? "—", identifier: "shift.estimate")
-                Divider().frame(height: 30).overlay(.white.opacity(0.4))
-                stat("Bu vardiya", "\(controller.packageCount) paket", identifier: "shift.packages")
+            let fixed: Money = payroll.fixedShareToday()
+            VStack(spacing: 8) {
+                HStack {
+                    stat(fixed.isZero ? "Şu ana kadar (brüt)" : "Şu ana kadar (sabit pay dahil)",
+                         estimate.map { PayFormat.tl($0.gross + fixed) } ?? "—", identifier: "shift.estimate")
+                    Divider().frame(height: 30).overlay(.white.opacity(0.4))
+                    stat("Bu vardiya", "\(controller.packageCount) paket", identifier: "shift.packages")
+                }
+                if payroll.hasFixedPay {
+                    FixedPayToggle()
+                }
             }
             .padding(12)
             .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -264,6 +271,7 @@ struct LiveShiftView: View {
     private func tap() {
         guard controller.recordDelivery() != nil else { return }
         Haptics.impact()
+        AppSounds.package()
         bounce += 1
         if !reduceMotion {
             let id = UUID()
@@ -278,6 +286,7 @@ struct LiveShiftView: View {
     private func finish() {
         let log: WorkLog? = controller.finish(context: modelContext)
         Haptics.success()
+        AppSounds.saved()
         if let log {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) { finished = log }
         } else {

@@ -57,6 +57,30 @@ final class PayrollModelTests: XCTestCase {
         return PayrollModel(store: PayrollStore(fileURL: nil), tariffs: tariffs, clock: { self.now })
     }
 
+    /// 1.12.1: ayni gunun vardiyalari gun toplamiyla (2.–3. bolge, 10 + 8 + 7 = 25 paket -> 24–27 primi 760 TL);
+    /// bir vardiya silinince kalanlar yeniden paylastirilir ve kazanc kayitlari guncellenir.
+    func testShiftsOnSameDayShareDailyTier() throws {
+        let model = makeModel()
+        model.chooseFirm("pt_migros", regionTier: "r23", seniorityYears: nil, vehicleType: nil, flags: [])
+        var logs: [WorkLog] = []
+        for packages in [10, 8, 7] {
+            var input = try XCTUnwrap(model.baseInput(day: "2026-10-07"))
+            input.dayPackages = packages
+            input.hours = 2
+            logs.append(try XCTUnwrap(model.save(input, method: .shift, context: context)))
+        }
+        let total: Money = model.logs.map(\.gross).sum()
+        XCTAssertEqual(total, Money(760))
+        let recordSum: Double = try context.fetch(FetchDescriptor<EarningRecord>()).map { $0.grossEarning + $0.bonus }.reduce(0, +)
+        XCTAssertEqual(recordSum, 760, accuracy: 0.001)
+
+        // Ilk vardiya silinir: 8 + 7 = 15 paket, 16 altinda prim yok
+        model.delete(logs[0], context: context)
+        XCTAssertEqual(model.logs.map(\.gross).sum(), .zero)
+        let remaining: Double = try context.fetch(FetchDescriptor<EarningRecord>()).map { $0.grossEarning + $0.bonus }.reduce(0, +)
+        XCTAssertEqual(remaining, 0, accuracy: 0.001)
+    }
+
     func testSavingDailyLogCreatesLinkedEarningRecord() throws {
         let model = makeModel()
         model.select(platform: "yemeksepeti")

@@ -15,6 +15,8 @@ struct ShiftActivityAttributes: ActivityAttributes {
         var shiftGross: Double? = nil
         /// Konumdan / tarifeden bolge ("Kadıköy · 1. bölge").
         var region: String? = nil
+        /// 1.12.1: kilit ekraninda "Bitir"e basildi; "Emin misin?" onayi bekleniyor.
+        var confirmingEnd: Bool? = nil
     }
 
     var start: Date

@@ -142,7 +142,7 @@ final class ReminderScheduler {
             let content = UNMutableNotificationContent()
             content.title = nudge.title
             content.body = nudge.body
-            content.sound = .default
+            content.sound = AppSounds.notificationSound
             content.threadIdentifier = "goal"
             let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: nudge.fireDate)
             let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
@@ -176,7 +176,7 @@ final class ReminderScheduler {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        content.sound = AppSounds.notificationSound
         var components = DateComponents()
         components.hour = hour
         components.minute = minute
@@ -189,7 +189,7 @@ final class ReminderScheduler {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        content.sound = AppSounds.notificationSound
         center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
 }

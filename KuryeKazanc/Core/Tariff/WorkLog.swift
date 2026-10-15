@@ -129,6 +129,8 @@ struct PayrollState: Codable, Equatable {
     var switchBaseline: String? = nil
     /// 1.12: kullanicinin kendi soyledigi hiz (paket / saat). nil: kayitlardan olculen ya da varsayilan 2,5.
     var packagesPerHour: Decimal? = nil
+    /// 1.12.1: kullanici aylik sabit ucretini biliyor; Bugun / vardiya / hedef yalnizca paket, bonus ve giderle hesaplanir.
+    var excludesFixedPay: Bool = false
 
     init() {}
 
@@ -152,6 +154,7 @@ struct PayrollState: Codable, Equatable {
         demoLogIDs = try c.decodeIfPresent([UUID].self, forKey: .demoLogIDs) ?? []
         switchBaseline = try c.decodeIfPresent(String.self, forKey: .switchBaseline)
         packagesPerHour = try c.decodeIfPresent(Decimal.self, forKey: .packagesPerHour)
+        excludesFixedPay = try c.decodeIfPresent(Bool.self, forKey: .excludesFixedPay) ?? false
     }
 
     var activePlatform: String? { platformHistory.last?.code }
@@ -260,6 +263,11 @@ final class PayrollStore {
         persist()
     }
 
+    func setExcludesFixedPay(_ value: Bool) {
+        state.excludesFixedPay = value
+        persist()
+    }
+
     func setPackagesPerHour(_ value: Decimal?) {
         state.packagesPerHour = value.flatMap { $0 > 0 ? $0 : nil }
         persist()
@@ -330,6 +338,13 @@ final class PayrollStore {
     func linkEarningRecord(_ recordID: UUID, to logID: UUID) {
         guard let index = state.logs.firstIndex(where: { $0.id == logID }) else { return }
         state.logs[index].earningRecordID = recordID
+        persist()
+    }
+
+    /// 1.12.1: gun paylasimi (DaySplit) sonucu; yeniden hesaplama gecmisine yazilmaz (ayni tarife, ayni gun).
+    func setResult(_ result: PayBreakdown, logID: UUID) {
+        guard let index = state.logs.firstIndex(where: { $0.id == logID }), state.logs[index].result != result else { return }
+        state.logs[index].result = result
         persist()
     }
 

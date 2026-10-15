@@ -47,6 +47,11 @@ struct RootView: View {
             // 1.9: Getir / Trendyol GO secenler firmayi yeniden secer
             if payroll.migrateTo19() { startFirm = "" }
             retireAnonymousSharing(defaults: .standard)
+            // 1.12.1: ayni gunde birden cok vardiyasi olan gunler gun toplamiyla bir kez yeniden paylastirilir
+            if !UserDefaults.standard.bool(forKey: "payroll.daySplit.v1") {
+                payroll.rebalanceAllDays(context: modelContext)
+                UserDefaults.standard.set(true, forKey: "payroll.daySplit.v1")
+            }
         }
     }
 }
@@ -68,19 +73,26 @@ extension RootView {
 struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var today = Calendar.current.startOfDay(for: .now)
+    @State private var tab = 0
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             TodayView(day: today)
                 .id(today) // Gun degisince sorgular yeni gunle yeniden kurulur
                 .tabItem { Label("Bugün", systemImage: "sun.max") }
+                .tag(0)
             EarningsTabView()
                 .tabItem { Label("Kazanç", systemImage: "turkishlirasign.circle") }
+                .tag(1)
             FirmsView()
                 .tabItem { Label("Firmalar", systemImage: "building.2") }
+                .tag(2)
             ProfileView()
                 .tabItem { Label("Profil", systemImage: "person.crop.circle") }
+                .tag(3)
         }
+        // 1.12.1: sekme degisiminde hafif titresim
+        .onChange(of: tab) { _, _ in Haptics.selection() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { refreshDay() }
         }

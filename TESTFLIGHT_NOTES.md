@@ -3,6 +3,22 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.12.1
+
+Düzeltme:
+- Aynı gün birden çok vardiya (ya da vardiya + elle hesap) artık tek gün gibi hesaplanıyor. Günlük paket primi günün TOPLAM paketine göre ve tek kademe: ör. 2.–3. bölgede gün içinde 25 paket → 24–27 primi 760 TL (önceden bir vardiyaya 16–19 primi 200 TL yazılıyordu). Gün bitmeden 28. paket gelirse 24–27 primi düşer, 28–33 primi (1.005 TL) yazılır. Eski günler ilk açılışta kendiliğinden düzeltilir.
+- Bugün'den bir kaydı silince bağlı hakediş de silinir, günün diğer vardiyaları yeniden hesaplanır.
+
+Yeni:
+- Kilit ekranında "Bitir": önce "Vardiya bitirilip hesaplanacak, emin misin?" (Evet, bitir / Vazgeç).
+- Ses ve titreşim (Profil): geri tuşu, sekme değişimi ve düğmelerde titreşim; her pakette ve vardiya bitince ses; bildirim sesi aç/kapa.
+- Sabit ücret dahil / hariç: Bugün kartında ve vardiya ekranında. Hariçken Bugün, vardiya ve günlük hedef yalnızca paket, bonus ve giderle hesaplanır; değiştirmeden önce sorar.
+
+Lütfen test et:
+- Aynı gün 2–3 vardiya yap; toplam pakete göre günlük primin tek kademe geldiğini Bugün > döküm'de gör.
+- Kilit ekranında Bitir → Vazgeç, sonra Bitir → Evet.
+- Sabit ücreti hariç yap / geri kat.
+
 ## 1.12.0
 
 Yeni:
