@@ -2,6 +2,7 @@ import Foundation
 import CoreLocation
 import Observation
 import SwiftData
+import UserNotifications
 
 /// Dokunustan hemen sonra gosterilen geri bildirim: "4–6 km bandı · 1 paket eklendi".
 struct ShiftTapFeedback: Equatable, Identifiable {
@@ -22,6 +23,8 @@ final class LiveShiftController {
     private(set) var regionMessage: String?
     /// Paket Taxi Istanbul / Ankara: Plus mi standart mi kullanicidan secilmeli.
     private(set) var needsRegionChoice = false
+    /// 1.12: widget / bildirimden "vardiya ekranini ac" istegi; Bugun ekrani tuketir.
+    var presentationRequested = false
 
     @ObservationIgnored private let autoShift: AutoShiftCoordinator
     @ObservationIgnored private let workSession: WorkSessionManager
@@ -30,6 +33,8 @@ final class LiveShiftController {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let calendar: Calendar
     @ObservationIgnored private let clock: () -> Date
+    /// Otomatik bitiste kayit icin (uygulama arka planda olabilir, gorunum yok).
+    @ObservationIgnored var contextProvider: (() -> ModelContext?)?
 
     init(autoShift: AutoShiftCoordinator, workSession: WorkSessionManager, location: LocationService, payroll: PayrollModel,
          defaults: UserDefaults = .standard, calendar: Calendar = .current, clock: @escaping () -> Date = { Date() }) {
@@ -64,7 +69,60 @@ final class LiveShiftController {
         regionMessage = nil
         needsRegionChoice = false
         persist()
+        autoShift.liveShiftChanged()
         Task { await locateStart() }
+    }
+
+    /// 1.12: otomatik vardiya basladi; paketler kilit ekranindan sayilabilsin diye canli vardiya da baslar.
+    func startFromAutoShift() {
+        guard shift == nil else { return }
+        start()
+    }
+
+    /// Kilit ekrani / widget "+1 paket": vardiya yoksa once baslatir. Donus: yeni paket sayisi.
+    @discardableResult
+    func addPackageFromOutside() -> Int? {
+        if shift == nil { start() }
+        return recordDelivery()?.count
+    }
+
+    /// Widget "Vardiya": vardiya yoksa baslatir ve canli vardiya ekraninin acilmasini ister.
+    func openFromWidget() {
+        if shift == nil { start() }
+        if shift != nil { presentationRequested = true }
+    }
+
+    /// Canli Etkinlik icin anlik durum.
+    func activitySnapshot() -> (packages: Int, gross: Double, region: String?)? {
+        guard let shift else { return nil }
+        let gross: Double = liveEstimate()?.gross.doubleValue ?? 0
+        let region: String = WidgetPublisher.regionText(place: shift.district ?? shift.province, tier: payroll.state.regionTier)
+        return (shift.packageCount, gross, region.isEmpty ? nil : region)
+    }
+
+    /// Otomatik vardiya 20 dk duraganlikla bitti. Paket varsa vardiya hesaplanip kaydedilir (true), yoksa canli vardiya
+    /// kapanir ve normal "Vardiya bitti" akisi surer (false).
+    func handleAutoShiftFinished(_ summary: WorkSessionSummary) -> Bool {
+        guard let current = shift else { return false }
+        defer { clear() }
+        guard current.packageCount > 0, let context = contextProvider?(),
+              let input = input(end: summary.end, km: summary.distanceKm) else { return false }
+        let log: WorkLog? = payroll.save(input, method: .shift, start: current.start, end: summary.end,
+                                          recordKm: summary.distanceKm, context: context)
+        guard log != nil else { return false }
+        let gross: String = liveEstimateText(input)
+        let content = UNMutableNotificationContent()
+        content.title = "Vardiya bitti, kaydedildi"
+        content.body = "\(current.packageCount) paket\(gross). 20 dakikadır durduğun için vardiya kendiliğinden kapandı."
+        content.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "shift.autoSaved.\(current.start.timeIntervalSince1970)",
+                                                                     content: content, trigger: nil))
+        return true
+    }
+
+    private func liveEstimateText(_ input: PayInput) -> String {
+        guard case let .success(result) = payroll.calculate(input) else { return "" }
+        return " · brüt \(PayFormat.tl(result.gross))"
     }
 
     /// Cikis noktasi ve il: bolgeye bagli tarife secimleri konumdan yapilir.
@@ -78,6 +136,7 @@ final class LiveShiftController {
         shift?.province = place.province
         shift?.district = place.district
         persist()
+        autoShift.liveShiftChanged()
         guard let profile = payroll.tariffProfile,
               let suggestion = RegionResolver.suggest(province: place.province, district: place.district,
                                                       neighborhood: place.neighborhood, profile: profile) else { return }
@@ -113,6 +172,7 @@ final class LiveShiftController {
                                                  day: payroll.day(now), calendar: calendar)
         let feedback = ShiftTapFeedback(id: delivery.id, zone: zone, count: current.packageCount)
         lastFeedback = feedback
+        autoShift.liveShiftChanged()
         return feedback
     }
 
@@ -121,6 +181,7 @@ final class LiveShiftController {
         shift = current
         persist()
         lastFeedback = nil
+        autoShift.liveShiftChanged()
     }
 
     // MARK: - Canli tahmin ve bitis
@@ -155,6 +216,12 @@ final class LiveShiftController {
         return payroll.save(input, method: .shift, start: current.start, end: end, recordKm: km, context: context)
     }
 
+    /// Otomatik vardiya iptal edildi (vardiya altyapisi zaten kapandi): yalnizca paket durumu silinir.
+    func dropAfterAutoCancel() {
+        guard shift != nil else { return }
+        clear()
+    }
+
     /// Yanlislikla baslayan vardiya: kayit yapilmadan kapatilir.
     func discard() {
         guard shift != nil else { return }
@@ -175,6 +242,23 @@ final class LiveShiftController {
             defaults.set(data, forKey: AppPreferences.liveShiftKey)
         } else {
             defaults.removeObject(forKey: AppPreferences.liveShiftKey)
+        }
+        publishWidget()
+    }
+
+    /// Widget: suren vardiyanin paketleri ve bolgesi (kilit ekranindan +1'de uygulama acilmadan da guncellenir).
+    private func publishWidget() {
+        let current: LiveShift? = shift
+        let tier: String? = payroll.state.regionTier
+        let firm: String = payroll.tariffProfile.map { PayrollModel.platformName($0.platformCode) } ?? ""
+        WidgetPublisher.publish { snapshot in
+            snapshot.isShiftActive = current != nil
+            snapshot.shiftPackages = current?.packageCount ?? 0
+            snapshot.shiftStart = current?.start
+            if !firm.isEmpty { snapshot.firm = firm }
+            if let current {
+                snapshot.region = WidgetPublisher.regionText(place: current.district ?? current.province, tier: tier)
+            }
         }
     }
 }

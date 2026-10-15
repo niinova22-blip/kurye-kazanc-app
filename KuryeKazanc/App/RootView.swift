@@ -15,7 +15,9 @@ struct RootView: View {
     /// konum -> sekmeler. Daha once firma secmis kullanici yeni tanitimi bir kez gorur.
     var body: some View {
         Group {
-            if !hasChosenAccountMode && !payroll.state.hasChosenFirm && startFirm.isEmpty {
+            if ModelContainerFactory.isUsingFallbackStore {
+                StoreUnavailableView()
+            } else if !hasChosenAccountMode && !payroll.state.hasChosenFirm && startFirm.isEmpty {
                 AccountWelcomeView { hasChosenAccountMode = true }
                     .transition(.opacity)
             } else if !payroll.state.hasChosenFirm && startFirm.isEmpty {
@@ -90,5 +92,24 @@ struct MainTabView: View {
     private func refreshDay() {
         let now = Calendar.current.startOfDay(for: .now)
         if now != today { today = now }
+    }
+}
+
+/// Kalici veri deposu bu oturumda acilamadi (bkz. ModelContainerFactory.isUsingFallbackStore). Kayitlar silinmedi;
+/// gecici depoya yazilip kaybolmasinlar diye ekranlar acilmaz, uygulamayi yeniden acmak yeterli.
+private struct StoreUnavailableView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "lock.rotation")
+                .font(.system(size: 48))
+                .foregroundStyle(Theme.accent)
+            Text("Verilerin hazırlanıyor")
+                .font(.title2.bold())
+            Text("Telefon yeniden başladıktan sonra kilit açılmadan uygulama arka planda çalıştı. Kayıtların yerinde; uygulamayı uygulama değiştiriciden kapatıp yeniden açman yeterli.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(32)
     }
 }

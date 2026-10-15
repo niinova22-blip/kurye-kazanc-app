@@ -144,7 +144,7 @@ struct GoalRing: View {
         }
         .accessibilityElement()
         .accessibilityLabel("Hedef")
-        .accessibilityValue("Yüzde \(Int(progress.fraction * 100))")
+        .accessibilityValue("Yüzde \(progress.fraction.isFinite ? Int(progress.fraction * 100) : 0)")
     }
 }
 

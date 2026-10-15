@@ -180,7 +180,7 @@ private struct AnalysisContentView: View {
     /// "%" yerellestirme bicim belirteci gibi yorumlanmasin diye metin once String olarak kurulur.
     static func changeText(_ change: Double) -> String {
         let sign: String = change >= 0 ? "+" : "−"
-        let percent: Int = Int(abs(change).rounded())
+        let percent: Int = change.isFinite ? Int(min(abs(change), 1_000_000).rounded()) : 0
         return "Önceki döneme göre " + sign + "%" + String(percent)
     }
 

@@ -127,6 +127,8 @@ struct PayrollState: Codable, Equatable {
     var demoLogIDs: [UUID] = []
     /// Firma gecis bildirimi: en son degerlendirilen tarife surumu cifti (ilk degerlendirmede bildirim yok).
     var switchBaseline: String? = nil
+    /// 1.12: kullanicinin kendi soyledigi hiz (paket / saat). nil: kayitlardan olculen ya da varsayilan 2,5.
+    var packagesPerHour: Decimal? = nil
 
     init() {}
 
@@ -149,6 +151,7 @@ struct PayrollState: Codable, Equatable {
         demoRecordIDs = try c.decodeIfPresent([UUID].self, forKey: .demoRecordIDs) ?? []
         demoLogIDs = try c.decodeIfPresent([UUID].self, forKey: .demoLogIDs) ?? []
         switchBaseline = try c.decodeIfPresent(String.self, forKey: .switchBaseline)
+        packagesPerHour = try c.decodeIfPresent(Decimal.self, forKey: .packagesPerHour)
     }
 
     var activePlatform: String? { platformHistory.last?.code }
@@ -254,6 +257,11 @@ final class PayrollStore {
 
     func setGoal(_ goal: GoalSpec?) {
         state.goal = goal
+        persist()
+    }
+
+    func setPackagesPerHour(_ value: Decimal?) {
+        state.packagesPerHour = value.flatMap { $0 > 0 ? $0 : nil }
         persist()
     }
 

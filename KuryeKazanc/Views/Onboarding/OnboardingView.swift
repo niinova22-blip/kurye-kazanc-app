@@ -12,6 +12,12 @@ struct OnboardingView: View {
     @State private var viewModel = OnboardingViewModel()
     @State private var errorMessage: String?
     @State private var showAutoShiftIntro = false
+    /// 1.12: otomatik vardiya bu kurulumda soruldu mu (konum izninden sonra bir kez, kendiliginden).
+    @State private var askedAutoShift = false
+    /// Soru "Başla"ya basilinca acildiysa kapaninca kurulum biter.
+    @State private var finishAfterAutoShift = false
+    @State private var reminders = ReminderScheduler.shared
+    private let isUITesting: Bool = LaunchOptions.current.isUITesting
 
     // Derleyicinin tip denetimi zaman asimina ugramasin diye govde kucuk parcalara bolundu.
     var body: some View {
@@ -39,11 +45,14 @@ struct OnboardingView: View {
             }
             viewModel.preselect(firm: profile.platformCode, vehicle: vehicle)
         }
-        .sheet(isPresented: $showAutoShiftIntro) {
+        .sheet(isPresented: $showAutoShiftIntro, onDismiss: {
+            if finishAfterAutoShift { finish() }
+        }) {
             AutoShiftIntroView {
                 let coordinator: AutoShiftCoordinator = autoShift
                 Task { _ = await coordinator.enable() }
             }
+            .interactiveDismissDisabled()
         }
         .alert("Kaydedilemedi", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
@@ -86,6 +95,12 @@ struct OnboardingView: View {
 
     private func advance() {
         if viewModel.isLastStep {
+            // 1.12: otomatik vardiya istege bagli bir dugme degil; sorulmadiysa once sorulur
+            if !askedAutoShift, !autoShift.isEnabled, !isUITesting {
+                finishAfterAutoShift = true
+                askAutoShift()
+                return
+            }
             finish()
         } else {
             withAnimation { viewModel.next() }
@@ -177,14 +192,58 @@ struct OnboardingView: View {
             }
 
             autoShiftOption
+            notificationOption
         }
-        // 1.9: izin bu adima gelince dogrudan sorulur (km, yakit ve bolge tarifesi icin gerekli)
+        // 1.9: izin bu adima gelince dogrudan sorulur (km, yakit ve bolge tarifesi icin gerekli).
+        // 1.12: konum sorusu cevaplaninca otomatik vardiya da kendiliginden sorulur.
         .onAppear {
-            if location.authorizationStatus == .notDetermined { location.requestWhenInUseAuthorization() }
+            if location.authorizationStatus == .notDetermined {
+                location.requestWhenInUseAuthorization()
+            } else {
+                askAutoShiftSoon()
+            }
+        }
+        .onChange(of: location.authorizationStatus) { old, new in
+            if old == .notDetermined, new != .notDetermined { askAutoShiftSoon() }
+        }
+        .task { await reminders.refreshStatus() }
+    }
+
+    private func askAutoShiftSoon() {
+        guard !askedAutoShift, !autoShift.isEnabled, !isUITesting else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            askAutoShift()
         }
     }
 
-    /// Istege bagli: otomatik vardiya aciklamasi; onayda izinler istenir.
+    private func askAutoShift() {
+        guard !askedAutoShift else { return }
+        askedAutoShift = true
+        showAutoShiftIntro = true
+    }
+
+    /// 1.12: genel bildirimler (vardiya hatirlatmasi, gun sonu, hedefe ne kaldi) burada istenir.
+    @ViewBuilder
+    private var notificationOption: some View {
+        if reminders.isAuthorized {
+            Label("Bildirimler açık", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(Theme.accent)
+        } else if reminders.status == .notDetermined {
+            Button {
+                Task { await reminders.enableRecommended() }
+            } label: {
+                Label("Bildirimlere izin ver", systemImage: "bell.badge")
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("onboarding.notifications")
+            Text("Hedefine ne kadar kaldığını, vardiya ve gün sonu hatırlatmalarını bildirimle söyleriz.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Otomatik vardiya: konum izninden sonra kendiliginden sorulur; reddedilirse buradan yeniden acilir.
     @ViewBuilder
     private var autoShiftOption: some View {
         if autoShift.isEnabled {
@@ -194,7 +253,7 @@ struct OnboardingView: View {
             Button {
                 showAutoShiftIntro = true
             } label: {
-                Label("Otomatik vardiyayı aç (isteğe bağlı)", systemImage: "scooter")
+                Label("Otomatik vardiyayı aç", systemImage: "scooter")
             }
             .buttonStyle(.bordered)
             .accessibilityIdentifier("onboarding.autoShift")
@@ -202,6 +261,11 @@ struct OnboardingView: View {
     }
 
     private func finish() {
+        finishAfterAutoShift = false
+        // Bildirim izni hic sorulmadiysa kurulum biterken sorulur (hedef bildirimleri icin)
+        if reminders.status == .notDetermined, !isUITesting {
+            Task { await reminders.enableRecommended() }
+        }
         do {
             try viewModel.complete(in: modelContext, platforms: platforms)
         } catch {

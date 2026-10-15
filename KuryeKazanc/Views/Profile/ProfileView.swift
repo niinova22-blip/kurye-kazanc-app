@@ -81,6 +81,22 @@ struct ProfileView: View {
             }
             .foregroundStyle(.primary)
             .accessibilityIdentifier("profile.firm")
+            NavigationLink { RegionSettingsView() } label: {
+                LabeledContent {
+                    Text(payroll.state.regionTier.map(TariffQuestions.regionName) ?? "Seçilmedi")
+                } label: {
+                    Label("Çalıştığın bölge", systemImage: "map")
+                }
+            }
+            .accessibilityIdentifier("profile.region")
+            NavigationLink { PaceSettingsView() } label: {
+                LabeledContent {
+                    Text("\(Formatters.decimalText(payroll.state.packagesPerHour ?? PaceEstimate.defaultPackagesPerHour)) paket/sa")
+                } label: {
+                    Label("Çalışma hızın", systemImage: "gauge.with.dots.needle.67percent")
+                }
+            }
+            .accessibilityIdentifier("profile.pace")
             NavigationLink { FuelSettingsView() } label: {
                 Label("Araç ve yakıt", systemImage: "fuelpump")
             }

@@ -2,11 +2,16 @@ import Foundation
 
 /// Kuryenin secili firmadaki hizi: son 8 haftanin kayitlarindan paket/saat ve km/paket.
 /// En az 5 paketli kayit ve 10 saat yoksa varsayilan kullanilir ve `isAssumed` isaretlenir.
+/// 1.12: kullanici hizini kendisi girdiyse (kurulum / Profil > Çalışma hızın) paket/saat odur (`isUserProvided`).
 struct PaceEstimate: Equatable {
     var packagesPerHour: Decimal
     var kmPerPackage: Decimal
     var isAssumed: Bool
     var sampleCount: Int
+    var isUserProvided: Bool = false
+
+    /// Kullanicinin girebilecegi hiz araligi (paket / saat).
+    static let userRange: ClosedRange<Decimal> = Decimal(string: "0.5")!...8
 
     static let defaultPackagesPerHour: Decimal = Decimal(string: "2.5")!
     static let defaultKmPerPackage: Decimal = Decimal(string: "3.5")!
@@ -15,7 +20,17 @@ struct PaceEstimate: Equatable {
     static let minimumHours: Decimal = 10
 
     static func estimate(entries: [EarningEntry], platform: String, now: Date,
-                         defaults: (packagesPerHour: Decimal, kmPerPackage: Decimal)? = nil) -> PaceEstimate {
+                         defaults: (packagesPerHour: Decimal, kmPerPackage: Decimal)? = nil,
+                         userPackagesPerHour: Decimal? = nil) -> PaceEstimate {
+        let measured: PaceEstimate = estimate(entries: entries, platform: platform, now: now, defaults: defaults)
+        guard let user = userPackagesPerHour, user > 0 else { return measured }
+        let rate: Decimal = min(userRange.upperBound, max(userRange.lowerBound, user))
+        return PaceEstimate(packagesPerHour: rate, kmPerPackage: measured.kmPerPackage, isAssumed: false,
+                            sampleCount: measured.sampleCount, isUserProvided: true)
+    }
+
+    private static func estimate(entries: [EarningEntry], platform: String, now: Date,
+                                 defaults: (packagesPerHour: Decimal, kmPerPackage: Decimal)?) -> PaceEstimate {
         let fallbackRate: Decimal = defaults?.packagesPerHour ?? defaultPackagesPerHour
         let fallbackKm: Decimal = defaults?.kmPerPackage ?? defaultKmPerPackage
         let cutoff: Date = now.addingTimeInterval(-windowDays * 86_400)

@@ -24,7 +24,9 @@ enum Formatters {
 
     /// 3 sa 25 dk
     static func duration(_ interval: TimeInterval) -> String {
-        let totalMinutes = Int((interval / 60).rounded(.down))
+        // NaN / sonsuz / negatif sure (bozuk kayit, saat geri alinmasi) Int donusumunde cokme yapmasin
+        guard interval.isFinite, interval > 0 else { return "0 dk" }
+        let totalMinutes = Int(min(interval, 10_000 * 3600) / 60)
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
         switch (hours, minutes) {

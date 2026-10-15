@@ -87,7 +87,7 @@ struct LiveShiftView: View {
             .accessibilityIdentifier("shift.minimize")
             Spacer()
             if let start = controller.shift?.start {
-                TimelineView(.periodic(from: start, by: 1)) { context in
+                TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(Formatters.duration(context.date.timeIntervalSince(start)))
                         .font(.headline.monospacedDigit())
                         .padding(.horizontal, 12)

@@ -81,9 +81,24 @@ final class AppEnvironment {
                                         defaults: testDefaults ?? .standard)
         // Canli Etkinlik "Vardiyayi bitir": iOS uygulamayi arka planda soguk baslatsa da bagli olsun.
         // Form acilamaz: ozet bekleyen vardiya olur, "Vardiya bitti" bildirimi kazanc formuna goturur.
-        ShiftIntentBridge.endShift = { [weak self] in
-            _ = self?.autoShift.endShiftToPending()
+        // 1.12: canli vardiya (paket sayma) suruyorsa hesaplanip kaydedilir; yoksa eski akis.
+        let live: LiveShiftController = liveShift
+        let shiftCoordinator: AutoShiftCoordinator = autoShift
+        live.contextProvider = { container.mainContext }
+        shiftCoordinator.liveShiftSnapshot = { [weak live] in live?.activitySnapshot() }
+        shiftCoordinator.onAutoShiftStarted = { [weak live] in live?.startFromAutoShift() }
+        shiftCoordinator.onAutoShiftFinished = { [weak live] summary in live?.handleAutoShiftFinished(summary) ?? false }
+        shiftCoordinator.onAutoShiftCancelled = { [weak live] in live?.dropAfterAutoCancel() }
+        ShiftIntentBridge.endShift = { [weak live, weak shiftCoordinator] in
+            if let live, live.isActive {
+                _ = live.finish(context: container.mainContext)
+            } else {
+                _ = shiftCoordinator?.endShiftToPending()
+            }
         }
+        ShiftIntentBridge.addPackage = { [weak live] in live?.addPackageFromOutside() }
+        ShiftIntentBridge.undoPackage = { [weak live] in live?.undoLast() }
+        ShiftIntentBridge.openShift = { [weak live] in live?.openFromWidget() }
     }
 
     /// Bugun KAYDEDILMIS kazanc/gider kayitlarinin ozeti (suren vardiya haric; onu koordinator ekler).

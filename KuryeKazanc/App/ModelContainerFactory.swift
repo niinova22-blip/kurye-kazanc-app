@@ -37,6 +37,11 @@ enum KuryeMigrationPlan: SchemaMigrationPlan {
 enum ModelContainerFactory {
     static let schema = Schema(versionedSchema: SchemaV2.self)
 
+    /// Kalici depo acilamadi, gecici (bellek) depo kullaniliyor. Ornek: cihaz yeniden basladiktan sonra kilit hic
+    /// acilmadan iOS uygulamayi konum olayiyla arka planda baslatti (dosya korumasi). Eskiden burada `fatalError` vardi:
+    /// uygulama cokuyordu. Simdi cokmez; on plana gelince kullaniciya yeniden acmasi soylenir (bkz. RootView).
+    static private(set) var isUsingFallbackStore = false
+
     /// - Parameters:
     ///   - inMemory: UI testleri ve SwiftUI onizlemeleri icin diske yazmayan depo.
     ///   - url: Goc testleri icin ozel dosya konumu.
@@ -54,6 +59,16 @@ enum ModelContainerFactory {
                 configurations: [configuration]
             )
         } catch {
+            // Gecici hata (dosya kilidi / koruma): bir kez daha denenir
+            if let container = try? ModelContainer(for: schema, migrationPlan: KuryeMigrationPlan.self,
+                                                   configurations: [configuration]) {
+                return container
+            }
+            isUsingFallbackStore = !inMemory
+            let memory = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            if let container = try? ModelContainer(for: schema, configurations: [memory]) {
+                return container
+            }
             fatalError("ModelContainer oluşturulamadı: \(error)")
         }
     }

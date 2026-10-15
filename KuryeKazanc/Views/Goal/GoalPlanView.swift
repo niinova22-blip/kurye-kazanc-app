@@ -186,6 +186,8 @@ struct GoalPlanView: View {
         payroll.setGoal(spec)
         withAnimation { saved = true }
         Task { @MainActor in
+            // 1.12: hedef kaydedilince "hedefe su kadar kaldi" bildirimleri icin izin (verilmisse soru cikmaz)
+            _ = await ReminderScheduler.shared.ensureAuthorization()
             try? await Task.sleep(for: .milliseconds(350))
             withAnimation(.snappy) { proxy.scrollTo("result", anchor: .top) }
         }

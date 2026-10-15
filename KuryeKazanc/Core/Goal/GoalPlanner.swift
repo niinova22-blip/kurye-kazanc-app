@@ -265,6 +265,7 @@ struct GoalPlanner {
     private func smallestPackages(target: Money, upTo limit: Int, _ profile: CourierTariffProfile, _ pace: PaceEstimate,
                                   _ day: String, _ daysPerWeek: Int) -> Int? {
         let points: [Int] = breakpoints(upTo: limit, profile, day, daysPerWeek)
+        guard points.count >= 2 else { return nil }
         for index in 0..<(points.count - 1) {
             let start: Int = points[index]
             let end: Int = min(limit, points[index + 1] - 1)

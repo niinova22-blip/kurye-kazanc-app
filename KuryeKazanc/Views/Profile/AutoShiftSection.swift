@@ -132,6 +132,20 @@ struct AutoShiftIntroView: View {
             }
             .listStyle(.insetGrouped)
             .toolbar { toolbarContent }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 10) {
+                    Button("Otomatik vardiyayı aç") {
+                        onContinue()
+                        dismiss()
+                    }
+                    .buttonStyle(PrimaryActionButtonStyle())
+                    .accessibilityIdentifier("autoShift.enable")
+                    Button("Şimdi değil") { dismiss() }
+                        .font(.subheadline)
+                }
+                .padding()
+                .background(.bar)
+            }
         }
     }
 
@@ -142,7 +156,7 @@ struct AutoShiftIntroView: View {
                     .font(.largeTitle)
                     .foregroundStyle(Theme.accent)
                     .accessibilityHidden(true)
-                Text("Vardiyan kendiliğinden başlasın")
+                Text("Vardiyan kendiliğinden başlasın mı?")
                     .font(.title2.bold())
                 Text("Motorla ya da bisikletle yola çıktığında vardiyanı başlatır ve km'ni sayar; 20 dakika durunca bitirir. Yanlış başlarsa bildirimden tek dokunuşla iptal edersin.")
                     .foregroundStyle(.secondary)
@@ -154,14 +168,15 @@ struct AutoShiftIntroView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
-            Button("Vazgeç") { dismiss() }
+            Button("Şimdi değil") { dismiss() }
                 .accessibilityIdentifier("autoShift.cancel")
         }
         ToolbarItem(placement: .confirmationAction) {
-            Button("Devam") {
+            Button("Aç") {
                 onContinue()
                 dismiss()
             }
+            .bold()
             .accessibilityIdentifier("autoShift.continue")
         }
     }

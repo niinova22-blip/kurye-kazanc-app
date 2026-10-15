@@ -476,7 +476,19 @@ final class PayrollModel {
     }
 
     func pace(entries: [EarningEntry]) -> PaceEstimate {
-        PaceEstimate.estimate(entries: entries, platform: state.activePlatform ?? "", now: clock())
+        PaceEstimate.estimate(entries: entries, platform: state.activePlatform ?? "", now: clock(),
+                              userPackagesPerHour: state.packagesPerHour)
+    }
+
+    /// Kayitlardan olculen hiz (kullanicinin girdigi deger yok sayilir): ayarlarda karsilastirma icin.
+    func measuredPace(entries: [EarningEntry]) -> PaceEstimate {
+        PaceEstimate.estimate(entries: entries, platform: state.activePlatform ?? "", now: clock(), userPackagesPerHour: nil)
+    }
+
+    /// Kullanicinin girdigi hiz; nil olcume / varsayilana doner.
+    func setPackagesPerHour(_ value: Decimal?) {
+        store.setPackagesPerHour(value)
+        reload()
     }
 
     /// Secili firmanin tarifesiyle hedef plani; firma ya da hedef yoksa nil.

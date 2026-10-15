@@ -35,6 +35,12 @@ struct KuryeKazancApp: App {
                     await syncNow()
                 }
                 .onChange(of: scenePhase) { _, phase in
+                    // 1.12: ekran kilitlenirken / arka plana gecerken suren vardiyanin Canli Etkinligi kesin acik olsun:
+                    // kilit ekranina kendiliginden duser (ActivityKit istegi yalnizca uygulama gorunurken basarili olur)
+                    if phase == .inactive {
+                        environment.autoShift.ensureLiveActivity()
+                        return
+                    }
                     // On plana donus: Ayarlar'da verilen izinler ve suren vardiya yeniden degerlendirilir
                     guard phase == .active else { return }
                     let autoShift = environment.autoShift
@@ -52,6 +58,10 @@ struct KuryeKazancApp: App {
     /// Once sablonlar ve planlama kurallari, sonra kuyruk. Ust uste cagrilar koordinatorde tek calismaya iner.
     @MainActor
     private func syncNow() async {
+        // On plana her donuste cagrilir: ust uste binen calismalar (yavas ag) ayni durumu iki kez degistirmesin
+        guard !SyncGate.isRunning else { return }
+        SyncGate.isRunning = true
+        defer { SyncGate.isRunning = false }
         let sync: SyncCoordinator = environment.sync
         await sync.refreshTemplatesIfNeeded()
         await sync.refreshRulesIfNeeded()
@@ -75,6 +85,11 @@ extension KuryeKazancApp {
                                                                              fallbackCostPerKm: costPerKm) else { return }
         await TariffSwitchNotifier.notify(suggestion)
     }
+}
+
+@MainActor
+private enum SyncGate {
+    static var isRunning = false
 }
 
 /// Test/CI icin baslatma argumanlari. XCUITest `app.launchArguments` ile bunlari gecer.

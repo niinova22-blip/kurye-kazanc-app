@@ -91,6 +91,7 @@ struct RepeatButton: View {
 
     @State private var timer: Timer?
     @State private var ticks = 0
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Image(systemName: symbol)
@@ -110,6 +111,10 @@ struct RepeatButton: View {
             .accessibilityLabel(symbol == "plus" ? "Artır" : "Azalt")
             .accessibilityIdentifier(identifier)
             .onDisappear(perform: stop)
+            // Basili tutarken uygulama arka plana giderse parmak kalkma olayi gelmez: zamanlayici burada durur
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { stop() }
+            }
     }
 
     private func start() {
@@ -123,6 +128,8 @@ struct RepeatButton: View {
 
     private func tick() {
         ticks += 1
+        // Guvenlik: kalkma olayi kaybolsa da sonsuza dek artmasin (~30 sn)
+        guard ticks < 250 else { return stop() }
         let repeats: Int = ticks > 20 ? 5 : (ticks > 8 ? 2 : 1)
         for _ in 0..<repeats { action() }
     }
