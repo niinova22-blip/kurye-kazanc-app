@@ -110,3 +110,22 @@ final class GoalNudgeTests: XCTestCase {
                                                           calendar: calendar), 0)
     }
 }
+
+final class GoalPlanPeriodScaleTests: XCTestCase {
+    func testScalesMonthlyToSelectedPeriod() throws {
+        let catalog = TariffCatalog.merged(bundled: BundledTariffs.all, remote: [], user: [])
+        let engine = PayEngine(catalog: catalog)
+        let fuel = FuelCostModel(settings: FuelSettings(), vehicleType: "motorcycle", fallbackCostPerKm: .zero)
+        let profile = CourierTariffProfile(platformCode: "yemeksepeti", regionTier: "ys_ankara_izmir", seniorityYears: nil,
+                                           vehicleType: nil, flags: [], contractHours: nil)
+        let pace = PaceEstimate(packagesPerHour: 3, kmPerPackage: 3, isAssumed: false, sampleCount: 0)
+        let goal = GoalSpec(amount: Money(23_310), period: .week, daysPerWeek: 7)
+        let plan = try GoalPlanner(engine: engine, fuel: fuel).plan(goal: goal, profile: profile, pace: pace, day: "2026-10-15").get()
+        XCTAssertEqual(plan.scaled(plan.net, to: .month), plan.net)
+        // Hafta = 7 / ayin is gunu; gun = 1 / ayin is gunu
+        let week: Decimal = plan.scaled(plan.net, to: .week).value
+        let day: Decimal = plan.scaled(plan.net, to: .day).value
+        XCTAssertEqual(NSDecimalNumber(decimal: week).doubleValue, NSDecimalNumber(decimal: day * 7).doubleValue, accuracy: 0.05)
+        XCTAssertEqual(plan.scaled(plan.net, to: .week), plan.periodNet())
+    }
+}

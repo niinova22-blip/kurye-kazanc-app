@@ -428,6 +428,34 @@ final class PayrollModel {
                                 fuel: fuel, monthWorkDays: state.goal?.monthWorkDays ?? 26)
     }
 
+    // MARK: - Kazanc raporu (1.12.2)
+
+    /// Secilen tarihi iceren gun / hafta (Pzt–Paz) / ay.
+    func reportRange(_ span: EarningsReport.Span, containing date: Date) -> (start: String, end: String) {
+        switch span {
+        case .day: return (day(date), day(date))
+        case .week: return weekRange(containing: date)
+        case .month: return monthRange(containing: date)
+        }
+    }
+
+    func earningsReport(span: EarningsReport.Span, containing date: Date, expenses: [DatedExpense],
+                        fallbackCostPerKm: Double?) -> EarningsReport? {
+        guard let code = state.activePlatform else { return nil }
+        let range = reportRange(span, containing: date)
+        let result: PeriodResult = period(platform: code, start: range.start, end: range.end)
+        let inRange: [DatedExpense] = expenses.filter { $0.day >= range.start && $0.day <= range.end }
+        var fuel: Money = inRange.filter { $0.category == .fuel }.map(\.amount).sum()
+        if fuel.isZero, let fallbackCostPerKm {
+            fuel = fuelModel(fallbackCostPerKm: fallbackCostPerKm).cost(km: result.km, on: range.end)
+        }
+        let other: Money = inRange.filter { $0.category != .fuel }.map(\.amount).sum()
+        let share: Money? = span == .month || !includesFixedPay ? nil : fixedShareRowsToday().map(\.perDay).sum()
+        return EarningsReportBuilder.make(platformName: PayrollModel.platformName(code), span: span, start: range.start,
+                                          end: range.end, result: result, logs: store.logs(platform: code),
+                                          fixedSharePerDay: share, fuel: fuel, otherExpenses: other)
+    }
+
     // MARK: - Odeme kontrolu
 
     func reconcile(platform: String, start: String, end: String, actual: Money, advances: Money, deductions: Money) -> (PeriodResult, Reconciliation) {

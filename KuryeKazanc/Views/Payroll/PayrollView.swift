@@ -178,6 +178,10 @@ private struct LiveShiftBanner: View {
 private struct MethodsSection: View {
     var body: some View {
         Section {
+            NavigationLink { EarningsReportView() } label: {
+                Label("Kazanç raporu (gün / hafta / ay)", systemImage: "doc.richtext")
+            }
+            .accessibilityIdentifier("payroll.report")
             NavigationLink { PeriodSummaryView() } label: {
                 Label("Hafta / ay özeti", systemImage: "calendar")
             }
@@ -187,7 +191,7 @@ private struct MethodsSection: View {
             }
             .accessibilityIdentifier("payroll.payment")
         } header: {
-            Text("Dönem ve ödeme")
+            Text("Rapor, dönem ve ödeme")
         } footer: {
             Text("Vardiya başlatmayı unuttuğun günler için Bugün > “Elle hesapla”yı kullan.")
         }

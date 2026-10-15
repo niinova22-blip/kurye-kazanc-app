@@ -14,6 +14,8 @@ Hesap mantığı (tarifeler aynı, yalnızca toplamlar doğru tutuluyor):
 Yeni:
 - Bugün > Paket sayacı: Bugün / Bu hafta / Bu ay (Yemeksepeti'nde Bugün / Bu hafta) toplam paket, ulaşılan kademe ve "28. pakete 3 kaldı → 1.005 TL".
 - Vardiya ekranında günün toplamı ve sıradaki kademe.
+- Plan: günlük / haftalık hedef seçince "Firmadan alacağın", "Yakıt gideri" ve "Ayrıntılı döküm" de o döneme göre (Haftada + Günde ya da yalnızca Günde); altında "Bu şekilde çalışmaya devam edersen günde …, ayda … net kalır".
+- Kazanç > Hakediş > Kazanç raporu: geriye dönük günlük / haftalık / aylık ayrıntılı kazanç (kalem kalem, gün gün, yakıt, net); PDF ya da Excel (CSV) olarak paylaş.
 
 ## 1.12.1
 

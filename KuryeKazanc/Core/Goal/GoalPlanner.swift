@@ -59,6 +59,21 @@ struct GoalPlan: Equatable {
         return Int(share.rounded(.up))
     }
 
+    /// 1.12.2: aylik plan tutarinin bir doneme dusen payi: gun = 1 / ayin is gunu, hafta = haftadaki gun / ayin is gunu.
+    /// (Cebine kalan / firmadan alacagin / yakit / dokum ayni olcekle gosterilir.)
+    func ratio(for period: GoalPeriod) -> Decimal {
+        guard workDays > 0 else { return period == .month ? 1 : 0 }
+        switch period {
+        case .month: return 1
+        case .week: return Decimal(min(7, max(1, goal.daysPerWeek))) / Decimal(workDays)
+        case .day: return 1 / Decimal(workDays)
+        }
+    }
+
+    func scaled(_ monthly: Money, to period: GoalPeriod) -> Money {
+        period == .month ? monthly : Money(Money.round(monthly.value * ratio(for: period)))
+    }
+
     /// Hedef donemindeki net (hedef tutariyla ayni olcek).
     func periodNet() -> Money {
         guard goal.period != .month else { return net }
