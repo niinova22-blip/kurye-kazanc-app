@@ -26,9 +26,13 @@ enum DaySplit {
             let anyKm: Bool = inputs.contains { $0.totalKm != nil || !$0.deliveryDistancesKm.isEmpty }
             total.totalKm = anyKm ? inputs.map(\.distanceKm).reduce(0, +) : nil
         }
-        // Saat dagilimi ancak paketli her kayitta varsa birlesir; yoksa motor gunduz / aksam paketlerinden tahmin eder
-        if inputs.allSatisfy({ !$0.deliverySlots.isEmpty || $0.totalPackages == 0 }) {
-            total.deliverySlots = inputs.flatMap(\.deliverySlots)
+        // Saat dagilimi: canli vardiyada her paket kendi saatiyle. Saati olmayan kayit (elle hesap) varsa onun paketleri
+        // motorun tahminiyle ayni saate yazilir (gunduz 12:00, aksam 18:00) ki vardiyalarin gercek saatleri kaybolmasin.
+        if inputs.contains(where: { !$0.deliverySlots.isEmpty }) {
+            total.deliverySlots = inputs.flatMap { input -> [DeliverySlot] in
+                guard input.deliverySlots.isEmpty, input.totalPackages > 0 else { return input.deliverySlots }
+                return estimatedSlots(input)
+            }
         } else {
             total.deliverySlots = []
         }
@@ -109,4 +113,16 @@ enum DaySplit {
     }
 
     private static func counts(_ line: PayLine) -> Bool { line.included && line.isCash }
+
+    /// Saati bilinmeyen kaydin paketleri: gunduz (ve birlesik) 12:00, aksam 18:00 (motorun tahmin kuraliyla ayni).
+    static func estimatedSlots(_ input: PayInput) -> [DeliverySlot] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let weekday: Int = RuleDay.date(input.startDay).map { calendar.component(.weekday, from: $0) } ?? 2
+        var slots: [DeliverySlot] = []
+        let dayCount: Int = input.dayPackages + input.combinedPackages
+        if dayCount > 0 { slots.append(DeliverySlot(weekday: weekday, hour: 12, count: dayCount)) }
+        if input.nightPackages > 0 { slots.append(DeliverySlot(weekday: weekday, hour: 18, count: input.nightPackages)) }
+        return slots
+    }
 }

@@ -14,7 +14,8 @@ struct GoalResultCard: View {
             if !plan.guaranteed.isEmpty { GuaranteedBlock(plan: plan) }
             MoneyBlock(plan: plan)
             if plan.reachability != .alreadyMet || !plan.breakdown.lines.isEmpty {
-                PayDetailDisclosure(detail: detail, periodTitle: "Ayda", identifier: "goal.detail")
+                // 1.12.2: dokum secili donemde (aylik: Ayda + Günde, haftalik: Haftada + Günde, gunluk: yalnizca gun)
+                PayDetailDisclosure(detail: periodDetail, periodTitle: periodColumnTitle, identifier: "goal.detail")
             }
             if let hint = plan.nextTier { hintRow(hint) }
         } header: {
@@ -35,6 +36,32 @@ struct GoalResultCard: View {
                                       perDay: Money(Money.round(plan.weeklyBonusIncome.value / Decimal(days)))))
         }
         return PayDetailBuilder.make(breakdown: plan.breakdown, days: plan.workDays, extraRows: extra)
+    }
+
+    private var periodColumnTitle: String? {
+        switch plan.goal.period {
+        case .month: "Ayda"
+        case .week: "Haftada"
+        case .day: nil
+        }
+    }
+
+    /// Aylik dokum secili doneme cevrilir. Aylik carpanli etiketler ("× 30 gün", "× 4,29 hafta") ve aylik miktarlar
+    /// (581 paket × 59) donem disinda yaniltici oldugundan kaldirilir.
+    private var periodDetail: PayDetail {
+        let monthly: PayDetail = detail
+        let period: GoalPeriod = plan.goal.period
+        guard period != .month else { return monthly }
+        var scaled = monthly
+        scaled.rows = monthly.rows.map { row in
+            var copy = row
+            copy.periodAmount = period == .day ? row.perDay : plan.scaled(row.periodAmount, to: period)
+            copy.quantityText = nil
+            copy.label = row.label.components(separatedBy: " × ").first ?? row.label
+            return copy
+        }
+        scaled.days = period == .day ? 1 : min(7, max(1, plan.goal.daysPerWeek))
+        return scaled
     }
 
     // MARK: - Ust kart
@@ -143,14 +170,15 @@ private struct GuaranteedBlock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Paket yapmasan da alacakların")
+            Text(plan.goal.period == .month ? "Paket yapmasan da alacakların"
+                 : "Paket yapmasan da alacakların (\(plan.goal.period == .week ? "haftaya" : "güne") düşen payı)")
                 .font(.subheadline.weight(.semibold))
             ForEach(plan.guaranteed) { line in
                 HStack {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.positive)
                     Text(line.label).font(.subheadline)
                     Spacer()
-                    Text((line.isSideBenefit ? "+" : "") + PayFormat.tl(line.amount))
+                    Text((line.isSideBenefit ? "+" : "") + PayFormat.tl(plan.scaled(line.amount, to: plan.goal.period)))
                         .font(.subheadline.monospacedDigit())
                 }
             }
@@ -165,8 +193,8 @@ private struct MoneyBlock: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            row("Firmadan alacağın", PayFormat.tl(plan.gross + plan.sideIncome), color: .primary)
-            row("Yakıt gideri", "−" + PayFormat.tl(plan.fuel), color: Theme.negative)
+            row("Firmadan alacağın", PayFormat.tl(plan.scaled(plan.gross + plan.sideIncome, to: period)), color: .primary)
+            row("Yakıt gideri", "−" + PayFormat.tl(plan.scaled(plan.fuel, to: period)), color: Theme.negative)
             Divider()
             HStack(alignment: .firstTextBaseline) {
                 Text("Cebine kalan").font(.headline)
@@ -178,14 +206,26 @@ private struct MoneyBlock: View {
                     .contentTransition(.numericText())
                     .accessibilityIdentifier("goal.net")
             }
-            if plan.goal.period != .month {
-                Text("Aylık karşılığı: \(PayFormat.tl(plan.net)) net")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
+            Text(projectionText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .multilineTextAlignment(.trailing)
+                .accessibilityIdentifier("goal.projection")
         }
         .padding(.vertical, 4)
+    }
+
+    private var period: GoalPeriod { plan.goal.period }
+
+    /// Secili donem disindakiler: "Bu şekilde çalışmaya devam edersen günde …, ayda … net".
+    private var projectionText: String {
+        let others: [GoalPeriod] = GoalPeriod.allCases.filter { $0 != period }
+        let parts: [String] = others.map { other in
+            let word: String = other == .day ? "günde" : (other == .week ? "haftada" : "ayda")
+            return "\(word) \(PayFormat.tl(plan.scaled(plan.net, to: other)))"
+        }
+        return "Bu şekilde çalışmaya devam edersen " + parts.joined(separator: ", ") + " net kalır."
     }
 
     private func row(_ title: String, _ value: String, color: Color) -> some View {
@@ -199,8 +239,8 @@ private struct MoneyBlock: View {
     private var netText: String {
         switch plan.goal.period {
         case .month: "\(PayFormat.tl(plan.net)) / ay"
-        case .week: "≈ \(PayFormat.tl(plan.periodNet())) / hafta"
-        case .day: "≈ \(PayFormat.tl(plan.periodNet())) / gün"
+        case .week: "≈ \(PayFormat.tl(plan.scaled(plan.net, to: .week))) / hafta"
+        case .day: "≈ \(PayFormat.tl(plan.scaled(plan.net, to: .day))) / gün"
         }
     }
 }

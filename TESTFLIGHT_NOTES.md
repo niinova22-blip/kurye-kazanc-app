@@ -3,6 +3,20 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.12.2
+
+Hesap mantığı (tarifeler aynı, yalnızca toplamlar doğru tutuluyor):
+- Paket Taxi (Restoran / Migros / Migros Hemen): günlük prim GÜNÜN toplam paketine göre tek kademe; aylık bonus AYIN toplamına göre tek kademe; sabit ücret aylık. Haftalık bonus yok.
+- Yemeksepeti: paket başı ücret gün + saat bandına göre, km 3,70 TL, gece / Pazar akşamı +15 TL; günlük bonus GÜNÜN toplamına, haftalık bonus HAFTANIN (Pzt–Paz) toplamına göre (şehir grubu). Aylık bonus yok.
+- Gün döngüsü: gün 00:00'da, hafta Pazartesi, ay 1'inde sıfırlanır. Gece yarısını geçen vardiyada 00:00 sonrası paketler ertesi günün primine sayılır (vardiya iki güne bölünüp kaydedilir).
+- Aynı gün vardiya + elle hesap: vardiyanın gerçek saatleri (Yemeksepeti saat ücreti) korunur.
+
+Yeni:
+- Bugün > Paket sayacı: Bugün / Bu hafta / Bu ay (Yemeksepeti'nde Bugün / Bu hafta) toplam paket, ulaşılan kademe ve "28. pakete 3 kaldı → 1.005 TL".
+- Vardiya ekranında günün toplamı ve sıradaki kademe.
+- Plan: günlük / haftalık hedef seçince "Firmadan alacağın", "Yakıt gideri" ve "Ayrıntılı döküm" de o döneme göre (Haftada + Günde ya da yalnızca Günde); altında "Bu şekilde çalışmaya devam edersen günde …, ayda … net kalır".
+- Kazanç > Hakediş > Kazanç raporu: geriye dönük günlük / haftalık / aylık ayrıntılı kazanç (kalem kalem, gün gün, yakıt, net); PDF ya da Excel (CSV) olarak paylaş.
+
 ## 1.12.1
 
 Düzeltme:

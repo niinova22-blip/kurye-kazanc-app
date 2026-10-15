@@ -189,4 +189,48 @@ enum ShiftPayInput {
         input.hours = Money.round(Decimal(seconds / 3600), scale: 2)
         return input
     }
+
+    /// Gece yarisini gecen vardiya (1.12.2 gun dongusu): paketler teslim anina gore takvim gunlerine bolunur; gunluk prim /
+    /// bonus her gunun kendi toplamina girer (23:50'deki paket bugune, 00:10'daki yarina). Km ve sure gunlere sureyle
+    /// orantili dagitilir. Paketi olmayan gun parcasi dusulur; hic paket yoksa bos.
+    struct DayPart: Equatable {
+        var day: String
+        var start: Date
+        var end: Date
+        var input: PayInput
+    }
+
+    static func makeByDay(shift: LiveShift, end: Date, gpsKm: Decimal?, base: PayInput, version: TariffVersion?,
+                          calendar: Calendar = .current) -> [DayPart] {
+        let finish: Date = max(end, shift.start)
+        let total: Double = max(1, finish.timeIntervalSince(shift.start))
+        var parts: [DayPart] = []
+        var segmentStart: Date = shift.start
+        while true {
+            let nextMidnight: Date = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: segmentStart)) ?? finish
+            let segmentEnd: Date = min(nextMidnight, finish)
+            var piece = shift
+            piece.start = segmentStart
+            // Ilk parca vardiya oncesini, son parca bitis sonrasini da alir (saat kaymasinda paket kaybolmasin)
+            let isFirst: Bool = segmentStart == shift.start
+            let isLast: Bool = segmentEnd == finish
+            piece.deliveries = shift.deliveries.filter { delivery in
+                (isFirst || delivery.at >= segmentStart) && (isLast || delivery.at < segmentEnd)
+            }
+            if !piece.deliveries.isEmpty {
+                let day: String = RuleDay.string(segmentStart, calendar: calendar)
+                var dayBase = base
+                dayBase.startDay = day
+                dayBase.endDay = day
+                let share: Double = segmentEnd.timeIntervalSince(segmentStart) / total
+                let km: Decimal? = gpsKm.map { Money.round($0 * Decimal(share), scale: 1) }
+                let input: PayInput = make(shift: piece, end: segmentEnd, gpsKm: km, base: dayBase, version: version,
+                                           calendar: calendar)
+                parts.append(DayPart(day: day, start: segmentStart, end: segmentEnd, input: input))
+            }
+            if segmentEnd >= finish { break }
+            segmentStart = segmentEnd
+        }
+        return parts
+    }
 }
