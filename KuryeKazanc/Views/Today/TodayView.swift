@@ -194,8 +194,6 @@ struct TodayView: View {
             Section {
                 TodayGoalCard(progress: progress, hasGoal: payroll.goal != nil)
             }
-            // 1.12.2: bugun / bu hafta / bu ay toplam paket ve prim kademesi
-            BonusTrackSection(tracks: payroll.bonusTracks(live: liveShift.packagesByDay()))
             manualCalcSection
             fuelReminderSection
             DailyHintSection(firmCode: payroll.tariffProfile?.platformCode, progress: progress)
@@ -203,6 +201,8 @@ struct TodayView: View {
             if !todaysExpenses.isEmpty {
                 expensesSection
             }
+            // 1.12.2: bugun / bu hafta / bu ay toplam paket ve prim kademesi (listenin sonunda: kayitlari asagi itmesin)
+            BonusTrackSection(tracks: payroll.bonusTracks(live: liveShift.packagesByDay()))
         }
     }
 
