@@ -95,6 +95,7 @@ struct ScreenshotVerifier {
         let count = Double(parsed.packageCount)
         let lower = count * minFee * 0.8
         let upper = count * maxFee * 1.5 + parsed.bonus
+        guard lower.isFinite, upper.isFinite, lower <= upper else { return false }
         return (lower...upper).contains(parsed.totalEarning)
     }
 }

@@ -85,8 +85,8 @@ struct TodayView: View {
     }
 
     /// Bugunku hedef: kayitli kazanclar + suren vardiyanin paketleri (her dokunusta dolar) + sabit ucretin gunluk payi.
-    private var dailyProgress: DailyGoalProgress? {
-        let entries: [EarningEntry] = allEarnings.map(\.entry)
+    /// 1.12: govdede bir kez hesaplanir ve asagi aktarilir (eskiden her cizimde 5-6 kez tum kayitlar islenirdi).
+    private func computeDailyProgress(entries: [EarningEntry]) -> DailyGoalProgress? {
         guard case let .success(plan)? = payroll.goalPlan(entries: entries, fallbackCostPerKm: costPerKm),
               let code = payroll.tariffProfile?.platformCode else { return nil }
         var progress = DailyGoalProgress.today(plan: plan, entries: entries, platform: code, day: payroll.today,
@@ -117,8 +117,11 @@ struct TodayView: View {
             autoEstimate: autoEstimate
         )
 
+        let entries: [EarningEntry] = allEarnings.map(\.entry)
+        let progress: DailyGoalProgress? = computeDailyProgress(entries: entries)
+
         NavigationStack {
-            todayList(summary)
+            todayList(summary, progress: progress)
                 .listStyle(.insetGrouped)
                 .navigationTitle("Bugün")
                 .toolbar { toolbarContent }
@@ -131,13 +134,21 @@ struct TodayView: View {
                 .onChange(of: autoShift.requestedPendingID) { _, _ in
                     openRequestedPending()
                 }
-                .onChange(of: dailyProgress?.fraction ?? 0) { _, fraction in
+                .onChange(of: progress?.fraction ?? 0) { _, fraction in
                     // Gunluk hedefe ulasildiginda (gunde bir kez) kutlama bildirimi
                     if fraction >= 1 { ReminderScheduler.shared.goalReached(day: payroll.today) }
                 }
+                // 1.12: her paket / kayitta "hedefe su kadar kaldi" hatirlatmalari guncel ilerlemeyle yeniden kurulur
+                .task(id: nudgeSignature(progress)) { scheduleGoalNudges(summary: summary, progress: progress, entries: entries) }
                 .fullScreenCover(isPresented: $showsLiveShift) { LiveShiftView() }
+                // 1.12: widget'taki "Vardiya" dugmesi
+                .onChange(of: liveShift.presentationRequested, initial: true) { _, requested in
+                    guard requested else { return }
+                    liveShift.presentationRequested = false
+                    if liveShift.isActive { showsLiveShift = true }
+                }
                 .fullScreenCover(isPresented: $showsBreakdown) {
-                    TodayBreakdownView(content: breakdownContent(summary)) { showsBreakdown = false }
+                    TodayBreakdownView(content: breakdownContent(summary, progress: progress)) { showsBreakdown = false }
                 }
                 .fullScreenCover(isPresented: $showsShiftTutorial) {
                     ShiftTutorialView(mode: .firstRun) {
@@ -161,7 +172,7 @@ struct TodayView: View {
 
     // MARK: - Bolumler
 
-    private func todayList(_ summary: EarningsSummary) -> some View {
+    private func todayList(_ summary: EarningsSummary, progress: DailyGoalProgress?) -> some View {
         List {
             autoShiftSections
             heroSection(summary)
@@ -174,11 +185,11 @@ struct TodayView: View {
             }
             shiftStartSection
             Section {
-                TodayGoalCard(progress: dailyProgress, hasGoal: payroll.goal != nil)
+                TodayGoalCard(progress: progress, hasGoal: payroll.goal != nil)
             }
             manualCalcSection
             fuelReminderSection
-            DailyHintSection(firmCode: payroll.tariffProfile?.platformCode, progress: dailyProgress)
+            DailyHintSection(firmCode: payroll.tariffProfile?.platformCode, progress: progress)
             earningsSection
             if !todaysExpenses.isEmpty {
                 expensesSection
@@ -357,7 +368,7 @@ struct TodayView: View {
         showsBreakdown = true
     }
 
-    private func breakdownContent(_ summary: EarningsSummary) -> TodayBreakdownView.Content {
+    private func breakdownContent(_ summary: EarningsSummary, progress: DailyGoalProgress?) -> TodayBreakdownView.Content {
         let recordIDs: Set<UUID> = Set(todaysEarnings.map(\.id))
         let todayLogs: [WorkLog] = payroll.logs.filter { log in
             guard log.isDaily, log.startDay == payroll.today, let id = log.earningRecordID else { return false }
@@ -380,8 +391,34 @@ struct TodayView: View {
         return TodayBreakdownView.Content(
             breakdown: breakdown, packages: packages, workDuration: summary.workDuration, distanceKm: summary.distanceKm,
             fuelEstimate: summary.estimatedExpenses, manualExpenses: manual, net: net,
-            dailyTarget: dailyProgress?.targetNet, pace: goalPace(todayNet: net), goal: payroll.goal
+            dailyTarget: progress?.targetNet, pace: goalPace(todayNet: net), goal: payroll.goal
         )
+    }
+
+    /// Hatirlatmalari yeniden kurmayi gerektiren degerler.
+    private func nudgeSignature(_ progress: DailyGoalProgress?) -> String {
+        guard let progress, let goal = payroll.goal else { return "none" }
+        return "\(payroll.today)|\(progress.packages)|\(progress.targetPackages)|\(progress.net.value)|\(goal.amount.value)|\(goal.period.rawValue)"
+    }
+
+    private func scheduleGoalNudges(summary: EarningsSummary, progress: DailyGoalProgress?, entries: [EarningEntry]) {
+        guard let goal = payroll.goal, let progress else {
+            ReminderScheduler.shared.scheduleGoalNudges([])
+            return
+        }
+        let calendar: Calendar = .current
+        let now: Date = .now
+        let rate: Decimal = payroll.pace(entries: entries).packagesPerHour
+        var nudges: [GoalNudge] = GoalNudgePlanner.today(progress: progress, packagesPerHour: rate, now: now, calendar: calendar,
+                                                         isWorkDay: GoalNudgePlanner.isWorkDay(goal: goal, now: now, calendar: calendar))
+        let todayNet: Double = summary.netEarnings + fixedShareToday.doubleValue + liveGross
+        let perPackage: Decimal = progress.targetPackages > 0 ? progress.targetNet.value / Decimal(progress.targetPackages) : 0
+        if let period = GoalNudgePlanner.period(pace: goalPace(todayNet: todayNet), netPerPackage: perPackage,
+                                                daysLeft: GoalNudgePlanner.remainingWorkDays(goal: goal, now: now, calendar: calendar),
+                                                now: now, calendar: calendar) {
+            nudges.append(period)
+        }
+        ReminderScheduler.shared.scheduleGoalNudges(nudges)
     }
 
     /// Hedef doneminde calisilan gunlerin netleri (gecmis gunlere sabit ucret payi eklenir; bugun ust karttaki net).
@@ -446,7 +483,7 @@ struct TodayView: View {
     private func shiftPanel(_ summary: EarningsSummary) -> some View {
         VStack(spacing: 8) {
             if let start = workSession.sessionStart {
-                TimelineView(.periodic(from: start, by: 30)) { context in
+                TimelineView(.everyMinute) { context in
                     Text(shiftStatus(elapsed: context.date.timeIntervalSince(start), summary: summary))
                         .font(.footnote)
                         .foregroundStyle(.secondary)

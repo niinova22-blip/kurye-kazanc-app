@@ -27,6 +27,7 @@ struct SetupFlowView: View {
     @State private var goalPeriod: GoalPeriod = .month
     @State private var weekdays: Set<Int> = Set(GoalSpec.defaultWeekdays(count: 6))
     @State private var maxHours = 10
+    @State private var pace: Decimal = PaceEstimate.defaultPackagesPerHour
     @State private var loaded = false
 
     var body: some View {
@@ -66,7 +67,9 @@ struct SetupFlowView: View {
             TariffQuestionSections(questions: questions, regionTier: $regionTier, seniority: $seniority,
                                    contractHours: $contractHours, vehicle: $vehicle, flags: $flags)
         case .fuel: fuelSection
-        case .goal: goalSection
+        case .goal:
+            paceSection
+            goalSection
         }
     }
 
@@ -105,6 +108,17 @@ struct SetupFlowView: View {
                            unit: "\(fuelType.unitName)/100 km", identifier: "fuel.consumption")
         } footer: {
             Text("Pompadaki fiyatı gir; km başı yakıt gideri bununla hesaplanır. Şimdilik elle giriliyor.")
+        }
+    }
+
+    /// 1.12: plan ve hedef hesaplari bu hizla yapilir (eskiden herkes icin sabit 2,5 paket/saat).
+    private var paceSection: some View {
+        Section {
+            PaceStepper(value: $pace, identifier: "setup.pace")
+        } header: {
+            Text("Saatte kaç paket atıyorsun?")
+        } footer: {
+            Text("Ortalamanı yaz; bilmiyorsan 2,5 kalsın. Hedefe kaç saatte ulaşacağın bununla hesaplanır. Profil > Çalışma hızın'dan istediğin zaman değiştirebilirsin.")
         }
     }
 
@@ -197,6 +211,7 @@ struct SetupFlowView: View {
             maxHours = NSDecimalNumber(decimal: goal.maxHoursPerDay).intValue
         }
         consumption = payroll.state.fuel.consumptionPer100Km ?? FuelCostModel.defaultConsumption(vehicleType: vehicle)
+        pace = payroll.state.packagesPerHour ?? PaceEstimate.defaultPackagesPerHour
     }
 
     private func finish() {
@@ -210,6 +225,7 @@ struct SetupFlowView: View {
                            contractHours: q.contractHours.isEmpty ? nil : contractHours)
         if !firmOnly {
             payroll.setConsumption(consumption)
+            payroll.setPackagesPerHour(pace)
             if let fuelPrice, fuelPrice > 0 {
                 payroll.addFuelPrice(Money(fuelPrice), type: fuelType, on: Date())
             }

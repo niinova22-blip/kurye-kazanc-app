@@ -48,6 +48,14 @@ final class AutoShiftCoordinator {
     /// Son degerlendirmede (tick) gorulen son hareket. Surec oluyken gecen uzun duraganlik sonrasi
     /// gelen ilk GPS hareketi bununla ayirt edilir. Acilista kayitli son hareketle baslar.
     @ObservationIgnored private var observedLastMovement: Date?
+    /// 1.12: paket sayilan canli vardiyanin anlik durumu (Canli Etkinlikte paket sayisi ve brut). nil: canli vardiya yok.
+    @ObservationIgnored var liveShiftSnapshot: (() -> (packages: Int, gross: Double)?)?
+    /// Otomatik vardiya basladi: paket sayma (canli vardiya) da baslar, kilit ekranindan "+1 paket" calisir.
+    @ObservationIgnored var onAutoShiftStarted: (() -> Void)?
+    /// Otomatik vardiya duraganliktan bitti. true donerse canli vardiya kaydedildi: bekleyen vardiya olusturulmaz.
+    @ObservationIgnored var onAutoShiftFinished: ((WorkSessionSummary) -> Bool)?
+    /// "Bu bir vardiya değil": otomatik baslayan canli vardiya da kayitsiz kapanir.
+    @ObservationIgnored var onAutoShiftCancelled: (() -> Void)?
     /// Son hareket bundan yeniyse (GPS hareketi zaten kanitliyor) hareket gecmisi sorgulanmaz.
     @ObservationIgnored private let motionRefreshMinAge: TimeInterval = 60
 
@@ -164,6 +172,7 @@ final class AutoShiftCoordinator {
         guard case .start(let start) = decision, isEnabled, !workSession.isWorking else { return }
         beginShift(at: start, origin: .auto)
         notifier.autoShiftStarted()
+        onAutoShiftStarted?()
     }
 
     /// Suren vardiya: Canli Etkinligi gunceller; otomatik vardiyada duraganligi denetler.
@@ -189,6 +198,14 @@ final class AutoShiftCoordinator {
     func ensureLiveActivity() {
         guard workSession.isWorking, let start = workSession.sessionStart else { return }
         liveActivity.begin(start: start, isAuto: workSession.origin == .auto, state: currentState(endedAt: nil))
+    }
+
+    /// Paket eklendi / geri alindi: Canli Etkinlik kisitlamasiz hemen guncellenir (kilit ekranindaki sayi aninda artsin).
+    func liveShiftChanged() {
+        guard workSession.isWorking else { return }
+        lastActivityUpdate = clock()
+        lastActivityMeters = workSession.location.sessionDistanceMeters
+        ensureLiveActivity()
     }
 
     // MARK: - Kullanici eylemleri
@@ -225,6 +242,7 @@ final class AutoShiftCoordinator {
         liveActivity.dismiss()
         notifier.clearAutoShiftStarted()
         defaults.set(clock(), forKey: AppPreferences.lastAutoCancelKey)
+        onAutoShiftCancelled?()
     }
 
     /// Bekleyen vardiyanin ozeti; listeden SILMEZ. Kazanc kaydedilene kadar bekleyen kalir (spec 3):
@@ -259,6 +277,11 @@ final class AutoShiftCoordinator {
         guard let summary = workSession.stop(now: clock(), end: end) else { return }
         stopTimer()
         notifier.clearAutoShiftStarted()
+        // Paket sayilan vardiya kendiliginden hesaplanip kaydedildiyse bekleyen vardiya gerekmez
+        if let handler = onAutoShiftFinished, handler(summary) {
+            liveActivity.finish(state)
+            return
+        }
         let duration = summary.end.timeIntervalSince(summary.start)
         if policy.isTooShort(duration: duration, distanceKm: summary.distanceKm) {
             // Kayit yok: ozet de gosterilmez
@@ -303,8 +326,10 @@ final class AutoShiftCoordinator {
         let perHour = TodayViewModel.liveNetPerHour(
             todayNet: net, workedSeconds: todayWorkedSeconds(), elapsed: elapsed
         )
+        let live = liveShiftSnapshot?()
         return ShiftActivityAttributes.ContentState(
-            distanceKm: workSession.sessionDistanceKm, todayNet: net, netPerHour: perHour, endedAt: endedAt
+            distanceKm: workSession.sessionDistanceKm, todayNet: net, netPerHour: perHour, endedAt: endedAt,
+            packages: live?.packages, shiftGross: live?.gross
         )
     }
 

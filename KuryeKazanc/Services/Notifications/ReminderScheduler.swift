@@ -17,6 +17,7 @@ final class ReminderScheduler {
         static let fuel = "reminders.fuel"
         static let goal = "reminders.goal"
         static let tariff = "reminders.tariff"
+        static let goalNudge = "reminders.goalNudge"
         static let goalNotifiedDay = "reminders.goalNotifiedDay"
         static let notifiedTariffCount = "reminders.notifiedTariffCount"
     }
@@ -39,6 +40,14 @@ final class ReminderScheduler {
     var isFuelOn: Bool { didSet { store(isFuelOn, Key.fuel) } }
     var isGoalOn: Bool { didSet { store(isGoalOn, Key.goal) } }
     var isTariffOn: Bool { didSet { store(isTariffOn, Key.tariff) } }
+    /// 1.12: hedef kayitliyken gun icinde "hedefe su kadar kaldi" hatirlatmalari.
+    var isGoalNudgeOn: Bool {
+        didSet {
+            defaults.set(isGoalNudgeOn, forKey: Key.goalNudge)
+            if !isGoalNudgeOn { scheduleGoalNudges([]) }
+        }
+    }
+    @ObservationIgnored private var lastNudges: [GoalNudge]?
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let isDisabled: Bool
@@ -53,6 +62,7 @@ final class ReminderScheduler {
         isFuelOn = defaults.object(forKey: Key.fuel) as? Bool ?? false
         isGoalOn = defaults.object(forKey: Key.goal) as? Bool ?? true
         isTariffOn = defaults.object(forKey: Key.tariff) as? Bool ?? true
+        isGoalNudgeOn = defaults.object(forKey: Key.goalNudge) as? Bool ?? true
     }
 
     var isAuthorized: Bool { status == .authorized || status == .provisional || status == .ephemeral }
@@ -113,9 +123,31 @@ final class ReminderScheduler {
     /// Gunluk hedefe ulasilinca gunde bir kez.
     func goalReached(day: String) {
         guard !isDisabled, isGoalOn, defaults.string(forKey: Key.goalNotifiedDay) != day else { return }
+        // Hedef tamam: bugunun "kaldi" hatirlatmalari gereksiz
+        center.removePendingNotificationRequests(withIdentifiers: GoalNudgePlanner.slotHours.indices.map { GoalNudgePlanner.idPrefix + "\($0)" })
         defaults.set(day, forKey: Key.goalNotifiedDay)
         immediate(id: ID.goal, title: "Bugünkü hedefe ulaştın 🎉",
                   body: "Planladığın paket sayısını tamamladın. Devam edersen her paket hedefin üstüne yazılır.")
+    }
+
+    /// Hedef hatirlatmalarini verilen listeyle degistirir (bos liste hepsini kaldirir). Ayni liste tekrar kurulmaz.
+    func scheduleGoalNudges(_ nudges: [GoalNudge]) {
+        guard !isDisabled else { return }
+        let wanted: [GoalNudge] = isGoalNudgeOn ? nudges : []
+        guard wanted != lastNudges else { return }
+        lastNudges = wanted
+        center.removePendingNotificationRequests(withIdentifiers: GoalNudgePlanner.allIDs)
+        guard isAuthorized else { return }
+        for nudge in wanted {
+            let content = UNMutableNotificationContent()
+            content.title = nudge.title
+            content.body = nudge.body
+            content.sound = .default
+            content.threadIdentifier = "goal"
+            let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: nudge.fireDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
+            center.add(UNNotificationRequest(identifier: nudge.id, content: content, trigger: trigger))
+        }
     }
 
     /// Okunmamis tarife bildirimi sayisi arttiysa bir kez haber verir.

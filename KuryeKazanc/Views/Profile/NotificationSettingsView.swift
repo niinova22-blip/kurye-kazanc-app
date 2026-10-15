@@ -33,12 +33,16 @@ struct NotificationSettingsView: View {
                 Text("Vardiyayı başlatmayı ya da günü kaydetmeyi unutmaman için. Hepsi telefonunda planlanır.")
             }
             Section {
+                toggle("Hedefe ne kaldı (gün içinde)", systemImage: "chart.line.uptrend.xyaxis", isOn: $reminders.isGoalNudgeOn,
+                       identifier: "notifications.goalNudge")
                 toggle("Günlük hedefe ulaşınca", systemImage: "flag.checkered", isOn: $reminders.isGoalOn,
                        identifier: "notifications.goal")
                 toggle("Tarifemde değişiklik olunca", systemImage: "doc.badge.clock", isOn: $reminders.isTariffOn,
                        identifier: "notifications.tariff")
             } header: {
-                Text("Haberler")
+                Text("Hedef ve haberler")
+            } footer: {
+                Text("Hedef kayıtlıysa 12:00, 16:00 ve 19:00'da kaç paket ve ne kadar para kaldığını, haftalık/aylık hedefte ertesi sabah temponu söyler.")
             }
         }
         .navigationTitle("Bildirimler")

@@ -24,16 +24,16 @@ struct StartShiftIntent: AppIntent {
 
 struct RecordDeliveryIntent: AppIntent {
     static var title: LocalizedStringResource = "Paket bıraktım"
-    static var description = IntentDescription("Süren vardiyaya bir paket ekler.")
+    static var description = IntentDescription("Süren vardiyaya bir paket ekler; vardiya yoksa başlatır.")
     static var openAppWhenRun: Bool = false
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let liveShift: LiveShiftController = AppEnvironment.shared.liveShift
-        guard let feedback = liveShift.recordDelivery() else {
-            return .result(dialog: "Süren vardiya yok. Önce vardiyayı başlat.")
+        guard let count = liveShift.addPackageFromOutside() else {
+            return .result(dialog: "Önce uygulamada firmanı seç.")
         }
-        return .result(dialog: "\(feedback.count). paket eklendi.")
+        return .result(dialog: "\(count). paket eklendi.")
     }
 }
 

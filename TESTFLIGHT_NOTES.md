@@ -3,6 +3,24 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.12.0
+
+Yeni:
+- Çökme düzeltmesi: uygulama uzun süre arka planda kalıp açılınca kapanmasına yol açabilecek durumlar giderildi (telefon yeniden başladıktan sonra kilit açılmadan arka planda çalışma, bozuk süre/yüzde değerleri, boş listeler, üst üste senkron).
+- Çalışma hızın: kurulumda hedef ekranında "Saatte kaç paket atıyorsun?" (varsayılan 2,5). Profil > Çalışma hızın'dan istediğin zaman değiştir; kayıtlarından ölçülen hızı tek dokunuşla kullan.
+- Çalıştığın bölge: Profil > Çalıştığın bölge'den elle seç ya da "Konumumdan bul" (elle hesap yapanlar için).
+- Otomatik vardiya artık kurulumda konum izninden sonra doğrudan soruluyor.
+- Bildirim izni kurulumda soruluyor. Hedef kayıtlıysa gün içinde (12:00, 16:00, 19:00) "Bugünkü hedefe 20 paket var · 1.250 TL daha kazanalım", geç kalıyorsan "saatte 6 paket atman lazım"; haftalık/aylık hedefte ertesi sabah tempon. Profil > Bildirimler'den kapatılabilir.
+- Kilit ekranından paket sayma: vardiya sürerken Canlı Etkinlikte "Paket bıraktım" (+1), "Geri al" ve "Bitir". Dynamic Island'da paket sayısı.
+- Otomatik vardiya başlayınca paket sayma da başlar; 20 dk durunca vardiya kendiliğinden hesaplanıp kaydedilir.
+- Widget: ana ekran ve kilit ekranı için "Paket say" (+1 paket, vardiya yoksa başlatır; orta boyda "Vardiya" ekranı). iOS 18'de Denetim Merkezi / kilit ekranı kontrolü "Paket bıraktım".
+
+Lütfen test et:
+- Uygulamayı uzun süre arka planda bırakıp aç (özellikle otomatik vardiya açıkken).
+- Silip kur: hedef ekranında hızı değiştir, konum adımında otomatik vardiya sorusu ve bildirim izni.
+- Vardiya başlat → telefonu kilitle → kilit ekranında "Paket bıraktım"a birkaç kez bas, Geri al, Bitir.
+- Ana ekrana "Kurye Kazanç" widget'ı ekle, +1 pakete bas.
+
 ## 1.9.0
 
 Yeni:

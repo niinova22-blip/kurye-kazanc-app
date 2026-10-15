@@ -52,6 +52,10 @@ struct KuryeKazancApp: App {
     /// Once sablonlar ve planlama kurallari, sonra kuyruk. Ust uste cagrilar koordinatorde tek calismaya iner.
     @MainActor
     private func syncNow() async {
+        // On plana her donuste cagrilir: ust uste binen calismalar (yavas ag) ayni durumu iki kez degistirmesin
+        guard !SyncGate.isRunning else { return }
+        SyncGate.isRunning = true
+        defer { SyncGate.isRunning = false }
         let sync: SyncCoordinator = environment.sync
         await sync.refreshTemplatesIfNeeded()
         await sync.refreshRulesIfNeeded()
@@ -75,6 +79,11 @@ extension KuryeKazancApp {
                                                                              fallbackCostPerKm: costPerKm) else { return }
         await TariffSwitchNotifier.notify(suggestion)
     }
+}
+
+@MainActor
+private enum SyncGate {
+    static var isRunning = false
 }
 
 /// Test/CI icin baslatma argumanlari. XCUITest `app.launchArguments` ile bunlari gecer.

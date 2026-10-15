@@ -215,7 +215,8 @@ enum GoalAlternatives {
     /// tutar o kademenin netine cikar (10 TL'ye asagi yuvarlanir). Aksam: paketlerin yarisi aksam / gece bandinda planlanir.
     static func applied(_ alternative: GoalAlternative, to goal: GoalSpec) -> GoalSpec {
         let neededHours: Decimal = GoalPlanner.roundUpToHalf(alternative.hoursPerDay)
-        let wholeHours: Int = Int(NSDecimalNumber(decimal: neededHours).doubleValue.rounded(.up))
+        let rawHours: Double = NSDecimalNumber(decimal: neededHours).doubleValue
+        let wholeHours: Int = rawHours.isFinite ? Int(min(max(rawHours, 0), 24).rounded(.up)) : GoalSpec.maxDailyHours
         let hours: Decimal = min(Decimal(GoalSpec.maxDailyHours), max(goal.maxHoursPerDay, Decimal(wholeHours)))
         let days: Int = min(7, max(1, alternative.daysPerWeek))
         let weekdays: [Int]?

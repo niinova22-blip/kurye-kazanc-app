@@ -112,7 +112,7 @@ struct GoalResultCard: View {
 
     private var periodPackagesText: String {
         let pace: String = Formatters.decimalText(plan.pace.packagesPerHour)
-        let source: String = plan.pace.isAssumed ? "tahmini hız" : "senin hızın"
+        let source: String = plan.pace.isUserProvided ? "girdiğin hız" : (plan.pace.isAssumed ? "tahmini hız" : "kayıtlarındaki hızın")
         switch plan.goal.period {
         case .day:
             return "Saatte \(pace) paket (\(source)) ile hesaplandı."
