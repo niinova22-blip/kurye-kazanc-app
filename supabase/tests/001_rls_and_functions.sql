@@ -144,6 +144,8 @@ begin
     return next is((select count(*)::int from public.shifts where user_id = a), 0, 'A vardiyalari silindi');
     return next is((select count(*)::int from public.backups where user_id = a), 0, 'A yedegi silindi');
     return next is((select count(*)::int from public.shifts where user_id = b), 1, 'B dokunulmadi');
+    return next is((select count(*)::int from auth.users where id = a), 0, 'A hesabi silindi');
+    return next is((select count(*)::int from auth.users where id = b), 1, 'B hesabi duruyor');
 end;
 $$;
 

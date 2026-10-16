@@ -24,7 +24,7 @@ extension AccountError: LocalizedError {
         case .busy:
             return "Yedekleme veya silme sürüyor, biraz sonra tekrar dene."
         case .deletePending:
-            return "Verilerimi sil tamamlanmadı; önce onu tekrar dene."
+            return "Hesap silme tamamlanmadı; önce onu tekrar dene."
         }
     }
 }

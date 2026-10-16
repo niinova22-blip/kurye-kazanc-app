@@ -43,6 +43,8 @@ struct LiveShift: Codable, Equatable, Identifiable {
     var startPoint: GeoPoint?
     var province: String?
     var district: String?
+    /// 1.12.3: semt (Levent, Maslak...); Paket Taxi 1. bolge semtle belirlenir.
+    var neighborhood: String?
     var deliveries: [ShiftDelivery] = []
 
     var packageCount: Int { deliveries.count }

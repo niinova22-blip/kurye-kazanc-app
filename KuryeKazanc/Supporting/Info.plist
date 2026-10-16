@@ -7,9 +7,9 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Kazanç kayıtlarına çalıştığın ilçe/semt bilgisini otomatik eklemek için konumunu kullanıyoruz.</string>
+	<string>Vardiya sırasında gittiğin km'yi, çalıştığın tarife bölgesini ve teslimat mesafesini ölçmek için konumunu kullanıyoruz. Tam konumun saklanmaz.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Vardiya sırasında mesafeni ölçmek ve otomatik vardiya açıksa yola çıktığını anlayıp vardiyanı kendiliğinden başlatmak için konumunu kullanıyoruz. Konumun cihazından çıkmaz.</string>
+	<string>Uygulama arka plandayken de vardiyanın km'sini ve bölgesini güncel tutmak, otomatik vardiya açıksa yola çıktığını anlayıp vardiyanı kendiliğinden başlatmak için konumunu kullanıyoruz. Tam konumun saklanmaz.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

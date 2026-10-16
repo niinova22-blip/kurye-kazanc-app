@@ -619,6 +619,12 @@ struct TodayView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Vardiya sürüyor · \(liveShift.packageCount) paket")
                                 .font(.headline)
+                            if let region = liveShift.regionLine {
+                                Label(region, systemImage: "mappin.and.ellipse")
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                    .accessibilityIdentifier("today.liveShift.region")
+                            }
                             Text("Paket bırakınca dokunmak için aç")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)

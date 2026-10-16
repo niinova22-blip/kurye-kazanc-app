@@ -20,7 +20,6 @@ struct KuryeKazancApp: App {
                 .tint(Theme.accent)
                 .environment(environment.location)
                 .environment(environment.workSession)
-                .environment(environment.scanner)
                 .environment(environment.autoShift)
                 .environment(environment.sync)
                 .environment(environment.account)

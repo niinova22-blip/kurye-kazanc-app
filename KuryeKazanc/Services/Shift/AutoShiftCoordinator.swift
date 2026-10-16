@@ -54,6 +54,8 @@ final class AutoShiftCoordinator {
     @ObservationIgnored var onAutoShiftStarted: (() -> Void)?
     /// Otomatik vardiya duraganliktan bitti. true donerse canli vardiya kaydedildi: bekleyen vardiya olusturulmaz.
     @ObservationIgnored var onAutoShiftFinished: ((WorkSessionSummary) -> Bool)?
+    /// 1.12.3: her konum olayi (vardiya surerken bolge yeniden cozulur: 1. bolgeden 2. bolgeye gecis).
+    @ObservationIgnored var onShiftLocation: (() -> Void)?
     /// "Bu bir vardiya değil": otomatik baslayan canli vardiya da kayitsiz kapanir.
     @ObservationIgnored var onAutoShiftCancelled: (() -> Void)?
     /// 1.12.1: kilit ekraninda "Bitir"e basildi, onay bekleniyor.
@@ -367,6 +369,7 @@ final class AutoShiftCoordinator {
     private func installLocationHandlers() {
         location.onLocationEvent = { [weak self] in
             guard let self else { return }
+            self.onShiftLocation?()
             Task { await self.handleWake() }
         }
         location.onAuthorizationChange = { [weak self] status in

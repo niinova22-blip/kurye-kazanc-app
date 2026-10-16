@@ -33,6 +33,10 @@ final class LiveShiftController {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let calendar: Calendar
     @ObservationIgnored private let clock: () -> Date
+    @ObservationIgnored private let regionPolicy = RegionRefreshPolicy()
+    @ObservationIgnored private var lastResolvedPoint: GeoPoint?
+    @ObservationIgnored private var lastResolvedAt: Date?
+    @ObservationIgnored private var isResolvingRegion = false
     /// Otomatik bitiste kayit icin (uygulama arka planda olabilir, gorunum yok).
     @ObservationIgnored var contextProvider: (() -> ModelContext?)?
 
@@ -137,17 +141,54 @@ final class LiveShiftController {
             shift?.startPoint = GeoPoint(here)
             persist()
         }
-        guard let place = await location.region(for: here) else { return }
+        await resolveRegion(at: here)
+    }
+
+    /// 1.12.3: vardiya surerken her konum olayi. Kurye bolge degistirdiyse (1. bolgeden 2. bolgeye) yer ve tarife bolgesi
+    /// yeniden cozulur; vardiya ekrani, widget ve kilit ekrani hemen guncellenir. Geocoder'a sik sorulmaz (RegionRefreshPolicy).
+    func locationUpdated() {
+        guard shift != nil, !isResolvingRegion, let here = location.lastLocation,
+              here.horizontalAccuracy >= 0, here.horizontalAccuracy <= 100,
+              clock().timeIntervalSince(here.timestamp) < 300,
+              regionPolicy.shouldResolve(lastPoint: lastResolvedPoint, lastAt: lastResolvedAt, point: GeoPoint(here), now: clock(),
+                                      hasPlace: shift?.province != nil)
+        else { return }
+        Task { await resolveRegion(at: here) }
+    }
+
+    private func resolveRegion(at here: CLLocation) async {
+        guard shift != nil, !isResolvingRegion else { return }
+        isResolvingRegion = true
+        defer { isResolvingRegion = false }
+        lastResolvedPoint = GeoPoint(here)
+        lastResolvedAt = clock()
+        guard let place = await location.region(for: here), shift != nil else { return }
+        let previousTier: String? = payroll.state.regionTier
+        let placeChanged: Bool = shift?.province != place.province || shift?.district != place.district
+            || shift?.neighborhood != place.neighborhood
         shift?.province = place.province
         shift?.district = place.district
+        shift?.neighborhood = place.neighborhood
+        if let profile = payroll.tariffProfile,
+           let suggestion = RegionResolver.suggest(province: place.province, district: place.district,
+                                                   neighborhood: place.neighborhood, profile: profile) {
+            payroll.applyRegion(suggestion)
+            if suggestion.changed, let message = suggestion.message {
+                regionMessage = previousTier == nil ? message : "Bölge değişti · \(message)"
+            }
+            // Daha once secilmis bolge varsa (or. Istanbul'da semt okunamadi) tekrar sorulmaz
+            needsRegionChoice = suggestion.needsRegionChoice
+        }
+        guard placeChanged || payroll.state.regionTier != previousTier else { return }
         persist()
         autoShift.liveShiftChanged()
-        guard let profile = payroll.tariffProfile,
-              let suggestion = RegionResolver.suggest(province: place.province, district: place.district,
-                                                      neighborhood: place.neighborhood, profile: profile) else { return }
-        payroll.applyRegion(suggestion)
-        regionMessage = suggestion.message
-        needsRegionChoice = suggestion.needsRegionChoice
+    }
+
+    /// Vardiya ekraninda surekli gorunen yer ve bolge: "Bağcılar · 2.–3. bölge".
+    var regionLine: String? {
+        guard let shift else { return nil }
+        let text: String = WidgetPublisher.regionText(place: shift.district ?? shift.province, tier: payroll.state.regionTier)
+        return text.isEmpty ? nil : text
     }
 
     func chooseRegion(_ tier: String) {
@@ -178,6 +219,7 @@ final class LiveShiftController {
         let feedback = ShiftTapFeedback(id: delivery.id, zone: zone, count: current.packageCount)
         lastFeedback = feedback
         autoShift.liveShiftChanged()
+        locationUpdated()
         return feedback
     }
 
@@ -264,6 +306,8 @@ final class LiveShiftController {
 
     private func clear() {
         shift = nil
+        lastResolvedPoint = nil
+        lastResolvedAt = nil
         lastFeedback = nil
         regionMessage = nil
         needsRegionChoice = false

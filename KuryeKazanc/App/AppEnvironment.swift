@@ -11,7 +11,6 @@ final class AppEnvironment {
     let container: ModelContainer
     let location: LocationService
     let workSession: WorkSessionManager
-    let scanner: ScreenshotScanner
     let autoShift: AutoShiftCoordinator
     let sync: SyncCoordinator
     let account: AccountService
@@ -60,12 +59,6 @@ final class AppEnvironment {
                                vehicleType: nil, flags: [], contractHours: firm == "pt_restoran" ? 10 : nil)
             if launch.loadsSampleData { payroll.setGoal(GoalSpec(amount: Money(100_000), period: .month)) }
         }
-        let templates: @MainActor () -> [OCRTemplate] = { sync.mergedTemplates() }
-        if let testDefaults {
-            scanner = ScreenshotScanner(defaults: testDefaults, templates: templates)
-        } else {
-            scanner = ScreenshotScanner(library: PhotoKitScreenshotLibrary(), templates: templates)
-        }
         let todaySummary = AppEnvironment.cachedTodaySummary(in: container.mainContext)
         autoShift = AutoShiftCoordinator(
             workSession: workSession,
@@ -87,6 +80,7 @@ final class AppEnvironment {
         live.contextProvider = { container.mainContext }
         shiftCoordinator.liveShiftSnapshot = { [weak live] in live?.activitySnapshot() }
         shiftCoordinator.onAutoShiftStarted = { [weak live] in live?.startFromAutoShift() }
+        shiftCoordinator.onShiftLocation = { [weak live] in live?.locationUpdated() }
         shiftCoordinator.onAutoShiftFinished = { [weak live] summary in live?.handleAutoShiftFinished(summary) ?? false }
         shiftCoordinator.onAutoShiftCancelled = { [weak live] in live?.dropAfterAutoCancel() }
         ShiftIntentBridge.endShift = { [weak live, weak shiftCoordinator] in
