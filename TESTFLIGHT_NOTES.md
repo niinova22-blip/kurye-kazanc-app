@@ -3,6 +3,20 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.12.3
+
+Düzeltme:
+- Vardiya sırasında bölge artık senkron: 1. bölgede başlayıp 2.–3. bölgeye geçince (500 m+ yer değişiminde, en geç dakikada bir) ilçe ve tarife bölgesi yeniden okunur. Vardiya ekranı, Bugün'deki "Vardiya sürüyor" kartı, widget ve kilit ekranı (Canlı Etkinlik) hemen güncellenir; bölge değişince vardiya ekranında "Bölge değişti · …" yazar.
+- İnternet yokken bölge okunamazsa dakikada bir yeniden denenir.
+
+Test et:
+- Vardiya başlat → bir ilçeden diğerine geç (ör. Beşiktaş → Bağcılar) → vardiya ekranında, Bugün kartında ve kilit ekranında ilçe + bölge değişiyor mu?
+- Uygulama kapalıyken (kilit ekranı) bölge geçişi → kilit ekranındaki satır güncelleniyor mu?
+
+Diğer:
+- Tanıtımın 2. sayfası artık canlı vardiyayı (tek dokunuşla paket, kilit ekranı +1) anlatıyor.
+- Konum ve fotoğraf izin metinleri ile gizlilik bildirimi (yedekte giden veriler) App Store için güncellendi.
+
 ## 1.12.2
 
 Hesap mantığı (tarifeler aynı, yalnızca toplamlar doğru tutuluyor):

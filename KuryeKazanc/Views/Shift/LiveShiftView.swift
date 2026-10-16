@@ -134,9 +134,21 @@ struct LiveShiftView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding(.top, 10)
-        } else if let message = controller.regionMessage {
-            Label(message, systemImage: "mappin.and.ellipse")
+        } else if controller.regionLine != nil || controller.regionMessage != nil {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let line = controller.regionLine {
+                        Text(line).font(.footnote.weight(.semibold))
+                    }
+                    if let message = controller.regionMessage {
+                        Text(message).font(.caption).opacity(0.85)
+                    }
+                }
+            } icon: {
+                Image(systemName: "mappin.and.ellipse")
+            }
                 .font(.footnote.weight(.semibold))
+                .animation(.easeInOut, value: controller.regionLine)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 14, style: .continuous))

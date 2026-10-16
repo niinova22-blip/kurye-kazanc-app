@@ -45,7 +45,7 @@ struct FuelSettingsView: View {
         } header: {
             Text("Güncel fiyat")
         } footer: {
-            Text("Pompadaki fiyatı gir. Fiyat 7 günden eskiyse Bugün ekranında hatırlatılır. İleride fiyatlar otomatik güncellenecek.")
+            Text("Pompadaki fiyatı gir. Fiyat 7 günden eskiyse Bugün ekranında hatırlatılır.")
         }
     }
 

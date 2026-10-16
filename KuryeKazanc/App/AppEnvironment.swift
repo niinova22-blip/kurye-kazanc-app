@@ -87,6 +87,7 @@ final class AppEnvironment {
         live.contextProvider = { container.mainContext }
         shiftCoordinator.liveShiftSnapshot = { [weak live] in live?.activitySnapshot() }
         shiftCoordinator.onAutoShiftStarted = { [weak live] in live?.startFromAutoShift() }
+        shiftCoordinator.onShiftLocation = { [weak live] in live?.locationUpdated() }
         shiftCoordinator.onAutoShiftFinished = { [weak live] summary in live?.handleAutoShiftFinished(summary) ?? false }
         shiftCoordinator.onAutoShiftCancelled = { [weak live] in live?.dropAfterAutoCancel() }
         ShiftIntentBridge.endShift = { [weak live, weak shiftCoordinator] in

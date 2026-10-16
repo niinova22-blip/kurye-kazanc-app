@@ -13,8 +13,8 @@ enum IntroContent {
         return [
             IntroPage(id: 0, title: "Ne kazandığını, ne kaldığını bil",
                       text: "Günlük, haftalık ve aylık net kazancın tek ekranda. Yakıt düşülmüş, gerçek rakam."),
-            IntroPage(id: 1, title: "Kazancını saniyeler içinde ekle",
-                      text: "Kazanç ekranının görüntüsünü ekle ya da elle yaz; rakamlar okunur, sen onaylarsın."),
+            IntroPage(id: 1, title: "Paketini tek dokunuşla say",
+                      text: "Vardiyayı başlat, paketi bırakınca ekrana ya da kilit ekranındaki +1'e dokun. Km, bölge ve ücret kendiliğinden hesaplanır."),
             IntroPage(id: 2, title: tariffTitle,
                       text: "Sabit ücret, paket ücreti, km ve bonuslar firmanın yayımladığı güncel tarifeden hesaplanır."),
             IntroPage(id: 3, title: "Hedefini koy, yolunu gör",
@@ -39,7 +39,7 @@ struct IntroIllustration: View {
         Group {
             switch page {
             case 0: NetIllustration(isActive: animates)
-            case 1: ScanIllustration(isActive: animates)
+            case 1: ShiftIllustration(isActive: animates)
             case 2: TariffIllustration(isActive: animates)
             case 3: GoalIllustration(isActive: animates)
             case 4: PathsIllustration(isActive: animates)
@@ -136,61 +136,59 @@ private struct Sparkline: Shape {
     }
 }
 
-// MARK: - 1: Ekran goruntusu tarama
+// MARK: - 1: Canli vardiya (paket sayma)
 
-private struct ScanIllustration: View {
+private struct ShiftIllustration: View {
     let isActive: Bool
-    @State private var sweep = false
-    @State private var read = 3
+    @State private var count = 0
+    @State private var pulse = false
 
-    private let rows: [(String, String)] = [("Paket", "34"), ("Kazanç", "₺2.910"), ("Km", "96,4"), ("Süre", "8 sa 10 dk")]
+    private let rows: [(String, String)] = [("Bölge", "Kadıköy · 1. bölge"), ("Km", "42,6"), ("Brüt", "₺2.910")]
 
     var body: some View {
         HStack(spacing: 18) {
             ZStack {
-                RoundedRectangle(cornerRadius: 30, style: .continuous)
-                    .fill(.white.opacity(0.12))
-                    .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(.white.opacity(0.5), lineWidth: 3))
-                    .frame(width: 130, height: 240)
-                VStack(spacing: 14) {
-                    ForEach(0..<5, id: \.self) { index in
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(.white.opacity(0.35))
-                            .frame(width: index.isMultiple(of: 2) ? 90 : 64, height: 10)
-                    }
+                Circle()
+                    .strokeBorder(.white.opacity(0.45), lineWidth: 2)
+                    .frame(width: 150, height: 150)
+                    .scaleEffect(pulse ? 1.12 : 0.95)
+                    .opacity(pulse ? 0.2 : 0.9)
+                Circle()
+                    .fill(.white)
+                    .frame(width: 110, height: 110)
+                VStack(spacing: 2) {
+                    Image(systemName: "hand.tap.fill").font(.title2)
+                    Text("\(count)").font(.title.weight(.heavy)).monospacedDigit()
+                        .contentTransition(.numericText())
+                    Text("paket").font(.caption2.weight(.semibold))
                 }
-                Rectangle()
-                    .fill(LinearGradient(colors: [.clear, Theme.positive, .clear], startPoint: .leading, endPoint: .trailing))
-                    .frame(width: 120, height: 4)
-                    .shadow(color: Theme.positive, radius: 8)
-                    .offset(y: sweep ? 100 : -100)
+                .foregroundStyle(Theme.accent)
             }
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.positive)
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(row.0).font(.caption2).opacity(0.75)
-                            Text(row.1).font(.subheadline.weight(.bold)).monospacedDigit()
-                        }
+                Label("+1 paket", systemImage: "lock.fill")
+                    .font(.caption.weight(.bold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.white.opacity(0.2), in: Capsule())
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(row.0).font(.caption2).opacity(0.75)
+                        Text(row.1).font(.subheadline.weight(.bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
                     }
-                    .opacity(index < read ? 1 : 0.15)
-                    .scaleEffect(index < read ? 1 : 0.9, anchor: .leading)
                 }
             }
             .foregroundStyle(.white)
-            .frame(width: 120, alignment: .leading)
+            .frame(width: 130, alignment: .leading)
         }
         .onChange(of: isActive, initial: true) { _, active in
-            if active {
-                read = 0
-                sweep = false
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { sweep = true }
-                for index in 1...rows.count {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.35 * Double(index))) { read = index }
-                }
-            } else {
-                sweep = false
+            guard active else {
+                pulse = false
+                return
+            }
+            count = 31
+            withAnimation(.easeOut(duration: 1.1).repeatForever(autoreverses: false)) { pulse = true }
+            for step in 1...3 {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.6).delay(0.9 * Double(step))) { count = 31 + step }
             }
         }
     }

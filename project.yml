@@ -14,7 +14,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.12.2"
+    MARKETING_VERSION: "1.12.3"
     CURRENT_PROJECT_VERSION: "1"
     VERSIONING_SYSTEM: apple-generic   # CI'da agvtool ile build numarasi arttirilir
     # DEVELOPMENT_TEAM bilerek yok: Codemagic `xcode-project use-profiles` ile imzalama ayarlarini enjekte eder.
@@ -45,7 +45,7 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.finance
-        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Platformunun kazanç ekranının yeni ekran görüntülerini bulup kayda dönüştürmek için. Görüntüler cihazında işlenir, hiçbir yere gönderilmez."
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Seçtiğin kazanç ekran görüntüsünün çekim tarihini okuyup kaydı doğru güne yazmak için. Görüntüler cihazında işlenir, hiçbir yere gönderilmez."
         INFOPLIST_KEY_NSSupportsLiveActivities: YES
         INFOPLIST_KEY_NSMotionUsageDescription: "Motorla ya da bisikletle yola çıktığını anlayıp vardiyanı kendiliğinden başlatmak için hareket bilgini kullanıyoruz. Bu bilgi cihazından çıkmaz."
         TARGETED_DEVICE_FAMILY: "1"
