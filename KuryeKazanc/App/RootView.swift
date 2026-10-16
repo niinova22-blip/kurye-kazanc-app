@@ -60,6 +60,11 @@ extension RootView {
     /// 1.8: anonim kazanc / konum paylasimi (topluluk ortalamalari icindi) kaldirildi. Acik birakanlarin rizasi bir kez
     /// geri alinir ve bekleyen gonderimler silinir; uygulama artik kurye ortalamasi kullanmiyor.
     func retireAnonymousSharing(defaults: UserDefaults) {
+        // 1.13: kalibrasyon ekrani 1.10'da kalkti; acik kalan riza da kapatilir (bekleyen ornekler gonderilmez)
+        if defaults.bool(forKey: AppPreferences.calibrationOptInKey) {
+            defaults.set(false, forKey: AppPreferences.calibrationOptInKey)
+            sync.calibrationConsentChanged(enabled: false)
+        }
         guard defaults.bool(forKey: AppPreferences.dataSharingOptInKey)
             || defaults.bool(forKey: AppPreferences.locationSharingOptInKey) else { return }
         defaults.set(false, forKey: AppPreferences.dataSharingOptInKey)

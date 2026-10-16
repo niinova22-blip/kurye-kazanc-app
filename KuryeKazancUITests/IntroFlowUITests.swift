@@ -25,7 +25,7 @@ final class IntroFlowUITests: XCTestCase {
         app.buttons["welcome.next"].tap()
 
         XCTAssertTrue(app.staticTexts["intro.page.0"].waitForExistence(timeout: 10))
-        for _ in 0..<5 { app.buttons["intro.next"].tap() }
+        for _ in 0..<3 { app.buttons["intro.next"].tap() }
         XCTAssertTrue(app.buttons["intro.start"].waitForExistence(timeout: 5))
         app.buttons["intro.start"].tap()
 

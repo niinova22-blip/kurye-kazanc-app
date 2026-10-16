@@ -1,8 +1,13 @@
 import SwiftUI
+import SwiftData
 
-/// Arac ve yakit: guncel fiyat girisi, tuketim, fiyat gecmisi. Fiyat simdilik elle girilir.
+/// Arac ve yakit: arac, guncel fiyat girisi, tuketim, fiyat gecmisi. Fiyat simdilik elle girilir.
+/// 1.13: arac tek yerde (eskiden Profil'de ayri bir "Araç" vardi ve tarifedeki aracla ayrisabiliyordu).
 struct FuelSettingsView: View {
     @Environment(PayrollModel.self) private var payroll
+    @Environment(\.modelContext) private var modelContext
+    @Query private var couriers: [Courier]
+    @State private var vehicle: String = "motorcycle"
     @State private var price: Decimal?
     @State private var type: FuelType = .gasoline
     @State private var date = Date()
@@ -12,6 +17,7 @@ struct FuelSettingsView: View {
 
     var body: some View {
         List {
+            vehicleSection
             priceSection
             Section("Tüketim") {
                 DecimalStepper(title: "Ortalama", value: $consumption, range: 1...20, step: Decimal(string: "0.5")!,
@@ -27,6 +33,41 @@ struct FuelSettingsView: View {
         .dismissesKeyboard()
         .saveConfirmation(isPresented: $saved)
         .onAppear(perform: load)
+    }
+
+    /// Firmanin tarifesi araca gore degisiyorsa onun secenekleri, yoksa motosiklet / otomobil (yakit tuketimi icin).
+    private var vehicleOptions: [String] {
+        let fromTariff: [String] = payroll.questions(for: payroll.tariffProfile?.platformCode ?? "").vehicleTypes
+        return fromTariff.isEmpty ? ["motorcycle", "car"] : fromTariff
+    }
+
+    private var vehicleSection: some View {
+        Section {
+            Picker("Araç", selection: $vehicle) {
+                ForEach(vehicleOptions, id: \.self) { Text(TariffQuestions.vehicleName($0)).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("fuelSettings.vehicle")
+            .onChange(of: vehicle) { _, value in
+                guard loaded, value != payroll.state.vehicleType else { return }
+                saveVehicle(value)
+            }
+        } header: {
+            Text("Araç")
+        } footer: {
+            Text("Araç değişince ortalama tüketim o aracın varsayılanına döner; aşağıdan değiştirebilirsin.")
+        }
+    }
+
+    private func saveVehicle(_ value: String) {
+        payroll.setPreferences(regionTier: payroll.state.regionTier, seniorityYears: payroll.state.seniorityYears,
+                               vehicleType: value)
+        if let courier = couriers.first, let type = VehicleType(rawValue: value) {
+            courier.vehicleType = type
+            try? modelContext.save()
+        }
+        consumption = FuelCostModel.defaultConsumption(vehicleType: value)
+        payroll.setConsumption(consumption)
     }
 
     private var priceSection: some View {
@@ -66,6 +107,8 @@ struct FuelSettingsView: View {
 
     private func load() {
         guard !loaded else { return }
+        vehicle = payroll.state.vehicleType ?? couriers.first?.vehicleType.rawValue ?? "motorcycle"
+        if !vehicleOptions.contains(vehicle) { vehicle = vehicleOptions.first ?? "motorcycle" }
         consumption = payroll.fuelModel(fallbackCostPerKm: 0).consumption
         type = payroll.state.fuel.entries.last?.type ?? .gasoline
         loaded = true

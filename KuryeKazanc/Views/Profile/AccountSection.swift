@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Profil > Hesap ve yedek: Apple ile Giris, yedekle / geri yukle, cikis, "Verilerimi sil".
+/// Profil > Hesap ve yedek: Apple ile Giris, yedekle / geri yukle, cikis, "Hesabımı ve verilerimi sil" (1.13: hesap da silinir, App Store 5.1.1v).
 struct AccountSection: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AccountService.self) private var account
@@ -97,15 +97,15 @@ struct AccountSection: View {
     /// Liste icinde Section'a eklenen degistiriciler her satira uygulanabilir: sonuc uyarisi
     /// her zaman var olan bu satirda durur (giris/cikista satir kimligi degismez).
     private var deleteRow: some View {
-        Button("Verilerimi sil", role: .destructive) { showDeleteConfirmation = true }
+        Button("Hesabımı ve verilerimi sil", role: .destructive) { showDeleteConfirmation = true }
             .disabled(account.isBusy)
             .accessibilityIdentifier("profile.deleteMyData")
             .confirmationDialog(
-                "Bu cihazdan gönderdiğin tüm veriler sunucudan silinir: anonim kimlikle ve Apple hesabınla gönderilmiş vardiyaların, kalibrasyon örneklerin ve yedeğin. Paylaşım kapanır. Telefondaki kayıtların silinmez.",
+                "Hesabın ve sunucudaki tüm verilerin kalıcı olarak silinir: yedeğin, gönderilmiş vardiyaların ve bu cihazın kullandığı tüm kimlikler (Apple hesabına bağlı hesap dahil). Geri alınamaz. Telefondaki kayıtların silinmez; uygulamayı misafir olarak kullanmaya devam edebilirsin.",
                 isPresented: $showDeleteConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Verilerimi sil", role: .destructive, action: deleteMyData)
+                Button("Hesabımı sil", role: .destructive, action: deleteMyData)
                 Button("Vazgeç", role: .cancel) {}
             }
             .alert(alertTitle, isPresented: Binding(
@@ -165,7 +165,7 @@ struct AccountSection: View {
         Task {
             do {
                 try await service.deleteMyData(context: context)
-                showResult("Sunucudaki verilerin silindi.")
+                showResult("Hesabın ve sunucudaki verilerin silindi.")
             } catch {
                 showError(error)
             }

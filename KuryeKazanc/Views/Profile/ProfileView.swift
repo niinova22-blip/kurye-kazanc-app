@@ -2,7 +2,8 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 
-/// Profil sekmesi: hesap (Apple ile giris), ayarlar (firma, yakit, hedef, bildirimler), profil, konum, otomatik vardiya, veri.
+/// Profil sekmesi: hesap (Apple ile giris), ayarlar (firma, arac ve yakit, hedef, bildirimler), konum, otomatik vardiya, veri.
+/// 1.13: kullanilmayan "Ad" ve ikinci "Araç" secimi kaldirildi (arac: Araç ve yakıt).
 /// 1.10: ekran goruntusu taramasi, kalibrasyon ve eski "Platformlarım" kaldirildi; gider tahmini Gelismis'e tasindi.
 struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
@@ -13,20 +14,15 @@ struct ProfileView: View {
     @Environment(PayrollModel.self) private var payroll
     @Environment(\.showIntro) private var showIntro
 
-    @Query private var couriers: [Courier]
-
     @State private var showsFirmSetup = false
     @State private var showsShiftTutorial = false
     @State private var showDeleteConfirmation = false
-
-    private var courier: Courier? { couriers.first }
 
     var body: some View {
         NavigationStack {
             Form {
                 AccountSection()
                 settingsSection
-                profileSection
                 locationSection
                 AutoShiftSection()
                 dataSection
@@ -44,27 +40,6 @@ struct ProfileView: View {
             ) {
                 Button("Tüm kayıtları sil", role: .destructive, action: deleteAllRecords)
                 Button("Vazgeç", role: .cancel) {}
-            }
-        }
-    }
-
-    // MARK: - Profil
-
-    private var profileSection: some View {
-        Section("Profil") {
-            if let courier {
-                TextField("Ad", text: Binding(
-                    get: { courier.name },
-                    set: { courier.name = $0; try? modelContext.save() }
-                ))
-                Picker("Araç", selection: Binding(
-                    get: { courier.vehicleType },
-                    set: { courier.vehicleType = $0; try? modelContext.save() }
-                )) {
-                    ForEach(VehicleType.allCases) { Text($0.displayName).tag($0) }
-                }
-            } else {
-                Text("Profil bulunamadı").foregroundStyle(.secondary)
             }
         }
     }
@@ -177,7 +152,7 @@ struct ProfileView: View {
             Button("Tüm kayıtları sil", role: .destructive) { showDeleteConfirmation = true }
                 .accessibilityIdentifier("settings.deleteAll")
         } footer: {
-            Text("Yalnızca telefondaki kayıtları siler. Sunucudaki yedek için Hesap > “Verilerimi sil”.")
+            Text("Yalnızca telefondaki kayıtları siler. Hesabın ve sunucudaki yedeğin için Hesap > “Hesabımı ve verilerimi sil”.")
         }
     }
 

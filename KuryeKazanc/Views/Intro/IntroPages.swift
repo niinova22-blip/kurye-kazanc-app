@@ -10,19 +10,16 @@ enum IntroContent {
     /// Tanitim sayfalari; secilen firmanin adi metne girer.
     static func pages(firmName: String?) -> [IntroPage] {
         let tariffTitle: String = firmName.map { "\($0) tarifesiyle hesap" } ?? "Firmanın tarifesiyle hesap"
+        // 1.13: 6 sayfadan 4'e indi (yakit ve "daha iyi yollar" ilgili sayfalarla birlesti)
         return [
             IntroPage(id: 0, title: "Ne kazandığını, ne kaldığını bil",
-                      text: "Günlük, haftalık ve aylık net kazancın tek ekranda. Yakıt düşülmüş, gerçek rakam."),
+                      text: "Günlük, haftalık ve aylık net kazancın tek ekranda. Yakıt fiyatını girersin, her km netinden düşülür."),
             IntroPage(id: 1, title: "Paketini tek dokunuşla say",
                       text: "Vardiyayı başlat, paketi bırakınca ekrana ya da kilit ekranındaki +1'e dokun. Km, bölge ve ücret kendiliğinden hesaplanır."),
             IntroPage(id: 2, title: tariffTitle,
-                      text: "Sabit ücret, paket ücreti, km ve bonuslar firmanın yayımladığı güncel tarifeden hesaplanır."),
+                      text: "Sabit ücret, paket ücreti, km ve bonuslar firmanın güncel tarifesinden hesaplanır. Tarife değişince haber verir."),
             IntroPage(id: 3, title: "Hedefini koy, yolunu gör",
-                      text: "Örneğin ayda 80.000 TL. Günde kaç paket ve kaç saat çalışman gerektiğini söyler."),
-            IntroPage(id: 4, title: "Daha iyi yolları gösterir",
-                      text: "Bonus eşiği, akşam saatleri ya da farklı gün sayısıyla aynı paraya daha az saatte nasıl ulaşacağını önerir."),
-            IntroPage(id: 5, title: "Yakıt düşülür, tarife izlenir",
-                      text: "Yakıt fiyatını gir; her km netinden düşülür. Tarife değişince haber verir, verilerin telefonunda kalır."),
+                      text: "Örneğin ayda 80.000 TL: günde kaç paket ve kaç saat gerektiğini, aynı paraya daha az saatte ulaşmanın yollarını gösterir."),
         ]
     }
 }
@@ -41,9 +38,7 @@ struct IntroIllustration: View {
             case 0: NetIllustration(isActive: animates)
             case 1: ShiftIllustration(isActive: animates)
             case 2: TariffIllustration(isActive: animates)
-            case 3: GoalIllustration(isActive: animates)
-            case 4: PathsIllustration(isActive: animates)
-            default: FuelIllustration(isActive: animates)
+            default: GoalIllustration(isActive: animates)
             }
         }
         .frame(height: 280)
@@ -283,131 +278,6 @@ private struct GoalIllustration: View {
             for index in 1...3 {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.55).delay(0.25 * Double(index))) { dropped = index }
             }
-        }
-    }
-}
-
-// MARK: - 4: Daha iyi yollar
-
-private struct PathsIllustration: View {
-    let isActive: Bool
-    @State private var progress: CGFloat = 1
-    @State private var showsBadge = true
-
-    var body: some View {
-        ZStack {
-            // Uzun yol (soluk)
-            LongPath()
-                .stroke(.white.opacity(0.3), style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [2, 10]))
-            // Kisa yol (parlak, cizilerek)
-            ShortPath()
-                .trim(from: 0, to: progress)
-                .stroke(Theme.positiveGradient, style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                .shadow(color: Theme.positive.opacity(0.6), radius: 8)
-            marker("figure.outdoor.cycle", at: CGPoint(x: 30, y: 230))
-            marker("flag.checkered", at: CGPoint(x: 270, y: 40))
-            VStack(spacing: 4) {
-                Image(systemName: "gift.fill").font(.title2)
-                Text("−36 saat / ay").font(.caption.weight(.bold))
-            }
-            .foregroundStyle(.white)
-            .padding(10)
-            .background(Theme.highlight.opacity(0.9), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .position(x: 170, y: 150)
-            .scaleEffect(showsBadge ? 1 : 0.2)
-            .opacity(showsBadge ? 1 : 0)
-        }
-        .frame(width: 300, height: 270)
-        .onChange(of: isActive, initial: true) { _, active in
-            guard active else { return }
-            progress = 0
-            showsBadge = false
-            withAnimation(.easeInOut(duration: 1.4)) { progress = 1 }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.55).delay(1.1)) { showsBadge = true }
-        }
-    }
-
-    private func marker(_ symbol: String, at point: CGPoint) -> some View {
-        Image(systemName: symbol)
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(.white)
-            .frame(width: 44, height: 44)
-            .background(.white.opacity(0.2), in: Circle())
-            .overlay(Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1))
-            .position(point)
-    }
-}
-
-private struct LongPath: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: 30, y: 230))
-        path.addCurve(to: CGPoint(x: 270, y: 40), control1: CGPoint(x: 330, y: 260), control2: CGPoint(x: -40, y: 20))
-        return path
-    }
-}
-
-private struct ShortPath: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: 30, y: 230))
-        path.addQuadCurve(to: CGPoint(x: 270, y: 40), control: CGPoint(x: 120, y: 90))
-        return path
-    }
-}
-
-// MARK: - 5: Yakit ve tarife takibi
-
-private struct FuelIllustration: View {
-    let isActive: Bool
-    @State private var angle: Double = 40
-    @State private var showsAlert = true
-
-    var body: some View {
-        VStack(spacing: 18) {
-            ZStack {
-                Circle()
-                    .trim(from: 0.1, to: 0.9)
-                    .stroke(.white.opacity(0.25), style: StrokeStyle(lineWidth: 14, lineCap: .round))
-                    .rotationEffect(.degrees(90))
-                    .frame(width: 170, height: 170)
-                Circle()
-                    .trim(from: 0.1, to: 0.1 + 0.8 * (angle + 120) / 240)
-                    .stroke(Theme.positiveGradient, style: StrokeStyle(lineWidth: 14, lineCap: .round))
-                    .rotationEffect(.degrees(90))
-                    .frame(width: 170, height: 170)
-                Capsule()
-                    .fill(.white)
-                    .frame(width: 6, height: 70)
-                    .offset(y: -35)
-                    .rotationEffect(.degrees(angle))
-                Circle().fill(.white).frame(width: 16, height: 16)
-                Image(systemName: "fuelpump.fill")
-                    .font(.title2)
-                    .foregroundStyle(.white)
-                    .offset(y: 55)
-            }
-            HStack(spacing: 10) {
-                Image(systemName: "bell.badge.fill")
-                    .symbolRenderingMode(.multicolor)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Tarife güncellendi").font(.subheadline.weight(.bold))
-                    Text("Paket ücreti +%8 · yakıt +%11").font(.caption).opacity(0.85)
-                }
-            }
-            .foregroundStyle(.white)
-            .padding(12)
-            .background(.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.3), lineWidth: 1))
-            .offset(y: showsAlert ? 0 : 40)
-            .opacity(showsAlert ? 1 : 0)
-        }
-        .onChange(of: isActive, initial: true) { _, active in
-            guard active else { return }
-            angle = -110
-            showsAlert = false
-            withAnimation(.spring(response: 1.1, dampingFraction: 0.5)) { angle = 40 }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.75).delay(0.8)) { showsAlert = true }
         }
     }
 }

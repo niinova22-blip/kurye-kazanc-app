@@ -14,7 +14,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.12.3"
+    MARKETING_VERSION: "1.13.0"
     CURRENT_PROJECT_VERSION: "1"
     VERSIONING_SYSTEM: apple-generic   # CI'da agvtool ile build numarasi arttirilir
     # DEVELOPMENT_TEAM bilerek yok: Codemagic `xcode-project use-profiles` ile imzalama ayarlarini enjekte eder.
@@ -54,25 +54,7 @@ targets:
         ENABLE_PREVIEWS: YES
         CODE_SIGN_ENTITLEMENTS: KuryeKazanc/Supporting/KuryeKazanc.entitlements
 
-  # Fotograflar > Paylas > Kurye Kazanc. Gorseli App Group gelen kutusuna birakir (bkz. ScreenshotInbox).
-  KuryeShareExtension:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: KuryeShareExtension
-        excludes:
-          - "Info.plist"
-          - "*.entitlements"
-      - path: KuryeKazanc/Services/Screenshots/ScreenshotInbox.swift
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.kuryekazanc.app.share
-        INFOPLIST_FILE: KuryeShareExtension/Info.plist
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: "Kurye Kazanç"
-        CODE_SIGN_ENTITLEMENTS: KuryeShareExtension/KuryeShareExtension.entitlements
-        TARGETED_DEVICE_FAMILY: "1"
-        SKIP_INSTALL: YES
+  # 1.13: paylasim eklentisi (KuryeShareExtension) ve ekran goruntusu taramasi tamamen kaldirildi.
 
   # Vardiya Canli Etkinligi (kilit ekrani + Dynamic Island)
   KuryeLiveActivity:

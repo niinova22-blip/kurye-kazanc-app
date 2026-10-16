@@ -11,7 +11,6 @@ final class AppEnvironment {
     let container: ModelContainer
     let location: LocationService
     let workSession: WorkSessionManager
-    let scanner: ScreenshotScanner
     let autoShift: AutoShiftCoordinator
     let sync: SyncCoordinator
     let account: AccountService
@@ -59,12 +58,6 @@ final class AppEnvironment {
             payroll.chooseFirm(firm, regionTier: firm == "yemeksepeti" ? "ys_istanbul" : "r1", seniorityYears: nil,
                                vehicleType: nil, flags: [], contractHours: firm == "pt_restoran" ? 10 : nil)
             if launch.loadsSampleData { payroll.setGoal(GoalSpec(amount: Money(100_000), period: .month)) }
-        }
-        let templates: @MainActor () -> [OCRTemplate] = { sync.mergedTemplates() }
-        if let testDefaults {
-            scanner = ScreenshotScanner(defaults: testDefaults, templates: templates)
-        } else {
-            scanner = ScreenshotScanner(library: PhotoKitScreenshotLibrary(), templates: templates)
         }
         let todaySummary = AppEnvironment.cachedTodaySummary(in: container.mainContext)
         autoShift = AutoShiftCoordinator(

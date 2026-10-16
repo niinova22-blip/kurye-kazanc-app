@@ -3,6 +3,22 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.13.0
+
+Yayın öncesi son sürüm (1.12.3'teki bölge düzeltmesi dahil).
+
+Yeni / değişen:
+- Profil > Hesap > "Hesabımı ve verilerimi sil": hesabın ve sunucudaki tüm verilerin kalıcı olarak silinir (App Store kuralı).
+- Gizlilik ve KVKK ekranı güncel duruma göre yeniden yazıldı; web sürümü: https://niinova22-blip.github.io/kurye-kazanc/gizlilik.html
+- Araç tek yerde: Profil > Araç ve yakıt (Profil'deki ayrı "Ad" ve "Araç" kaldırıldı).
+- Tanıtım 6 sayfadan 4 sayfaya indi.
+- Kullanılmayan ekran görüntüsü tarama ekranları, kalibrasyon ve paylaşım eklentisi kaldırıldı (kazanç formundaki "Ekran görüntüsünden doldur" duruyor).
+
+Test et:
+- Apple ile giriş → Profil > Hesap > Hesabımı ve verilerimi sil → "Hesabın ve sunucudaki verilerin silindi", çıkış yapılmış, telefondaki kayıtlar duruyor mu?
+- Profil > Araç ve yakıt: araç değişince tüketim değişiyor mu, hesaplar yeni araca göre mi?
+- İlk açılış tanıtımı 4 sayfa.
+
 ## 1.12.3
 
 Düzeltme:
