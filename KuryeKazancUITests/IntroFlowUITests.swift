@@ -1,52 +1,29 @@
 import XCTest
 
-/// 1.8 ilk acilis: firma secimi -> tanitim -> tarife sorulari -> yakit -> hedef.
+/// 1.15 ilk acilis: firma secimi; Paket Taxi Restoran'da tek soru (gunluk saat), gerisi varsayilan.
 final class IntroFlowUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
     }
 
-    func testIntroPagesThenFirmSetup() {
+    func testFirmThenSingleHoursQuestion() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing", "-reset-defaults"]
         app.launch()
-        // 1.11: once hesap secimi; misafir aninda firma secimine gecer
-        XCTAssertTrue(app.buttons["welcome.guest"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["account.title"].exists)
-        app.buttons["welcome.guest"].tap()
         // 1.9: iki firma; Paket Taxi secilince kol sorulur
         XCTAssertTrue(app.buttons["firm.pakettaxi"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["firm.yemeksepeti"].exists)
-        XCTAssertFalse(app.buttons["firm.getir"].exists)
         app.buttons["firm.pakettaxi"].tap()
-        XCTAssertTrue(app.buttons["branch.migros_hemen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["branch.pt_restoran"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["welcome.next"].isEnabled, "Kol secmeden devam edilmemeli")
-        app.buttons["branch.migros_hemen"].tap()
+        app.buttons["branch.pt_restoran"].tap()
         app.buttons["welcome.next"].tap()
 
-        XCTAssertTrue(app.staticTexts["intro.page.0"].waitForExistence(timeout: 10))
-        for _ in 0..<3 { app.buttons["intro.next"].tap() }
-        XCTAssertTrue(app.buttons["intro.start"].waitForExistence(timeout: 5))
-        app.buttons["intro.start"].tap()
-
-        // Firma karsilamada secildi: kurulum dogrudan tarife sorulariyla baslar
-        XCTAssertTrue(app.buttons["question.region.r1"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["question.region.r4"].exists)
-        XCTAssertFalse(app.buttons["setup.next"].isEnabled, "Bolge secmeden devam edilmemeli")
-        app.buttons["question.region.r1"].tap()
-        app.buttons["setup.next"].tap()
-        let price = app.textFields["fuel.price"]
-        XCTAssertTrue(price.waitForExistence(timeout: 5))
-        price.tap()
-        price.typeText("45")
-        app.buttons["setup.next"].tap()
-        let amount = app.textFields["goal.amount"]
-        XCTAssertTrue(amount.waitForExistence(timeout: 5))
-        amount.tap()
-        amount.typeText("100000")
-        app.buttons["setup.finish"].tap()
-
-        XCTAssertTrue(app.buttons["onboarding.next"].waitForExistence(timeout: 10))
+        // Bolge, kidem, yakit, hedef sorulmaz; yalnizca gunluk saat (hazir secili)
+        XCTAssertTrue(app.staticTexts["quickSetup.title"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["question.region.r1"].exists)
+        app.buttons["quickSetup.start"].tap()
+        XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
     }
 
     func testReplayFromHelpBubble() {

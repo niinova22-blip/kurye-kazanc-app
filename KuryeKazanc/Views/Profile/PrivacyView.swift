@@ -47,7 +47,7 @@ struct PrivacyView: View {
         ),
         PrivacySection(
             title: "Satın alımlar",
-            body: "Kurye Kazanç Pro ve 7 günlük ücretsiz deneme App Store üzerinden alınır; ödemeyi Apple işler. Kart ya da ödeme bilgin bize hiç ulaşmaz. Pro'nun açık olup olmadığı telefonunda Apple'ın satın alma kaydından kontrol edilir; satın alma bilgin sunucumuza gönderilmez. Aboneliğini Ayarlar > Apple Hesabı > Abonelikler'den yönetebilir ya da iptal edebilirsin."
+            body: "Kurye Kazanç Pro ve 14 günlük ücretsiz deneme App Store üzerinden alınır; ödemeyi Apple işler. Kart ya da ödeme bilgin bize hiç ulaşmaz. Pro'nun açık olup olmadığı telefonunda Apple'ın satın alma kaydından kontrol edilir; satın alma bilgin sunucumuza gönderilmez. Aboneliğini Ayarlar > Apple Hesabı > Abonelikler'den yönetebilir ya da iptal edebilirsin."
         ),
         PrivacySection(
             title: "Hizmet sağlayıcılar",

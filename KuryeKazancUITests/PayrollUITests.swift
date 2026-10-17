@@ -26,17 +26,18 @@ final class PayrollUITests: XCTestCase {
         }
     }
 
-    /// 1.10: "Elle hesapla" Bugun'de; "Hesabı bitir" gunluk kazanca eklensin mi diye sorar.
+    /// 1.15: "Elle ekle" Bugun'de; yalnizca gunluk, "Kaydet" dogrudan gunun kazancina ekler.
     private func openManualFromToday(_ app: XCUIApplication) {
         let manual = app.buttons["today.manualCalc"]
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
         for _ in 0..<3 where !manual.exists { app.swipeUp() }
         XCTAssertTrue(manual.waitForExistence(timeout: 5))
         manual.tap()
-        XCTAssertTrue(app.segmentedControls["manual.span"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["manual.packages"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.segmentedControls["manual.span"].exists, "Haftalik / aylik secimi kalkti")
     }
 
-    func testManualCalculationAsksBeforeAddingToToday() {
+    func testManualSaveAddsToToday() {
         let app = launch()
         openManualFromToday(app)
         let packages = app.textFields["manual.packages"]
@@ -51,9 +52,6 @@ final class PayrollUITests: XCTestCase {
         let save = app.buttons["manual.save"]
         scrollTo(save, in: app)
         save.tap()
-        let add = app.alerts.buttons["Evet, ekle"].firstMatch
-        XCTAssertTrue(add.waitForExistence(timeout: 5), "Hesap bitince bugune eklensin mi diye sorulmali")
-        add.tap()
 
         // Bugun'e donulur; kayit listede
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 8))
@@ -72,39 +70,22 @@ final class PayrollUITests: XCTestCase {
         XCTAssertTrue(monthGross.label.contains("57.583"), "gelen: \(monthGross.label)")
     }
 
-    func testManualCalculationNotAddedWhenDeclined() {
+    /// 1.15: yakit varsayilan olarak harcanan tutar; km sorulmaz (firma km basina odemiyor, km'den hesap kapali).
+    func testManualFuelSpentIsDeducted() {
         let app = launch()
         openManualFromToday(app)
-        let packages = app.textFields["manual.packages"]
-        XCTAssertTrue(packages.waitForExistence(timeout: 5))
-        packages.tap()
-        packages.typeText("20")
-        XCTAssertTrue(app.staticTexts["manual.net"].waitForExistence(timeout: 5))
-        let save = app.buttons["manual.save"]
-        scrollTo(save, in: app)
-        save.tap()
-        let skip = app.alerts.buttons["Hayır, yalnızca hesapladım"].firstMatch
-        XCTAssertTrue(skip.waitForExistence(timeout: 5))
-        skip.tap()
-        XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 8))
-        XCTAssertFalse(app.buttons["dashboard.earningRow"].exists, "Reddedilen hesap kaydedilmemeli")
-    }
-
-    func testManualWeekShowsDailyAverageAndDetail() {
-        let app = launch()
-        openManualFromToday(app)
-        app.segmentedControls["manual.span"].buttons["Haftalık"].tap()
-        XCTAssertTrue(app.textFields["manual.days"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["manual.km"].exists)
         let packages = app.textFields["manual.packages"]
         packages.tap()
-        packages.typeText("270")
-        XCTAssertTrue(app.staticTexts["manual.net"].waitForExistence(timeout: 5))
-        // Klavye kapanir (kaydirinca), dokum basligina kadar inilir
-        // DisclosureGroup basligi Form'da dugme olarak gorunur: etiketle aranir
-        let detail = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label CONTAINS %@", "Ayrıntılı döküm")).firstMatch
-        scrollTo(detail, in: app)
-        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        packages.typeText("38")
+        let fuel = app.textFields["manual.fuel"]
+        XCTAssertTrue(fuel.waitForExistence(timeout: 5))
+        fuel.tap()
+        fuel.typeText("100")
+        let net = app.staticTexts["manual.net"]
+        XCTAssertTrue(net.waitForExistence(timeout: 5))
+        // 4.483,96 - 100 yakit
+        XCTAssertTrue(net.label.contains("4.383"), "gelen: \(net.label)")
     }
 
     /// 1.10: Kazanc > "Tutarları düzenle" (kalem) firma tutarini degistirir; sonra firma degerlerine donulebilir.

@@ -12,7 +12,7 @@ enum ProPaywallContext: Equatable {
     var isGate: Bool { self == .trialStart || self == .trialEnded }
 }
 
-/// 1.14 Kurye Kazanc Pro satin alma ekrani: neden acildi, Pro'nun getirdikleri, 7 gunluk ucretsiz deneme (kapida),
+/// 1.14 Kurye Kazanc Pro satin alma ekrani: neden acildi, Pro'nun getirdikleri, 14 gunluk ucretsiz deneme (kapida),
 /// uc secenek (yillik one cikar), geri yukleme ve Apple'in istedigi abonelik bilgileri (yenileme, iptal, kosullar, gizlilik).
 struct ProPaywallView: View {
     @Environment(ProStore.self) private var pro
@@ -21,6 +21,8 @@ struct ProPaywallView: View {
     let context: ProPaywallContext
     @State private var selection: ProProduct = .yearly
     @State private var showsAccount = false
+    /// 1.15: deneme kapisinda Pro secenekleri istenince acilir (ilk bakista tek dugme).
+    @State private var showsPlans = false
 
     init(feature: ProFeature) {
         context = .feature(feature)
@@ -37,12 +39,25 @@ struct ProPaywallView: View {
             ScrollView {
                 VStack(spacing: 22) {
                     header
-                    if context == .trialStart { trialCard }
-                    featureList
-                    plans
-                    // Deneme kapisinda satin alma sabit cubukta durmaz: denemeyle karismasin diye planlarin altinda
-                    if context == .trialStart { purchaseBar }
-                    if context == .trialEnded { keptNote }
+                    if context == .trialStart {
+                        trialCard
+                        shortBenefits
+                        // Satin alma sabit cubukta durmaz: denemeyle karismasin diye istenince, planlarin altinda
+                        if showsPlans {
+                            plans
+                            purchaseBar
+                        } else {
+                            Button("Pro seçeneklerini gör") {
+                                withAnimation(.snappy) { showsPlans = true }
+                            }
+                            .font(.footnote.weight(.semibold))
+                            .accessibilityIdentifier("paywall.showPlans")
+                        }
+                    } else {
+                        featureList
+                        plans
+                        if context == .trialEnded { keptNote }
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
@@ -114,37 +129,41 @@ struct ProPaywallView: View {
     private var subheadline: String {
         switch context {
         case .trialEnded: return "Senden hiçbir ücret alınmadı. Kullanmaya devam etmek istersen bir Pro seçeneği seç."
-        case .trialStart: return "Tüm özellikler \(ProTrial.days) gün açık, tamamen ücretsiz."
+        case .trialStart: return "Tüm özellikler açık, tamamen ücretsiz."
         case .feature, .upgrade: return "Paketini canlı say, gün bitmeden net kazancını bil."
         }
     }
 
-    /// Denemede para alinmadigi acikca: Apple onay penceresindeki ₺0, deneme boyunca ve bitince ucret / otomatik odeme yok.
+    /// Denemede para alinmadigi acikca, tek satirda: kart yok, ucret yok, bitince otomatik odeme yok.
     private var trialPromises: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            promise("Apple'ın onay penceresinde ₺0 görünür; kart bilgisi istenmez.")
-            promise("Deneme boyunca hiçbir ücret alınmaz.")
-            promise("\(ProTrial.days) gün bitince otomatik ödeme ya da abonelik başlamaz. Devam etmek istersen planı sen seçer, ayrıca onaylarsın.")
+        Label("Kart istenmez, ücret alınmaz. Bitince otomatik ödeme olmaz.", systemImage: "checkmark.shield.fill")
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(Theme.positive)
+            .multilineTextAlignment(.center)
+            .accessibilityIdentifier("paywall.trialPromises")
+    }
+
+    /// Deneme kapisi: uygulamanin ne yaptigi uc kisa maddede (uzun ozellik listesi yerine).
+    private var shortBenefits: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            shortBenefit("hand.tap.fill", "Her paketi tek dokunuşla say")
+            shortBenefit("turkishlirasign.circle.fill", "Cebine kalanı anında gör")
+            shortBenefit("target", "Hedefine ne kaldığını bil")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(16)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-        .accessibilityIdentifier("paywall.trialPromises")
     }
 
-    private func promise(_ text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Theme.positive)
-                .accessibilityHidden(true)
-            Text(text)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+    private func shortBenefit(_ symbol: String, _ title: String) -> some View {
+        Label {
+            Text(title).font(.headline)
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(Theme.accent)
         }
-        .font(.footnote)
     }
 
-    /// Kapi: 7 gunluk denemeyi baslat (0 TL'lik urun; Apple onay penceresi acilir).
+    /// Kapi: 14 gunluk denemeyi baslat (0 TL'lik urun; Apple onay penceresi acilir). Geri yukleme de burada.
     private var trialCard: some View {
         VStack(spacing: 10) {
             Button {
@@ -161,10 +180,14 @@ struct ProPaywallView: View {
             .disabled(pro.isStartingTrial || pro.purchaseInFlight != nil)
             .accessibilityIdentifier("paywall.startTrial")
             trialPromises
-            Text("ya da hemen Pro'ya geç")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.top, 4)
+            if !showsPlans {
+                Button(pro.isRestoring ? "Geri yükleniyor…" : "Satın alımları geri yükle") {
+                    Task { await pro.restore() }
+                }
+                .font(.caption.weight(.semibold))
+                .disabled(pro.isRestoring)
+                .accessibilityIdentifier("paywall.restore")
+            }
         }
     }
 

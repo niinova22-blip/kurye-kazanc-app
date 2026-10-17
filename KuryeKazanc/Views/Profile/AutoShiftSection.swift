@@ -36,10 +36,9 @@ struct AutoShiftSection: View {
         } header: {
             HStack(spacing: 6) {
                 Text("Otomatik vardiya")
-                if !pro.isPro { Text("· PRO").foregroundStyle(Theme.highlight) }
             }
         } footer: {
-            Text("Motorla ya da bisikletle yola çıkınca vardiyan kendiliğinden başlar, km sayılır; 20 dakika durunca biter. Yalnızca bu saatlerde başlar. Konum yalnızca vardiyada ayrıntılı izlenir.")
+            Text("Yola çıkınca vardiya kendiliğinden başlar, 20 dakika durunca biter.")
         }
     }
 

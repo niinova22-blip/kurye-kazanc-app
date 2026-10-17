@@ -68,7 +68,7 @@ struct FirmWelcomeView: View {
                 .foregroundStyle(.white)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("welcome.title")
-            Text("Ücretler, primler ve hedefin bu firmanın 2026 tarifesine göre hesaplanır.")
+            Text("Kazancını firmanın güncel tarifesiyle hesaplarız.")
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.8))
         }
@@ -157,7 +157,7 @@ struct FirmWelcomeView: View {
             .buttonStyle(.pressable)
             .disabled(chosenCode == nil)
             .accessibilityIdentifier("welcome.next")
-            Text("Aynı anda tek firmada çalışılır. Sonradan Profil > Çalıştığım firma'dan değiştirebilirsin.")
+            Text("Sonra Profil'den değiştirebilirsin.")
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.75))
                 .multilineTextAlignment(.center)

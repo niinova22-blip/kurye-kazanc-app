@@ -1,8 +1,10 @@
 import SwiftUI
 import SwiftData
-import TipKit
+import UserNotifications
 
-/// Bugun sekmesi: net kazanc, saatlik net, vardiya, gunluk hedef + plan, elle hesap, gunun ipucu ve kayitlar.
+/// Bugun sekmesi: cebine kalan, vardiya, gunluk hedef, elle ekle ve kayitlar.
+/// 1.15 sade: gunun ipucu, prim kademeleri, ipucu baloncuklari, yakit fiyati hatirlatmasi ve metrik seridi kalkti
+/// (ayrinti karta dokununca acilan dokumde).
 /// 1.10: ekran goruntusu taramasi ve sag ustteki + menusu (elle kazanc / gider) kaldirildi; yerine "Elle hesapla".
 struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
@@ -32,15 +34,11 @@ struct TodayView: View {
     @State private var showsLiveShift = false
     @State private var showsShiftTutorial = false
     @State private var showsLocationAlert = false
-    @State private var showsShiftReplay = false
 
     @State private var activeSheet: Sheet?
     /// 1.11: ust karta dokununca tam ekran gun dokumu.
     @State private var showsBreakdown = false
     @State private var showsHelp = false
-
-    private let manualTip = ManualCalcTip()
-    private let shiftTip = ShiftTip()
 
     private let day: Date
 
@@ -196,14 +194,18 @@ struct TodayView: View {
                 TodayGoalCard(progress: progress, hasGoal: payroll.goal != nil)
             }
             manualCalcSection
-            fuelReminderSection
-            DailyHintSection(firmCode: payroll.tariffProfile?.platformCode, progress: progress)
             earningsSection
             if !todaysExpenses.isEmpty {
                 expensesSection
             }
-            // 1.12.2: bugun / bu hafta / bu ay toplam paket ve prim kademesi (listenin sonunda: kayitlari asagi itmesin)
-            BonusTrackSection(tracks: payroll.bonusTracks(live: liveShift.packagesByDay()))
+        }
+        // 1.15: bildirim izni acilista degil, ilk kayit eklenince istenir
+        .onChange(of: todaysEarnings.count) { old, new in
+            guard old == 0, new > 0, !LaunchOptions.current.isUITesting else { return }
+            Task {
+                await ReminderScheduler.shared.refreshStatus()
+                if ReminderScheduler.shared.status == .notDetermined { await ReminderScheduler.shared.enableRecommended() }
+            }
         }
     }
 
@@ -341,27 +343,21 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HeroAmount(title: "Bugün cebine kalan", value: summary.netEarnings + extra,
                            identifier: "dashboard.netEarnings")
-                NetBreakdownLine(gross: summary.totalEarnings + extra, expenses: summary.totalExpenses)
-                if fixedShareToday.value > 0 {
-                    Text("Sabit ücretin bugüne düşen payı dahil: \(PayFormat.tl(fixedShareToday))")
-                        .font(.footnote)
-                        .opacity(0.8)
-                        .accessibilityIdentifier("dashboard.fixedShare")
-                }
+                Text(dayLine(summary))
+                    .font(.subheadline)
+                    .opacity(0.85)
+                    .monospacedDigit()
+                    .accessibilityIdentifier("dashboard.dayLine")
             }
-            MetricStrip(metricItems(summary, extraNet: fixedShareToday.doubleValue))
-                .padding(12)
-                .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             Button(action: openBreakdown) {
-                HStack {
-                    Label("Kalem kalem döküm ve hedefe göre durum", systemImage: "list.bullet.rectangle.portrait")
-                        .font(.footnote.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.footnote.weight(.bold))
+                HStack(spacing: 4) {
+                    Text("Ayrıntı")
+                    Image(systemName: "chevron.right")
                 }
-                .padding(.vertical, 10)
+                .font(.footnote.weight(.semibold))
+                .padding(.vertical, 6)
                 .padding(.horizontal, 12)
-                .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(.white.opacity(0.14), in: Capsule())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("today.breakdown")
@@ -481,36 +477,10 @@ struct TodayView: View {
         return GoalPace.project(goal: goal, dailyNets: past + [todayMoney])
     }
 
-    /// Yakit fiyati 7 gunden eskiyse (ya da hic girilmediyse) guncelleme satiri.
-    @ViewBuilder
-    private var fuelReminderSection: some View {
-        if payroll.fuelModel(fallbackCostPerKm: costPerKm).isStale(today: payroll.today) {
-            Section {
-                NavigationLink {
-                    FuelSettingsView()
-                } label: {
-                    Label("Yakıt fiyatını güncelle", systemImage: "fuelpump")
-                }
-                .accessibilityIdentifier("today.fuelReminder")
-            } footer: {
-                Text("Net kazanç güncel yakıt fiyatıyla hesaplanır.")
-            }
-        }
-    }
-
-    /// Saat basi, ustteki "cebine kalan" ile ayni neti (sabit ucret payi dahil) kullanir; yarim saatten kisa surede "—".
-    private func metricItems(_ summary: EarningsSummary, extraNet: Double) -> [MetricStrip.Item] {
-        let perHour = MetricStrip.Item(
-            title: "Saatlik net", value: Formatters.perHour(summary.netPerHour(adding: extraNet)),
-            identifier: "dashboard.netPerHour"
-        )
-        let duration = MetricStrip.Item(
-            title: "Çalışma süresi", value: Formatters.duration(summary.workDuration), identifier: "dashboard.workDuration"
-        )
-        let distance = MetricStrip.Item(
-            title: "Mesafe", value: Formatters.distance(summary.distanceKm), identifier: "dashboard.distance"
-        )
-        return [perHour, duration, distance]
+    /// Ust kartin tek satiri: bugunku paket ve calisma suresi.
+    private func dayLine(_ summary: EarningsSummary) -> String {
+        let packages: Int = savedPackagesToday + liveShift.packageCount
+        return "\(packages) paket · \(Formatters.duration(summary.workDuration))"
     }
 
     /// Yalnizca otomatik vardiya surerken: sure/mesafe ve "Vardiyayi bitir" (baslatma dugmesi 1.7'de kaldirildi).
@@ -535,7 +505,7 @@ struct TodayView: View {
     private var earningsSection: some View {
         Section {
             if todaysEarnings.isEmpty {
-                Text("Henüz kayıt yok. Vardiya başlat ya da “Elle hesapla” ile ekle.")
+                Text("Henüz kayıt yok.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
@@ -552,10 +522,6 @@ struct TodayView: View {
             }
         } header: {
             Text("Bugünün kayıtları")
-        } footer: {
-            if !todaysEarnings.isEmpty {
-                Text("Düzeltmek için kayda dokun, silmek için sola kaydır.")
-            }
         }
     }
 
@@ -578,28 +544,16 @@ struct TodayView: View {
     /// Vardiyayi baslatmayi unuttugu gunler icin hakedis hesabi; sonuc bugune eklensin mi diye sorulur.
     private var manualCalcSection: some View {
         Section {
-            TipView(manualTip, arrowEdge: .bottom)
             NavigationLink {
                 ManualCalcView()
-                    .onAppear { manualTip.invalidate(reason: .actionPerformed) }
             } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "square.and.pencil")
-                        .font(.title3)
-                        .foregroundStyle(Theme.accent)
-                        .frame(width: 44, height: 44)
-                        .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Elle hesapla")
-                            .font(.headline)
-                        Text("Paket, km ve saatten hakedişini hesapla")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.vertical, 2)
+                Label("Elle ekle", systemImage: "square.and.pencil")
+                    .font(.headline)
+                    .padding(.vertical, 6)
             }
             .accessibilityIdentifier("today.manualCalc")
+        } footer: {
+            Text("Vardiyayı başlatmayı unuttuysan paket sayını yaz.")
         }
     }
 
@@ -638,36 +592,15 @@ struct TodayView: View {
                 .accessibilityIdentifier("today.liveShift")
             } else {
                 VStack(spacing: 8) {
-                    TipView(shiftTip, arrowEdge: .bottom)
                     Button(action: requestStart) {
-                        HStack(spacing: 8) {
-                            Label("Vardiya başlat", systemImage: "play.fill")
-                            if !pro.isPro {
-                                Text("PRO")
-                                    .font(.caption2.weight(.heavy))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .foregroundStyle(Theme.brandDeep)
-                                    .background(Theme.amberOnDark, in: Capsule())
-                            }
-                        }
+                        Label("Vardiya başlat", systemImage: "play.fill")
                     }
                     .buttonStyle(PrimaryActionButtonStyle())
                     .accessibilityIdentifier("today.startShift")
-                    if hasSeenShiftTutorial {
-                        Button("Nasıl çalışır? Tanıtımı izle") { showsShiftReplay = true }
-                            .font(.footnote.weight(.semibold))
-                            .buttonStyle(.borderless)
-                            .accessibilityIdentifier("today.shiftTutorial")
-                    } else {
-                        Text("Her paketi bırakınca ekrana dokun; saat, km ve ücret kendiliğinden hesaplanır.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-                .fullScreenCover(isPresented: $showsShiftReplay) {
-                    ShiftTutorialView(mode: .replay) { showsShiftReplay = false }
+                    Text("Her paketi bırakınca ekrana dokun.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
@@ -678,7 +611,6 @@ struct TodayView: View {
     /// Ilk kullanimda once tanitim filmi; sonra konum kontrolu ve baslatma.
     private func requestStart() {
         Haptics.impact()
-        shiftTip.invalidate(reason: .actionPerformed)
         // 1.14: canli vardiya Pro'da
         guard pro.require(.liveShift) else { return }
         if !hasSeenShiftTutorial {

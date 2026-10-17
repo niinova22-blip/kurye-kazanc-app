@@ -8,42 +8,35 @@ struct RootView: View {
     @Environment(ProStore.self) private var pro
     @Environment(LiveShiftController.self) private var liveShift
     @AppStorage(AppPreferences.hasCompletedOnboardingKey) private var hasCompletedOnboarding = false
-    @AppStorage(AppPreferences.hasSeenIntroV18Key) private var hasSeenIntro = false
     @AppStorage(AppPreferences.startFirmKey) private var startFirm = ""
-    @AppStorage(AppPreferences.hasChosenAccountModeKey) private var hasChosenAccountMode = false
     @State private var showsIntroReplay = false
 
-    /// Akis: hesap (Apple ile giris / misafir, 1.11) -> firma secimi -> tanitim (bir kez, firmaya gore) -> 1.14 Pro kapisi
-    /// (7 gun ucretsiz deneme; bitince Pro sart) -> tarife sorulari, yakit, hedef -> konum -> sekmeler. Daha once firma
-    /// secmis kullanici yeni tanitimi bir kez gorur.
+    /// 1.15 sade akis: firma secimi -> Pro kapisi (14 gun ucretsiz deneme; bitince Pro sart) -> hizli kurulum (yalnizca
+    /// tarifenin sart kostugu tek soru, gerisi varsayilan) -> sekmeler. Hesap secimi, tanitim sayfalari, yakit / hedef /
+    /// konum adimlari ilk acilistan kalkti: izinler ihtiyac aninda istenir, ayarlar Profil'de.
     var body: some View {
         Group {
             if ModelContainerFactory.isUsingFallbackStore {
                 StoreUnavailableView()
-            } else if !hasChosenAccountMode && !payroll.state.hasChosenFirm && startFirm.isEmpty {
-                AccountWelcomeView { hasChosenAccountMode = true }
-                    .transition(.opacity)
             } else if !payroll.state.hasChosenFirm && startFirm.isEmpty {
                 FirmWelcomeView { startFirm = $0 }
-                    .transition(.opacity)
-            } else if !hasSeenIntro {
-                IntroView(mode: .firstRun, firmCode: payroll.tariffProfile?.platformCode ?? startFirm) { hasSeenIntro = true }
                     .transition(.opacity)
             } else if pro.blocksApp && !liveShift.isActive {
                 // Suren vardiya bitirilebilsin diye kapi vardiya bitince gelir
                 ProPaywallView(context: pro.access == .expired ? .trialEnded : .trialStart)
                     .transition(.opacity)
             } else if !payroll.state.hasChosenFirm {
-                SetupFlowView(initialFirm: startFirm.isEmpty ? nil : startFirm) {}
+                QuickSetupView(firm: startFirm)
+                    .transition(.opacity)
             } else if !hasCompletedOnboarding {
-                OnboardingView()
+                // 1.14 ve oncesinde kurulumu yarida kalanlar: kalan adimlar sorulmadan tamamlanir
+                QuickSetupView(firm: payroll.tariffProfile?.platformCode ?? startFirm)
             } else {
                 MainTabView()
             }
         }
-        .animation(.easeInOut, value: hasSeenIntro)
         .animation(.easeInOut, value: startFirm)
-        .animation(.easeInOut, value: hasChosenAccountMode)
+        .animation(.easeInOut, value: hasCompletedOnboarding)
         .animation(.easeInOut, value: pro.blocksApp)
         .environment(\.showIntro, ShowIntroAction { showsIntroReplay = true })
         .fullScreenCover(isPresented: $showsIntroReplay) {

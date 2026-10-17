@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 enum SetupStep: Int, CaseIterable {
     case firm, questions, fuel, goal
@@ -237,6 +238,82 @@ struct SetupFlowView: View {
         }
         Haptics.success()
         onFinish()
+    }
+}
+
+/// 1.15 ilk acilis kurulumu: yalnizca tarifenin sart kostugu gunluk calisma saati (Paket Taxi Restoran) tek dokunusla
+/// sorulur; bolge, kidem, arac (motosiklet), yakit (2,5 L/100 km, 85 TL), hiz ve hedef varsayilanla baslar. Bolge ilk
+/// vardiyada konumdan duzelir; hepsi Profil'den degisir. Soru yoksa ekran gorunmeden kurulum biter.
+struct QuickSetupView: View {
+    @Environment(PayrollModel.self) private var payroll
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Platform.sortOrder) private var platforms: [Platform]
+    let firm: String
+    @State private var contractHours: Int = 10
+    @State private var finished = false
+
+    private var questions: TariffQuestions { payroll.questions(for: firm) }
+
+    var body: some View {
+        Group {
+            if questions.contractHours.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .onAppear(perform: finish)
+            } else {
+                hoursQuestion
+            }
+        }
+        .onAppear {
+            let options: [Int] = questions.contractHours
+            if !options.isEmpty, !options.contains(contractHours) { contractHours = options[options.count / 2] }
+        }
+    }
+
+    private var hoursQuestion: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Spacer()
+            Text("Günde kaç saat çalışıyorsun?")
+                .font(.largeTitle.bold())
+                .accessibilityIdentifier("quickSetup.title")
+            Text("Sabit ücretin buna göre hesaplanır.")
+                .foregroundStyle(.secondary)
+            Picker("Günlük çalışma", selection: $contractHours) {
+                ForEach(questions.contractHours, id: \.self) { Text("\($0) saat").tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("question.hours")
+            Spacer()
+            Button("Başla", action: finish)
+                .buttonStyle(PrimaryActionButtonStyle())
+                .accessibilityIdentifier("quickSetup.start")
+        }
+        .padding(24)
+    }
+
+    /// Tarifenin bolgelerinden en yayginina yakin olani (bolge ilk vardiyada konumdan bulunur).
+    static func defaultRegion(_ tiers: [String]) -> String? {
+        ["ys_istanbul", "r23", "standard"].first(where: tiers.contains) ?? tiers.first
+    }
+
+    private func finish() {
+        guard !finished else { return }
+        finished = true
+        let q: TariffQuestions = questions
+        if !payroll.state.hasChosenFirm {
+            let vehicle: String = q.vehicleTypes.isEmpty || q.vehicleTypes.contains("motorcycle")
+                ? "motorcycle" : q.vehicleTypes[0]
+            payroll.chooseFirm(firm,
+                               regionTier: Self.defaultRegion(q.regionTiers),
+                               seniorityYears: q.asksSeniority ? 0 : nil,
+                               vehicleType: vehicle,
+                               flags: [],
+                               contractHours: q.contractHours.isEmpty ? nil : contractHours)
+        }
+        let model = OnboardingViewModel()
+        model.preselect(firm: firm, vehicle: payroll.tariffProfile?.vehicleType == "car" ? .car : .motorcycle)
+        try? model.complete(in: modelContext, platforms: platforms)
+        Haptics.success()
     }
 }
 
