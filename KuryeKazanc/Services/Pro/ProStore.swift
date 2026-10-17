@@ -28,7 +28,8 @@ final class ProStore {
     /// Erisim degisti (true: Pro ya da deneme). Ortam otomatik vardiyayi kapatmak icin baglar.
     @ObservationIgnored var onChange: ((Bool) -> Void)?
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private var override: ProAccess?
+    /// UI testi erisimi; gozlenir ki test modunda deneme baslayinca kapi kalksin.
+    private var override: ProAccess?
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
     @ObservationIgnored private var trialEndTask: Task<Void, Never>?
 
