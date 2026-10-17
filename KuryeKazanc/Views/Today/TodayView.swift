@@ -14,6 +14,7 @@ struct TodayView: View {
     @Environment(\.showIntro) private var showIntro
     @Environment(LiveShiftController.self) private var liveShift
     @Environment(LocationService.self) private var location
+    @Environment(ProStore.self) private var pro
 
     @Query private var todaysEarnings: [EarningRecord]
     @Query private var todaysExpenses: [ExpenseRecord]
@@ -639,7 +640,17 @@ struct TodayView: View {
                 VStack(spacing: 8) {
                     TipView(shiftTip, arrowEdge: .bottom)
                     Button(action: requestStart) {
-                        Label("Vardiya başlat", systemImage: "play.fill")
+                        HStack(spacing: 8) {
+                            Label("Vardiya başlat", systemImage: "play.fill")
+                            if !pro.isPro {
+                                Text("PRO")
+                                    .font(.caption2.weight(.heavy))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .foregroundStyle(Theme.brandDeep)
+                                    .background(Theme.amberOnDark, in: Capsule())
+                            }
+                        }
                     }
                     .buttonStyle(PrimaryActionButtonStyle())
                     .accessibilityIdentifier("today.startShift")
@@ -668,6 +679,8 @@ struct TodayView: View {
     private func requestStart() {
         Haptics.impact()
         shiftTip.invalidate(reason: .actionPerformed)
+        // 1.14: canli vardiya Pro'da
+        guard pro.require(.liveShift) else { return }
         if !hasSeenShiftTutorial {
             showsShiftTutorial = true
         } else {
@@ -686,7 +699,7 @@ struct TodayView: View {
 
     private func startLiveShift() {
         liveShift.start()
-        showsLiveShift = true
+        showsLiveShift = liveShift.isActive
     }
 
     // MARK: - Eylemler

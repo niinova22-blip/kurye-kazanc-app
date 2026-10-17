@@ -5,6 +5,7 @@ struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(PayrollModel.self) private var payroll
     @Environment(SyncCoordinator.self) private var sync
+    @Environment(ProStore.self) private var pro
     @AppStorage(AppPreferences.hasCompletedOnboardingKey) private var hasCompletedOnboarding = false
     @AppStorage(AppPreferences.hasSeenIntroV18Key) private var hasSeenIntro = false
     @AppStorage(AppPreferences.startFirmKey) private var startFirm = ""
@@ -41,6 +42,10 @@ struct RootView: View {
         .fullScreenCover(isPresented: $showsIntroReplay) {
             IntroView(mode: .replay, firmCode: payroll.tariffProfile?.platformCode) { showsIntroReplay = false }
         }
+        // 1.14: kilitli ozellige dokunulunca (Bugun, Profil, widget, Kisayollar) Pro satin alma ekrani
+        .sheet(item: paywallBinding) { feature in
+            ProPaywallView(feature: feature)
+        }
         .task {
             DataSeeder.seedPlatformsIfNeeded(in: modelContext)
             payroll.migrateLegacyGoal(defaults: .standard)
@@ -57,6 +62,10 @@ struct RootView: View {
 }
 
 extension RootView {
+    var paywallBinding: Binding<ProFeature?> {
+        Binding(get: { pro.paywallRequest }, set: { pro.paywallRequest = $0 })
+    }
+
     /// 1.8: anonim kazanc / konum paylasimi (topluluk ortalamalari icindi) kaldirildi. Acik birakanlarin rizasi bir kez
     /// geri alinir ve bekleyen gonderimler silinir; uygulama artik kurye ortalamasi kullanmiyor.
     func retireAnonymousSharing(defaults: UserDefaults) {

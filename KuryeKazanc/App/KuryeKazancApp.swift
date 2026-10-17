@@ -26,7 +26,11 @@ struct KuryeKazancApp: App {
                 .environment(environment.payroll)
                 .environment(environment.tariffs)
                 .environment(environment.liveShift)
+                .environment(environment.pro)
                 .task {
+                    // 1.14: Pro hakki StoreKit'ten (onbellekteki durum hemen kullanilir); acilisi bekletmez
+                    let pro: ProStore = environment.pro
+                    Task { await pro.start() }
                     // Hatirlatmalar ayarlara gore yeniden kurulur (izin geri alindiysa sessizce dusmez)
                     await ReminderScheduler.shared.refreshStatus()
                     ReminderScheduler.shared.reschedule()
@@ -98,6 +102,8 @@ struct LaunchOptions {
     var resetsDefaults: Bool
     /// "-firm <kod>": UI testleri kurulumu atlayip bu firmayla baslar.
     var firm: String? = nil
+    /// "-free": UI testleri Pro'suz (ucretsiz) akisi dener.
+    var isFree: Bool = false
 
     static var current: LaunchOptions {
         let args = ProcessInfo.processInfo.arguments
@@ -107,7 +113,8 @@ struct LaunchOptions {
             isUITesting: args.contains("-ui-testing"),
             loadsSampleData: args.contains("-sample-data"),
             resetsDefaults: args.contains("-reset-defaults"),
-            firm: firm
+            firm: firm,
+            isFree: args.contains("-free")
         )
     }
 }

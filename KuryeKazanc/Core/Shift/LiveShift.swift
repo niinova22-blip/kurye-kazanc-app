@@ -3,9 +3,9 @@ import Foundation
 // Canli vardiya: kurye her paketi biraktiginda ekrana dokunur. Her dokunus zaman + konumla saklanir; vardiya bitince
 // paketler tarifenin zaman bandina (gunduz / aksam / gece) ve mesafe bandina gore ayrilip ayni motorla hesaplanir.
 
-/// Ileride premium olacak; simdilik herkese acik. Kapatmak icin tek yer.
+/// 1.14: canli vardiya Kurye Kazanc Pro'dur (bkz. ProAccess). Baslatma kapisi LiveShiftController.start().
 enum LiveShiftFeature {
-    static let requiresPremium = false
+    static let requiresPremium = true
 }
 
 /// Enlem / boylam (CoreLocation'dan bagimsiz; Windows'ta test edilir).

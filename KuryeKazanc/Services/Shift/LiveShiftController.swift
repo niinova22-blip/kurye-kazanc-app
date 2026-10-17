@@ -39,6 +39,9 @@ final class LiveShiftController {
     @ObservationIgnored private var isResolvingRegion = false
     /// Otomatik bitiste kayit icin (uygulama arka planda olabilir, gorunum yok).
     @ObservationIgnored var contextProvider: (() -> ModelContext?)?
+    /// 1.14: canli vardiya Pro'da. Ortam ProStore'a baglar; false ise baslatma satin alma ekranini ister.
+    @ObservationIgnored var hasPro: () -> Bool = { true }
+    @ObservationIgnored var onLocked: ((ProFeature) -> Void)?
 
     init(autoShift: AutoShiftCoordinator, workSession: WorkSessionManager, location: LocationService, payroll: PayrollModel,
          defaults: UserDefaults = .standard, calendar: Calendar = .current, clock: @escaping () -> Date = { Date() }) {
@@ -75,8 +78,13 @@ final class LiveShiftController {
 
     // MARK: - Baslat
 
-    func start() {
+    /// - Parameter asksForPro: Pro yoksa satin alma ekrani istensin mi (otomatik vardiyada hayir).
+    func start(asksForPro: Bool = true) {
         guard shift == nil, let code = payroll.tariffProfile?.platformCode else { return }
+        guard !LiveShiftFeature.requiresPremium || hasPro() else {
+            if asksForPro { onLocked?(.liveShift) }
+            return
+        }
         if location.authorizationStatus == .notDetermined { location.requestWhenInUseAuthorization() }
         if !workSession.isWorking { autoShift.startManualShift() }
         shift = LiveShift(platformCode: code, start: workSession.sessionStart ?? clock())
@@ -91,12 +99,13 @@ final class LiveShiftController {
     /// 1.12: otomatik vardiya basladi; paketler kilit ekranindan sayilabilsin diye canli vardiya da baslar.
     func startFromAutoShift() {
         guard shift == nil else { return }
-        start()
+        start(asksForPro: false)
     }
 
     /// Kilit ekrani / widget "+1 paket": vardiya yoksa once baslatir. Donus: yeni paket sayisi.
     @discardableResult
     func addPackageFromOutside() -> Int? {
+        // Pro yoksa sayilmaz; uygulama acilinca satin alma ekrani neden sayilmadigini gosterir (Denetim Merkezi)
         if shift == nil { start() }
         return recordDelivery()?.count
     }

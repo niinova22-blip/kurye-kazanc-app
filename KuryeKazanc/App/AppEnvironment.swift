@@ -17,6 +17,7 @@ final class AppEnvironment {
     let tariffs: TariffSyncService
     let payroll: PayrollModel
     let liveShift: LiveShiftController
+    let pro: ProStore
 
     private init() {
         let launch = LaunchOptions.current
@@ -75,7 +76,12 @@ final class AppEnvironment {
         // Canli Etkinlik "Vardiyayi bitir": iOS uygulamayi arka planda soguk baslatsa da bagli olsun.
         // Form acilamaz: ozet bekleyen vardiya olur, "Vardiya bitti" bildirimi kazanc formuna goturur.
         // 1.12: canli vardiya (paket sayma) suruyorsa hesaplanip kaydedilir; yoksa eski akis.
+        // 1.14 Pro: UI testlerinde StoreKit yok; "-free" ile ucretsiz akis, yoksa Pro
+        let pro = ProStore(defaults: testDefaults ?? .standard, override: launch.isUITesting ? !launch.isFree : nil)
+        self.pro = pro
         let live: LiveShiftController = liveShift
+        live.hasPro = { [weak pro] in pro?.isPro ?? false }
+        live.onLocked = { [weak pro] feature in pro?.paywallRequest = feature }
         let shiftCoordinator: AutoShiftCoordinator = autoShift
         live.contextProvider = { container.mainContext }
         shiftCoordinator.liveShiftSnapshot = { [weak live] in live?.activitySnapshot() }
@@ -95,6 +101,11 @@ final class AppEnvironment {
         ShiftIntentBridge.addPackage = { [weak live] in live?.addPackageFromOutside() }
         ShiftIntentBridge.undoPackage = { [weak live] in live?.undoLast() }
         ShiftIntentBridge.openShift = { [weak live] in live?.openFromWidget() }
+        // Pro bitti (abonelik sona erdi / iade): otomatik vardiya kapanir. Suren vardiya bitene kadar kalir.
+        pro.onChange = { [weak shiftCoordinator] isPro in
+            guard !isPro, let shiftCoordinator, shiftCoordinator.isEnabled else { return }
+            shiftCoordinator.disable()
+        }
     }
 
     /// Bugun KAYDEDILMIS kazanc/gider kayitlarinin ozeti (suren vardiya haric; onu koordinator ekler).

@@ -17,6 +17,8 @@ struct WidgetSnapshot: Codable, Equatable {
     var isShiftActive: Bool = false
     var shiftPackages: Int = 0
     var shiftStart: Date?
+    /// 1.14: canli vardiya Pro'da; true ise widget +1 yerine uygulamayi acar (satin alma ekrani). Eski kayitlarda nil.
+    var shiftLocked: Bool?
 
     static let suiteName = "group.com.kuryekazanc.app"
     static let key = "widget.snapshot.v1"

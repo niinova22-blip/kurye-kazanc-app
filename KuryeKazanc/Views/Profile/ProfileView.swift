@@ -22,6 +22,7 @@ struct ProfileView: View {
         NavigationStack {
             Form {
                 AccountSection()
+                ProSection()
                 settingsSection
                 locationSection
                 AutoShiftSection()

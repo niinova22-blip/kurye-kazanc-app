@@ -3,6 +3,7 @@ import SwiftUI
 /// Profil > Otomatik vardiya: anahtar, calisma saatleri, izin uyarisi.
 struct AutoShiftSection: View {
     @Environment(AutoShiftCoordinator.self) private var autoShift
+    @Environment(ProStore.self) private var pro
     @Environment(\.openURL) private var openURL
     @State private var showIntro = false
     @State private var hours: WorkHours = .standard
@@ -33,7 +34,10 @@ struct AutoShiftSection: View {
                 .accessibilityIdentifier("profile.autoShiftPermission")
             }
         } header: {
-            Text("Otomatik vardiya")
+            HStack(spacing: 6) {
+                Text("Otomatik vardiya")
+                if !pro.isPro { Text("· PRO").foregroundStyle(Theme.highlight) }
+            }
         } footer: {
             Text("Motorla ya da bisikletle yola çıkınca vardiyan kendiliğinden başlar, km sayılır; 20 dakika durunca biter. Yalnızca bu saatlerde başlar. Konum yalnızca vardiyada ayrıntılı izlenir.")
         }
@@ -45,6 +49,8 @@ struct AutoShiftSection: View {
             get: { autoShift.isEnabled },
             set: { newValue in
                 if newValue {
+                    // 1.14: otomatik vardiya Pro'da
+                    guard pro.require(.autoShift) else { return }
                     showIntro = true
                 } else {
                     autoShift.disable()
