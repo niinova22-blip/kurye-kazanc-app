@@ -1,0 +1,75 @@
+# App Store ekran goruntuleri (6.9" iPhone, 1320x2868). Elle calistirilir; PNG'ler "store-screenshots" eserinde.
+name: Store Screenshots
+
+on:
+  workflow_dispatch:
+
+env:
+  XCODE_PROJECT: KuryeKazanc.xcodeproj
+  XCODE_SCHEME: KuryeKazanc
+
+jobs:
+  screenshots:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: En yeni Xcode'u sec
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: XcodeGen ile Xcode projesini uret
+        run: |
+          brew install xcodegen xcbeautify
+          xcodegen generate
+
+      - name: Pro Max simulatorunu sec ve hazirla
+        run: |
+          SIM_ID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, re, sys
+          data = json.load(sys.stdin)["devices"]
+          def version(r):
+              m = re.search(r"iOS-(\d+)-(\d+)", r)
+              return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+          for runtime in sorted((r for r in data if "iOS" in r), key=version, reverse=True):
+              for d in data[runtime]:
+                  if d["name"].startswith("iPhone") and "Pro Max" in d["name"]:
+                      print(d["udid"]); sys.exit(0)
+          sys.exit("Pro Max simulatoru yok")
+          ')
+          echo "SIM_ID=$SIM_ID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$SIM_ID" || true
+          xcrun simctl bootstatus "$SIM_ID" -b
+          xcrun simctl status_bar "$SIM_ID" override --time "9:41" --dataNetwork wifi --wifiBars 3 \
+            --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          xcrun simctl spawn "$SIM_ID" defaults write -g AppleLanguages -array tr
+          xcrun simctl spawn "$SIM_ID" defaults write -g AppleLocale -string tr_TR
+
+      - name: Derle ve goruntuleri al
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/build/screenshots"
+          export TEST_RUNNER_SCREENSHOT_DIR="$GITHUB_WORKSPACE/build/screenshots"
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "id=$SIM_ID" \
+            -derivedDataPath build/DerivedData \
+            -only-testing:KuryeKazancUITests/StoreScreenshotsUITests \
+            -resultBundlePath build/results/Screenshots.xcresult \
+            -testLanguage tr -testRegion TR \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+          ls -la build/screenshots
+
+      - name: Goruntuleri yukle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-screenshots
+          path: |
+            build/screenshots/*.png
+          retention-days: 14
