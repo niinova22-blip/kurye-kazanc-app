@@ -12,7 +12,7 @@ enum ProPaywallContext: Equatable {
     var isGate: Bool { self == .trialStart || self == .trialEnded }
 }
 
-/// 1.14 Kurye Kazanc Pro satin alma ekrani: neden acildi, Pro'nun getirdikleri, 10 gunluk ucretsiz deneme (kapida),
+/// 1.14 Kurye Kazanc Pro satin alma ekrani: neden acildi, Pro'nun getirdikleri, 7 gunluk ucretsiz deneme (kapida),
 /// uc secenek (yillik one cikar), geri yukleme ve Apple'in istedigi abonelik bilgileri (yenileme, iptal, kosullar, gizlilik).
 struct ProPaywallView: View {
     @Environment(ProStore.self) private var pro
@@ -115,7 +115,7 @@ struct ProPaywallView: View {
         }
     }
 
-    /// Kapi: 10 gunluk denemeyi baslat (0 TL'lik urun; Apple onay penceresi acilir).
+    /// Kapi: 7 gunluk denemeyi baslat (0 TL'lik urun; Apple onay penceresi acilir).
     private var trialCard: some View {
         VStack(spacing: 10) {
             Button {

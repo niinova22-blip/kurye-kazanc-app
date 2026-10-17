@@ -38,7 +38,7 @@ final class StoreScreenshotsUITests: XCTestCase {
         }
     }
 
-    /// 1.14: Pro kapisi, 10 gunluk deneme + secenekler (App Store Connect urun inceleme goruntusu). "-store-demo": ASC fiyatlari.
+    /// 1.14: Pro kapisi, 7 gunluk deneme + secenekler (App Store Connect urun inceleme goruntusu). "-store-demo": ASC fiyatlari.
     func testCapturePaywall() {
         let app = XCUIApplication()
         app.launchArguments = [

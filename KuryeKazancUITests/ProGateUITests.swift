@@ -1,6 +1,6 @@
 import XCTest
 
-/// 1.14 Pro: ilk 10 gun ucretsiz deneme, bitince uygulama yerine kapatilamaz Pro kapisi. StoreKit UI testlerinde
+/// 1.14 Pro: ilk 7 gun ucretsiz deneme, bitince uygulama yerine kapatilamaz Pro kapisi. StoreKit UI testlerinde
 /// kullanilmaz (fiyatlar yuklenmez); erisim baslatma argumanindan gelir ("-trial-new", "-trial", "-free" = deneme bitti).
 final class ProGateUITests: XCTestCase {
     override func setUp() {
@@ -18,7 +18,7 @@ final class ProGateUITests: XCTestCase {
         return app
     }
 
-    func testNewUserStartsTenDayTrial() {
+    func testNewUserStartsSevenDayTrial() {
         let app = launch("-trial-new")
         let startTrial = app.buttons["paywall.startTrial"]
         XCTAssertTrue(startTrial.waitForExistence(timeout: 10))

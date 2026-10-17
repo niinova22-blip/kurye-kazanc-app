@@ -14,7 +14,7 @@ struct RootView: View {
     @State private var showsIntroReplay = false
 
     /// Akis: hesap (Apple ile giris / misafir, 1.11) -> firma secimi -> tanitim (bir kez, firmaya gore) -> 1.14 Pro kapisi
-    /// (10 gun ucretsiz deneme; bitince Pro sart) -> tarife sorulari, yakit, hedef -> konum -> sekmeler. Daha once firma
+    /// (7 gun ucretsiz deneme; bitince Pro sart) -> tarife sorulari, yakit, hedef -> konum -> sekmeler. Daha once firma
     /// secmis kullanici yeni tanitimi bir kez gorur.
     var body: some View {
         Group {

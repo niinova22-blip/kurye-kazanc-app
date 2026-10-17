@@ -1,6 +1,6 @@
 import Foundation
 
-// 1.14 Kurye Kazanc Pro: uygulamanin tamami Pro'dur. Ilk 10 gun ucretsiz deneme (App Store'da 0 TL'lik tuketilmeyen
+// 1.14 Kurye Kazanc Pro: uygulamanin tamami Pro'dur. Ilk 7 gun ucretsiz deneme (App Store'da 0 TL'lik tuketilmeyen
 // "deneme" urunu, Apple kurali 3.1.1); deneme bitince Pro'ya gecmeden uygulama acilmaz. Urunler App Store Connect'te
 // tanimlanir (kodda fiyat yok, StoreKit'in gosterdigi fiyat kullanilir).
 
@@ -42,11 +42,11 @@ struct ProTransactionInfo: Equatable {
     var purchaseDate: Date? = nil
 }
 
-/// 10 gunluk ucretsiz deneme: Apple hesabina bagli 0 TL'lik urun. Baslangic islemin satin alma tarihidir; uygulamayi
+/// 7 gunluk ucretsiz deneme: Apple hesabina bagli 0 TL'lik urun. Baslangic islemin satin alma tarihidir; uygulamayi
 /// silip yuklemek, misafir kalmak ya da baska telefona gecmek denemeyi yenilemez.
 enum ProTrial {
-    static let productID = "com.kuryekazanc.app.pro.trial10"
-    static let days = 10
+    static let productID = "com.kuryekazanc.app.pro.trial7"
+    static let days = 7
 
     /// Deneme islemlerinden en erken baslangic (iade edilse de deneme kullanilmis sayilir).
     static func startDate(in transactions: [ProTransactionInfo]) -> Date? {
