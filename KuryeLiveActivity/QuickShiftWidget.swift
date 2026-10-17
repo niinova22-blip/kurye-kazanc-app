@@ -67,6 +67,17 @@ struct QuickShiftWidgetView: View {
     private var snapshot: WidgetSnapshot { entry.snapshot }
     private var packages: Int { snapshot.packages(now: entry.date) }
     private var regionText: String { snapshot.region.isEmpty ? "Bölge seçilmedi" : snapshot.region }
+    /// 1.14: canli vardiya Pro'da. Kilitliyse +1 uygulamayi acar (satin alma ekrani); suren vardiya her zaman sayilir.
+    private var isLocked: Bool { snapshot.shiftLocked == true && !snapshot.isShiftActive }
+
+    @ViewBuilder
+    private func packageButton<Content: View>(@ViewBuilder label: () -> Content) -> some View {
+        if isLocked {
+            Button(intent: OpenShiftIntent(), label: label)
+        } else {
+            Button(intent: AddPackageIntent(), label: label)
+        }
+    }
 
     var body: some View {
         switch family {
@@ -82,7 +93,7 @@ struct QuickShiftWidgetView: View {
     // MARK: - Kilit ekrani
 
     private var circular: some View {
-        Button(intent: AddPackageIntent()) {
+        packageButton {
             ZStack {
                 AccessoryWidgetBackground()
                 if snapshot.targetPackages > 0 {
@@ -93,7 +104,7 @@ struct QuickShiftWidgetView: View {
                     Text("\(packages)")
                         .font(.system(.title3, design: .rounded).weight(.bold))
                         .monospacedDigit()
-                    Image(systemName: "plus").font(.caption2.weight(.bold))
+                    Image(systemName: isLocked ? "bolt.fill" : "plus").font(.caption2.weight(.bold))
                 }
             }
         }
@@ -102,14 +113,14 @@ struct QuickShiftWidgetView: View {
     }
 
     private var rectangular: some View {
-        Button(intent: AddPackageIntent()) {
+        packageButton {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
                     Image(systemName: snapshot.isShiftActive ? "record.circle" : "shippingbox.fill")
                     Text(targetText).font(.headline).monospacedDigit()
                 }
                 Text(regionText).font(.caption).lineLimit(1)
-                Text("Dokun: +1 paket").font(.caption2).opacity(0.8)
+                Text(isLocked ? "Pro ile paket say" : "Dokun: +1 paket").font(.caption2).opacity(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -191,8 +202,8 @@ struct QuickShiftWidgetView: View {
     }
 
     private func addButton(compact: Bool) -> some View {
-        Button(intent: AddPackageIntent()) {
-            Label(compact ? "+1 paket" : "Paket bıraktım", systemImage: "plus")
+        packageButton {
+            Label(isLocked ? "Pro ile say" : (compact ? "+1 paket" : "Paket bıraktım"), systemImage: isLocked ? "bolt.fill" : "plus")
                 .font(.subheadline.weight(.bold))
                 .frame(maxWidth: .infinity, minHeight: compact ? 30 : nil, maxHeight: compact ? 30 : CGFloat.infinity)
                 .foregroundStyle(WidgetBrand.deep)

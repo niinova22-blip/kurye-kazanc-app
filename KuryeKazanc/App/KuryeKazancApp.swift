@@ -26,7 +26,11 @@ struct KuryeKazancApp: App {
                 .environment(environment.payroll)
                 .environment(environment.tariffs)
                 .environment(environment.liveShift)
+                .environment(environment.pro)
                 .task {
+                    // 1.14: Pro hakki StoreKit'ten (onbellekteki durum hemen kullanilir); acilisi bekletmez
+                    let pro: ProStore = environment.pro
+                    Task { await pro.start() }
                     // Hatirlatmalar ayarlara gore yeniden kurulur (izin geri alindiysa sessizce dusmez)
                     await ReminderScheduler.shared.refreshStatus()
                     ReminderScheduler.shared.reschedule()
@@ -42,6 +46,8 @@ struct KuryeKazancApp: App {
                     }
                     // On plana donus: Ayarlar'da verilen izinler ve suren vardiya yeniden degerlendirilir
                     guard phase == .active else { return }
+                    // 1.14: deneme bu arada bittiyse kapi gelir
+                    environment.pro.tick()
                     let autoShift = environment.autoShift
                     Task { @MainActor in
                         await autoShift.handleWake()
@@ -98,16 +104,24 @@ struct LaunchOptions {
     var resetsDefaults: Bool
     /// "-firm <kod>": UI testleri kurulumu atlayip bu firmayla baslar.
     var firm: String? = nil
+    /// UI testlerinde Pro erisimi: varsayilan Pro; "-free" deneme bitti (kapi), "-trial-new" deneme baslamadi,
+    /// "-trial" deneme suruyor (7 gun kaldi).
+    var proAccess: ProAccess = .pro
 
     static var current: LaunchOptions {
         let args = ProcessInfo.processInfo.arguments
         var firm: String? = nil
+        var proAccess: ProAccess = .pro
+        if args.contains("-free") { proAccess = .expired }
+        if args.contains("-trial-new") { proAccess = .trialAvailable }
+        if args.contains("-trial") { proAccess = .trial(endsAt: Date().addingTimeInterval(7 * 86_400)) }
         if let index = args.firstIndex(of: "-firm"), index + 1 < args.count { firm = args[index + 1] }
         return LaunchOptions(
             isUITesting: args.contains("-ui-testing"),
             loadsSampleData: args.contains("-sample-data"),
             resetsDefaults: args.contains("-reset-defaults"),
-            firm: firm
+            firm: firm,
+            proAccess: proAccess
         )
     }
 }

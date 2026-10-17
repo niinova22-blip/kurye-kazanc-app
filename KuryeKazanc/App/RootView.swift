@@ -5,14 +5,17 @@ struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(PayrollModel.self) private var payroll
     @Environment(SyncCoordinator.self) private var sync
+    @Environment(ProStore.self) private var pro
+    @Environment(LiveShiftController.self) private var liveShift
     @AppStorage(AppPreferences.hasCompletedOnboardingKey) private var hasCompletedOnboarding = false
     @AppStorage(AppPreferences.hasSeenIntroV18Key) private var hasSeenIntro = false
     @AppStorage(AppPreferences.startFirmKey) private var startFirm = ""
     @AppStorage(AppPreferences.hasChosenAccountModeKey) private var hasChosenAccountMode = false
     @State private var showsIntroReplay = false
 
-    /// Akis: hesap (Apple ile giris / misafir, 1.11) -> firma secimi -> tanitim (bir kez, firmaya gore) -> tarife sorulari, yakit, hedef ->
-    /// konum -> sekmeler. Daha once firma secmis kullanici yeni tanitimi bir kez gorur.
+    /// Akis: hesap (Apple ile giris / misafir, 1.11) -> firma secimi -> tanitim (bir kez, firmaya gore) -> 1.14 Pro kapisi
+    /// (7 gun ucretsiz deneme; bitince Pro sart) -> tarife sorulari, yakit, hedef -> konum -> sekmeler. Daha once firma
+    /// secmis kullanici yeni tanitimi bir kez gorur.
     var body: some View {
         Group {
             if ModelContainerFactory.isUsingFallbackStore {
@@ -26,6 +29,10 @@ struct RootView: View {
             } else if !hasSeenIntro {
                 IntroView(mode: .firstRun, firmCode: payroll.tariffProfile?.platformCode ?? startFirm) { hasSeenIntro = true }
                     .transition(.opacity)
+            } else if pro.blocksApp && !liveShift.isActive {
+                // Suren vardiya bitirilebilsin diye kapi vardiya bitince gelir
+                ProPaywallView(context: pro.access == .expired ? .trialEnded : .trialStart)
+                    .transition(.opacity)
             } else if !payroll.state.hasChosenFirm {
                 SetupFlowView(initialFirm: startFirm.isEmpty ? nil : startFirm) {}
             } else if !hasCompletedOnboarding {
@@ -37,9 +44,14 @@ struct RootView: View {
         .animation(.easeInOut, value: hasSeenIntro)
         .animation(.easeInOut, value: startFirm)
         .animation(.easeInOut, value: hasChosenAccountMode)
+        .animation(.easeInOut, value: pro.blocksApp)
         .environment(\.showIntro, ShowIntroAction { showsIntroReplay = true })
         .fullScreenCover(isPresented: $showsIntroReplay) {
             IntroView(mode: .replay, firmCode: payroll.tariffProfile?.platformCode) { showsIntroReplay = false }
+        }
+        // 1.14: kilitli ozellige dokunulunca (Bugun, Profil, widget, Kisayollar) Pro satin alma ekrani
+        .sheet(item: paywallBinding) { feature in
+            ProPaywallView(feature: feature)
         }
         .task {
             DataSeeder.seedPlatformsIfNeeded(in: modelContext)
@@ -57,6 +69,10 @@ struct RootView: View {
 }
 
 extension RootView {
+    var paywallBinding: Binding<ProFeature?> {
+        Binding(get: { pro.paywallRequest }, set: { pro.paywallRequest = $0 })
+    }
+
     /// 1.8: anonim kazanc / konum paylasimi (topluluk ortalamalari icindi) kaldirildi. Acik birakanlarin rizasi bir kez
     /// geri alinir ve bekleyen gonderimler silinir; uygulama artik kurye ortalamasi kullanmiyor.
     func retireAnonymousSharing(defaults: UserDefaults) {

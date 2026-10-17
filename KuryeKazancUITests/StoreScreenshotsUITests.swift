@@ -38,6 +38,26 @@ final class StoreScreenshotsUITests: XCTestCase {
         }
     }
 
+    /// 1.14: Pro kapisi, 7 gunluk deneme + secenekler (App Store Connect urun inceleme goruntusu). "-store-demo": ASC fiyatlari.
+    func testCapturePaywall() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-ui-testing", "-trial-new", "-store-demo", "-costPerKm", "2.5", "-isWorking", "NO",
+            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV18", "YES", "-firm", "yemeksepeti",
+            "-autoEstimateExpenses", "YES", "-reset-defaults", "-sample-data",
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["paywall.startTrial"].waitForExistence(timeout: 10))
+        snap("08-pro-deneme")
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["paywall.purchase"].waitForExistence(timeout: 5))
+        snap("09-pro-yillik")
+        app.buttons["paywall.plan.monthly"].tap()
+        snap("10-pro-aylik")
+        app.buttons["paywall.plan.lifetime"].tap()
+        snap("11-pro-omur-boyu")
+    }
+
     func testCaptureStoreScreens() {
         let app = launch()
 

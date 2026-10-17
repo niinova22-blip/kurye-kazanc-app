@@ -94,7 +94,7 @@ struct AccountWelcomeView: View {
         if !account.isSignedInWithApple {
             VStack(alignment: .leading, spacing: 12) {
                 option(symbol: "person.crop.circle.badge.questionmark", title: "Misafir olarak devam et",
-                       detail: "Tüm özellikler açık. Kayıtların yalnızca bu telefonda kalır; uygulamayı silersen kaybolur.")
+                       detail: "Kayıtların yalnızca bu telefonda kalır; uygulamayı silersen kaybolur.")
                 continueButton(title: "Misafir olarak devam et", identifier: "welcome.guest")
             }
             .padding(18)
