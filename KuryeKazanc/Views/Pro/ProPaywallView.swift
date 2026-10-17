@@ -109,10 +109,35 @@ struct ProPaywallView: View {
 
     private var subheadline: String {
         switch context {
-        case .trialEnded: return "Kurye Kazanç'ı kullanmaya devam etmek için bir Pro seçeneği seç."
-        case .trialStart: return "Tüm özellikler açık. Kart bilgisi ya da ödeme yok; deneme bitince kendiliğinden ücret alınmaz."
+        case .trialEnded: return "Senden hiçbir ücret alınmadı. Kullanmaya devam etmek istersen bir Pro seçeneği seç."
+        case .trialStart: return "Tüm özellikler \(ProTrial.days) gün açık, tamamen ücretsiz."
         case .feature, .upgrade: return "Paketini canlı say, gün bitmeden net kazancını bil."
         }
+    }
+
+    /// Denemede para alinmadigi acikca: Apple onay penceresindeki ₺0, deneme boyunca ve bitince ucret / otomatik odeme yok.
+    private var trialPromises: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            promise("Apple'ın onay penceresinde ₺0 görünür; kart bilgisi istenmez.")
+            promise("Deneme boyunca hiçbir ücret alınmaz.")
+            promise("\(ProTrial.days) gün bitince otomatik ödeme ya da abonelik başlamaz. Devam etmek istersen planı sen seçer, ayrıca onaylarsın.")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .accessibilityIdentifier("paywall.trialPromises")
+    }
+
+    private func promise(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Theme.positive)
+                .accessibilityHidden(true)
+            Text(text)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.footnote)
     }
 
     /// Kapi: 7 gunluk denemeyi baslat (0 TL'lik urun; Apple onay penceresi acilir).
@@ -131,10 +156,7 @@ struct ProPaywallView: View {
             .buttonStyle(PrimaryActionButtonStyle())
             .disabled(pro.isStartingTrial || pro.purchaseInFlight != nil)
             .accessibilityIdentifier("paywall.startTrial")
-            Text("App Store onayı istenir, ₺0. \(ProTrial.days) gün sonra devam etmek için Pro gerekir; abonelik kendiliğinden başlamaz.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            trialPromises
             Text("ya da hemen Pro'ya geç")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
