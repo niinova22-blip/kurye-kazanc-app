@@ -270,8 +270,10 @@ struct ProSection: View {
                 }
                 .accessibilityIdentifier("profile.pro.status")
                 if pro.entitlement.product?.isSubscription ?? false {
+                    // Liste icinde Section degistiricisi her satira uygulanabilir: sayfa dugmenin kendisinde
                     Button("Aboneliği yönet") { showsManage = true }
                         .accessibilityIdentifier("profile.pro.manage")
+                        .manageSubscriptionsSheet(isPresented: $showsManage)
                 }
             } else {
                 Button {
@@ -300,7 +302,6 @@ struct ProSection: View {
         } header: {
             Text("Pro")
         }
-        .manageSubscriptionsSheet(isPresented: $showsManage)
     }
 
     private var statusText: String {
