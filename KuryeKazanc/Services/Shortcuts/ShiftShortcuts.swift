@@ -35,7 +35,7 @@ struct RecordDeliveryIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let liveShift: LiveShiftController = AppEnvironment.shared.liveShift
         guard liveShift.isActive || AppEnvironment.shared.pro.isPro else {
-            return .result(dialog: "Paket sayma Kurye Kazanç Pro'da. Uygulamayı açıp Pro'ya geçebilirsin.")
+            return .result(dialog: "Ücretsiz deneme süren doldu. Devam etmek için uygulamayı açıp Pro'ya geçebilirsin.")
         }
         guard let count = liveShift.addPackageFromOutside() else {
             return .result(dialog: "Önce uygulamada firmanı seç.")

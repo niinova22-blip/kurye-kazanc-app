@@ -1,14 +1,34 @@
 import SwiftUI
 import StoreKit
 
-/// 1.14 Kurye Kazanc Pro satin alma ekrani: neden acildi (ozellik), Pro'nun getirdikleri, uc secenek (yillik one cikar),
-/// deneme, geri yukleme ve Apple'in istedigi abonelik bilgileri (yenileme, iptal, kosullar, gizlilik).
+/// Satin alma ekraninin nereden acildigi: kilitli ozellik / Profil (kapatilabilir sayfa) ya da kapi (kapatilamaz tam ekran:
+/// deneme hic baslamadi veya bitti).
+enum ProPaywallContext: Equatable {
+    case feature(ProFeature)
+    case upgrade
+    case trialStart
+    case trialEnded
+
+    var isGate: Bool { self == .trialStart || self == .trialEnded }
+}
+
+/// 1.14 Kurye Kazanc Pro satin alma ekrani: neden acildi, Pro'nun getirdikleri, 10 gunluk ucretsiz deneme (kapida),
+/// uc secenek (yillik one cikar), geri yukleme ve Apple'in istedigi abonelik bilgileri (yenileme, iptal, kosullar, gizlilik).
 struct ProPaywallView: View {
     @Environment(ProStore.self) private var pro
+    @Environment(AccountService.self) private var account
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
-    let feature: ProFeature
+    let context: ProPaywallContext
     @State private var selection: ProProduct = .yearly
+    @State private var showsAccount = false
+
+    init(feature: ProFeature) {
+        context = .feature(feature)
+    }
+
+    init(context: ProPaywallContext) {
+        self.context = context
+    }
 
     static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
 
@@ -17,9 +37,10 @@ struct ProPaywallView: View {
             ScrollView {
                 VStack(spacing: 22) {
                     header
+                    if context == .trialStart { trialCard }
                     featureList
                     plans
-                    freeNote
+                    if context == .trialEnded { keptNote }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
@@ -27,21 +48,26 @@ struct ProPaywallView: View {
             .background(Theme.groupedBackground)
             .safeAreaInset(edge: .bottom) { purchaseBar }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Kapat") { dismiss() }
-                        .accessibilityIdentifier("paywall.close")
+                if !context.isGate {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Kapat") { dismiss() }
+                            .accessibilityIdentifier("paywall.close")
+                    }
                 }
             }
+            .sheet(isPresented: $showsAccount) { accountSheet }
             .alert("Kurye Kazanç Pro", isPresented: messageBinding) {
                 Button("Tamam", role: .cancel) {}
             } message: {
                 Text(pro.message ?? "")
             }
         }
-        .accessibilityIdentifier("paywall.view")
+        .accessibilityIdentifier(context.isGate ? "paywall.gate" : "paywall.view")
+        .interactiveDismissDisabled(context.isGate)
         .task { await pro.loadProducts() }
-        .onChange(of: pro.isPro) { _, isPro in
-            if isPro { dismiss() }
+        .onChange(of: pro.isPaid) { _, isPaid in
+            // Kapi kendiliginden kalkar (kok gorunum); sayfa kapanir
+            if isPaid, !context.isGate { dismiss() }
         }
     }
 
@@ -61,7 +87,8 @@ struct ProPaywallView: View {
             Text(headline)
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
-            Text("Paketini canlı say, gün bitmeden net kazancını bil.")
+                .accessibilityIdentifier("paywall.headline")
+            Text(subheadline)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -70,14 +97,70 @@ struct ProPaywallView: View {
     }
 
     private var headline: String {
-        "\(feature.title) Pro'da"
+        switch context {
+        case .feature(let feature): return "\(feature.title) Pro'da"
+        case .upgrade:
+            guard let days = pro.access.trialDaysLeft(now: pro.now) else { return "Tüm özellikler tek pakette" }
+            return "Denemende \(days) gün kaldı"
+        case .trialStart: return "\(ProTrial.days) gün ücretsiz dene"
+        case .trialEnded: return "Ücretsiz deneme süren doldu"
+        }
     }
+
+    private var subheadline: String {
+        switch context {
+        case .trialEnded: return "Kurye Kazanç'ı kullanmaya devam etmek için bir Pro seçeneği seç."
+        case .trialStart: return "Tüm özellikler açık. Kart bilgisi ya da ödeme yok; deneme bitince kendiliğinden ücret alınmaz."
+        case .feature, .upgrade: return "Paketini canlı say, gün bitmeden net kazancını bil."
+        }
+    }
+
+    /// Kapi: 10 gunluk denemeyi baslat (0 TL'lik urun; Apple onay penceresi acilir).
+    private var trialCard: some View {
+        VStack(spacing: 10) {
+            Button {
+                Haptics.light()
+                Task { await pro.startTrial() }
+            } label: {
+                if pro.isStartingTrial {
+                    ProgressView().tint(.white)
+                } else {
+                    Text("\(ProTrial.days) gün ücretsiz başla")
+                }
+            }
+            .buttonStyle(PrimaryActionButtonStyle())
+            .disabled(pro.isStartingTrial || pro.purchaseInFlight != nil)
+            .accessibilityIdentifier("paywall.startTrial")
+            Text("App Store onayı istenir, ₺0. \(ProTrial.days) gün sonra devam etmek için Pro gerekir; abonelik kendiliğinden başlamaz.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Text("ya da hemen Pro'ya geç")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+        }
+    }
+
+    /// Pro'nun getirdikleri: uygulamanin tamami (hesap ozellikleri + canli vardiya ozellikleri).
+    private struct Benefit {
+        var symbol: String
+        var title: String
+        var detail: String
+    }
+
+    private static let benefits: [Benefit] = [
+        Benefit(symbol: "turkishlirasign.circle.fill", title: "Hakediş ve tarife hesabı",
+                detail: "Firmanın güncel tarifesiyle net kazancın; yakıt ve giderler düşülmüş."),
+        Benefit(symbol: "target", title: "Hedef ve plan",
+                detail: "Aylık hedefine göre günde kaç paket, kaç saat gerektiğini gör."),
+    ] + ProFeature.allCases.map { Benefit(symbol: $0.systemImage, title: $0.title, detail: $0.detail) }
 
     private var featureList: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ForEach(ProFeature.allCases) { item in
+            ForEach(Self.benefits, id: \.title) { item in
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: item.systemImage)
+                    Image(systemName: item.symbol)
                         .font(.headline)
                         .foregroundStyle(.white)
                         .frame(width: 36, height: 36)
@@ -189,11 +272,32 @@ struct ProPaywallView: View {
         }
     }
 
-    private var freeNote: some View {
-        Label("Elle kayıt, hakediş ve tarife hesabı, gider ve plan ücretsiz kalır.", systemImage: "checkmark.seal")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    /// Deneme bitti: kayitlar silinmez; hesap silme buradan da acik (App Store 5.1.1v).
+    private var keptNote: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Kayıtların silinmedi; Pro'ya geçince kaldığın yerden devam edersin.", systemImage: "checkmark.seal")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            if account.isServerAvailable {
+                Button("Hesap ve veriler") { showsAccount = true }
+                    .font(.footnote.weight(.semibold))
+                    .accessibilityIdentifier("paywall.account")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var accountSheet: some View {
+        NavigationStack {
+            Form { AccountSection() }
+                .navigationTitle("Hesap ve veriler")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Kapat") { showsAccount = false }
+                    }
+                }
+        }
     }
 
     // MARK: - Satin alma
@@ -259,10 +363,11 @@ struct ProPaywallView: View {
 struct ProSection: View {
     @Environment(ProStore.self) private var pro
     @State private var showsManage = false
+    @State private var showsUpgrade = false
 
     var body: some View {
         Section {
-            if pro.isPro {
+            if pro.isPaid {
                 LabeledContent {
                     Text(statusText)
                 } label: {
@@ -276,8 +381,16 @@ struct ProSection: View {
                         .manageSubscriptionsSheet(isPresented: $showsManage)
                 }
             } else {
+                if let days = pro.access.trialDaysLeft(now: pro.now) {
+                    LabeledContent {
+                        Text("\(days) gün kaldı")
+                    } label: {
+                        Label("Ücretsiz deneme", systemImage: "hourglass")
+                    }
+                    .accessibilityIdentifier("profile.pro.trial")
+                }
                 Button {
-                    pro.paywallRequest = .liveShift
+                    showsUpgrade = true
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "bolt.shield.fill")
@@ -287,12 +400,13 @@ struct ProSection: View {
                             .background(Theme.brandGradient, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Kurye Kazanç Pro'ya geç").font(.headline)
-                            Text("Canlı vardiya, kilit ekranından +1, otomatik vardiya").font(.footnote).foregroundStyle(.secondary)
+                            Text("Deneme bitince de tüm özellikler açık kalsın").font(.footnote).foregroundStyle(.secondary)
                         }
                     }
                 }
                 .foregroundStyle(.primary)
                 .accessibilityIdentifier("profile.pro.upgrade")
+                .sheet(isPresented: $showsUpgrade) { ProPaywallView(context: .upgrade) }
                 Button(pro.isRestoring ? "Geri yükleniyor…" : "Satın alımları geri yükle") {
                     Task { await pro.restore() }
                 }

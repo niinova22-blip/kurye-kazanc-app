@@ -62,4 +62,48 @@ final class ProAccessTests: XCTestCase {
         XCTAssertEqual(Set(ProProduct.displayOrder), Set(ProProduct.allCases))
         XCTAssertEqual(ProProduct.allCases.filter { !$0.isSubscription }, [.lifetime])
     }
+
+    // MARK: - 10 gunluk deneme
+
+    private func trial(startedAgo days: Double, revoked: Bool = false) -> ProTransactionInfo {
+        ProTransactionInfo(productID: ProTrial.productID, expirationDate: nil, revocationDate: revoked ? now : nil,
+                           purchaseDate: now.addingTimeInterval(-days * 86_400))
+    }
+
+    func testTrialProductIsNotPro() {
+        XCTAssertEqual(ProEntitlement.resolve([trial(startedAgo: 1)], now: now), .none)
+    }
+
+    func testTrialStartIsEarliestTrialPurchase() {
+        let start = ProTrial.startDate(in: [trial(startedAgo: 2), trial(startedAgo: 5, revoked: true), tx(.monthly, expires: 10)])
+        XCTAssertEqual(start, now.addingTimeInterval(-5 * 86_400))
+        XCTAssertNil(ProTrial.startDate(in: [tx(.lifetime)]))
+    }
+
+    func testNoTrialMeansTrialAvailable() {
+        XCTAssertEqual(ProAccess.resolve(entitlement: .none, trialStart: nil, now: now), .trialAvailable)
+        XCTAssertFalse(ProAccess.trialAvailable.hasAccess)
+    }
+
+    func testTrialLastsTenDays() {
+        let start = now.addingTimeInterval(-9.5 * 86_400)
+        let access = ProAccess.resolve(entitlement: .none, trialStart: start, now: now)
+        XCTAssertEqual(access, .trial(endsAt: start.addingTimeInterval(10 * 86_400)))
+        XCTAssertTrue(access.hasAccess)
+        XCTAssertEqual(access.trialDaysLeft(now: now), 1)
+        XCTAssertEqual(ProAccess.resolve(entitlement: .none, trialStart: now, now: now).trialDaysLeft(now: now), 10)
+    }
+
+    func testTrialEndsAfterTenDays() {
+        let access = ProAccess.resolve(entitlement: .none, trialStart: now.addingTimeInterval(-10 * 86_400), now: now)
+        XCTAssertEqual(access, .expired)
+        XCTAssertFalse(access.hasAccess)
+        XCTAssertNil(access.trialDaysLeft(now: now))
+    }
+
+    func testPaidWinsOverTrial() {
+        let paid = ProEntitlement(product: .yearly, expiresAt: now.addingTimeInterval(3600))
+        XCTAssertEqual(ProAccess.resolve(entitlement: paid, trialStart: now.addingTimeInterval(-30 * 86_400), now: now), .pro)
+        XCTAssertEqual(ProAccess.resolve(entitlement: paid, trialStart: nil, now: now), .pro)
+    }
 }

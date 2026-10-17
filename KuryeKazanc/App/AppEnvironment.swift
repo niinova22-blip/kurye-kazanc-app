@@ -76,8 +76,8 @@ final class AppEnvironment {
         // Canli Etkinlik "Vardiyayi bitir": iOS uygulamayi arka planda soguk baslatsa da bagli olsun.
         // Form acilamaz: ozet bekleyen vardiya olur, "Vardiya bitti" bildirimi kazanc formuna goturur.
         // 1.12: canli vardiya (paket sayma) suruyorsa hesaplanip kaydedilir; yoksa eski akis.
-        // 1.14 Pro: UI testlerinde StoreKit yok; "-free" ile ucretsiz akis, yoksa Pro
-        let pro = ProStore(defaults: testDefaults ?? .standard, override: launch.isUITesting ? !launch.isFree : nil,
+        // 1.14 Pro: UI testlerinde StoreKit yok; erisim baslatma argumanindan ("-free" deneme bitti, yoksa Pro)
+        let pro = ProStore(defaults: testDefaults ?? .standard, override: launch.isUITesting ? launch.proAccess : nil,
                            demo: launch.isUITesting && ProcessInfo.processInfo.arguments.contains("-store-demo"))
         self.pro = pro
         let live: LiveShiftController = liveShift

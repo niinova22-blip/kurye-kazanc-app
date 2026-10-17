@@ -1,8 +1,8 @@
 import Foundation
 
-// 1.14 Kurye Kazanc Pro: canli vardiya (paket sayma, kilit ekrani / widget +1, otomatik vardiya, Kisayollar) Pro'dur.
-// Ucretsiz: elle gunluk kayit, hakedis / tarife hesabi, gider, plan. Urunler App Store Connect'te tanimlanir;
-// fiyat ve 7 gun deneme orada ayarlanir (kodda fiyat yok, StoreKit'in gosterdigi fiyat kullanilir).
+// 1.14 Kurye Kazanc Pro: uygulamanin tamami Pro'dur. Ilk 10 gun ucretsiz deneme (App Store'da 0 TL'lik tuketilmeyen
+// "deneme" urunu, Apple kurali 3.1.1); deneme bitince Pro'ya gecmeden uygulama acilmaz. Urunler App Store Connect'te
+// tanimlanir (kodda fiyat yok, StoreKit'in gosterdigi fiyat kullanilir).
 
 /// App Store urunleri. Abonelikler ayni grupta ("Kurye Kazanç Pro"); omur boyu tuketilmeyen tek seferlik urun.
 enum ProProduct: String, CaseIterable, Codable {
@@ -39,6 +39,52 @@ struct ProTransactionInfo: Equatable {
     var productID: String
     var expirationDate: Date?
     var revocationDate: Date?
+    var purchaseDate: Date? = nil
+}
+
+/// 10 gunluk ucretsiz deneme: Apple hesabina bagli 0 TL'lik urun. Baslangic islemin satin alma tarihidir; uygulamayi
+/// silip yuklemek, misafir kalmak ya da baska telefona gecmek denemeyi yenilemez.
+enum ProTrial {
+    static let productID = "com.kuryekazanc.app.pro.trial10"
+    static let days = 10
+
+    /// Deneme islemlerinden en erken baslangic (iade edilse de deneme kullanilmis sayilir).
+    static func startDate(in transactions: [ProTransactionInfo]) -> Date? {
+        transactions.filter { $0.productID == productID }.compactMap(\.purchaseDate).min()
+    }
+
+    static func endDate(start: Date) -> Date {
+        start.addingTimeInterval(TimeInterval(days) * 86_400)
+    }
+}
+
+/// Uygulamaya erisim: Pro (ucretli), deneme suruyor, deneme hic baslamadi ya da deneme bitti (kapi).
+enum ProAccess: Equatable {
+    case pro
+    case trial(endsAt: Date)
+    case trialAvailable
+    case expired
+
+    static func resolve(entitlement: ProEntitlement, trialStart: Date?, now: Date = Date()) -> ProAccess {
+        if entitlement.isActive(now: now) { return .pro }
+        guard let trialStart else { return .trialAvailable }
+        let end: Date = ProTrial.endDate(start: trialStart)
+        return end > now ? .trial(endsAt: end) : .expired
+    }
+
+    /// Uygulama acik mi (Pro ya da deneme).
+    var hasAccess: Bool {
+        switch self {
+        case .pro, .trial: true
+        case .trialAvailable, .expired: false
+        }
+    }
+
+    /// Denemede kalan gun (son gun 1 gorunur); deneme yoksa nil.
+    func trialDaysLeft(now: Date = Date()) -> Int? {
+        guard case .trial(let end) = self else { return nil }
+        return max(1, Int((end.timeIntervalSince(now) / 86_400).rounded(.up)))
+    }
 }
 
 /// Kullanicinin Pro durumu. Cihazda saklanir: StoreKit cevap vermeden (cevrimdisi acilis) de dogru gorunsun.
