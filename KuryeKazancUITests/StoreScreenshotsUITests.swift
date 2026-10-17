@@ -125,12 +125,8 @@ final class StoreScreenshotsUITests: XCTestCase {
         let plan = app.buttons["today.planButton"]
         for _ in 0..<3 where !plan.exists { app.swipeUp() }
         if plan.waitForExistence(timeout: 3) {
+            // Ornek veride ayda 100.000 TL hedef kayitli: plan sonucu dogrudan gorunur
             plan.tap()
-            fill(app, "plan.amount", "60000")
-            let done = app.buttons["keyboard.done"].firstMatch
-            if done.exists { done.tap() }
-            let save = app.buttons["plan.save"]
-            if save.waitForExistence(timeout: 3) { save.tap() }
             if app.descendants(matching: .any)["goal.result"].firstMatch.waitForExistence(timeout: 5) {
                 snap("08-plan")
                 let projection = app.descendants(matching: .any)["goal.projection"].firstMatch
