@@ -40,13 +40,17 @@ struct ProPaywallView: View {
                     if context == .trialStart { trialCard }
                     featureList
                     plans
+                    // Deneme kapisinda satin alma sabit cubukta durmaz: denemeyle karismasin diye planlarin altinda
+                    if context == .trialStart { purchaseBar }
                     if context == .trialEnded { keptNote }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
             }
             .background(Theme.groupedBackground)
-            .safeAreaInset(edge: .bottom) { purchaseBar }
+            .safeAreaInset(edge: .bottom) {
+                if context != .trialStart { purchaseBar.padding(.horizontal, 20).background(.bar) }
+            }
             .toolbar {
                 if !context.isGate {
                     ToolbarItem(placement: .cancellationAction) {
@@ -355,9 +359,7 @@ struct ProPaywallView: View {
             }
             .font(.caption.weight(.semibold))
         }
-        .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(.bar)
     }
 
     private var ctaTitle: String {
