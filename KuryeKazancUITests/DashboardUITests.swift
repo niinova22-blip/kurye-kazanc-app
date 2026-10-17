@@ -56,8 +56,8 @@ final class DashboardUITests: XCTestCase {
 
         let net = app.staticTexts["dashboard.netEarnings"]
         XCTAssertTrue(net.waitForExistence(timeout: 10))
-        // 1.15 varsayilan yakit: 60 km × 2,5 L/100 km × 85 TL = 127,5; 1050 brut - 127,5 - 50 manuel = 872,5
-        XCTAssertTrue(net.label.contains("872,5"), "Beklenen net 872,5, gelen: \(net.label)")
+        // 1.15 varsayilan yakit: 60 km × 2,13 TL (2,5 L/100 km × 85 TL, kurusa yuvarlanir) = 127,8; 1050 - 127,8 - 50 = 872,2
+        XCTAssertTrue(net.label.contains("872,2"), "Beklenen net 872,2, gelen: \(net.label)")
         let line = app.staticTexts["dashboard.dayLine"].label
         XCTAssertTrue(line.contains("23 paket") && line.contains("6 sa"), "gelen: \(line)")
     }
@@ -72,7 +72,7 @@ final class DashboardUITests: XCTestCase {
         open.tap()
         let dayNet = app.staticTexts["dayBreakdown.net"]
         XCTAssertTrue(dayNet.waitForExistence(timeout: 5))
-        XCTAssertTrue(dayNet.label.contains("872,5"), "gelen: \(dayNet.label)")
+        XCTAssertTrue(dayNet.label.contains("872,2"), "gelen: \(dayNet.label)")
         let close = app.buttons["dayBreakdown.close"]
         for _ in 0..<5 where !close.isHittable { app.swipeUp() }
         close.tap()
@@ -126,7 +126,7 @@ final class DashboardUITests: XCTestCase {
         app.segmentedControls["history.periodPicker"].buttons["Gün"].tap()
         let net = app.staticTexts["history.netEarnings"]
         XCTAssertTrue(net.waitForExistence(timeout: 5))
-        XCTAssertTrue(net.label.contains("872,5"), "Gunluk net 872,5 olmali, gelen: \(net.label)")
+        XCTAssertTrue(net.label.contains("872,2"), "Gunluk net 872,2 olmali, gelen: \(net.label)")
 
         // 1.15: gider tahmini Profil > Diğer ayarlar > Gelismis'te; Profil'de Bildirimler var
         app.tabBars.buttons["Profil"].tap()
