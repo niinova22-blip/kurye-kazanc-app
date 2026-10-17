@@ -38,6 +38,26 @@ final class StoreScreenshotsUITests: XCTestCase {
         }
     }
 
+    /// 1.14: Pro satin alma ekrani (App Store Connect urun inceleme goruntusu). "-store-demo": ASC fiyatlari.
+    func testCapturePaywall() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-ui-testing", "-free", "-store-demo", "-costPerKm", "2.5", "-isWorking", "NO",
+            "-hasCompletedOnboarding", "YES", "-hasSeenIntroV18", "YES", "-firm", "yemeksepeti",
+            "-autoEstimateExpenses", "YES", "-reset-defaults", "-sample-data",
+        ]
+        app.launch()
+        let start = app.buttons["today.startShift"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
+        XCTAssertTrue(app.buttons["paywall.purchase"].waitForExistence(timeout: 5))
+        snap("09-pro-yillik")
+        app.buttons["paywall.plan.monthly"].tap()
+        snap("10-pro-aylik")
+        app.buttons["paywall.plan.lifetime"].tap()
+        snap("11-pro-omur-boyu")
+    }
+
     func testCaptureStoreScreens() {
         let app = launch()
 

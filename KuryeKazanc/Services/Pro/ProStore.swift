@@ -26,10 +26,16 @@ final class ProStore {
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
 
     static let entitlementKey = "pro.entitlement.v1"
+    /// Yalnizca UI testi "-store-demo": StoreKit olmadan satin alma ekraninin magaza / inceleme goruntusu (ASC fiyatlari).
+    @ObservationIgnored private var demoPrices: [ProProduct: Decimal] = [:]
 
-    init(defaults: UserDefaults = .standard, override: Bool? = nil) {
+    init(defaults: UserDefaults = .standard, override: Bool? = nil, demo: Bool = false) {
         self.defaults = defaults
         self.override = override
+        if override != nil, demo {
+            demoPrices = [.monthly: Decimal(string: "79.99")!, .yearly: Decimal(string: "599.99")!,
+                          .lifetime: Decimal(string: "1499.99")!]
+        }
         if let data = defaults.data(forKey: Self.entitlementKey),
            let saved = try? JSONDecoder().decode(ProEntitlement.self, from: data) {
             entitlement = saved
@@ -112,8 +118,19 @@ final class ProStore {
         }
     }
 
+    var hasPrices: Bool { !products.isEmpty || !demoPrices.isEmpty }
+
+    func price(_ item: ProProduct) -> Decimal? { products[item]?.price ?? demoPrices[item] }
+
+    func priceText(_ item: ProProduct) -> String? {
+        if let product = products[item] { return product.displayPrice }
+        guard let demo = demoPrices[item] else { return nil }
+        return demo.formatted(.currency(code: "TRY").locale(Formatters.locale))
+    }
+
     /// "7 gün ücretsiz" (deneme hakki varsa ve urunde tanimliysa).
     func trialText(for item: ProProduct) -> String? {
+        if demoPrices[item] != nil { return item.isSubscription ? "1 hafta ücretsiz" : nil }
         guard isEligibleForTrial, let offer = products[item]?.subscription?.introductoryOffer,
               offer.paymentMode == .freeTrial else { return nil }
         return "\(Self.periodText(offer.period)) ücretsiz"

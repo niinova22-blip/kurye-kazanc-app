@@ -97,7 +97,7 @@ struct ProPaywallView: View {
 
     @ViewBuilder
     private var plans: some View {
-        if pro.products.isEmpty {
+        if !pro.hasPrices {
             VStack(spacing: 10) {
                 if pro.isLoadingProducts {
                     ProgressView("Fiyatlar yükleniyor…")
@@ -110,7 +110,7 @@ struct ProPaywallView: View {
             .frame(maxWidth: .infinity, minHeight: 120)
         } else {
             VStack(spacing: 10) {
-                ForEach(ProProduct.displayOrder.filter { pro.products[$0] != nil }, id: \.self) { item in
+                ForEach(ProProduct.displayOrder.filter { pro.priceText($0) != nil }, id: \.self) { item in
                     planRow(item)
                 }
             }
@@ -143,7 +143,7 @@ struct ProPaywallView: View {
                 }
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text(pro.products[item]?.displayPrice ?? "")
+                    Text(pro.priceText(item) ?? "")
                         .font(.headline)
                         .monospacedDigit()
                     Text(item.periodText).font(.caption).foregroundStyle(.secondary)
@@ -173,7 +173,7 @@ struct ProPaywallView: View {
 
     /// Yillik, 12 aylik odemeye gore yuzde kac ucuz.
     private var yearlySaving: Int? {
-        guard let monthly = pro.products[.monthly]?.price, let yearly = pro.products[.yearly]?.price, monthly > 0 else { return nil }
+        guard let monthly = pro.price(.monthly), let yearly = pro.price(.yearly), monthly > 0 else { return nil }
         let full: Double = NSDecimalNumber(decimal: monthly * 12).doubleValue
         let paid: Double = NSDecimalNumber(decimal: yearly).doubleValue
         let percent: Int = Int(((full - paid) / full * 100).rounded())
@@ -210,7 +210,7 @@ struct ProPaywallView: View {
                 }
             }
             .buttonStyle(PrimaryActionButtonStyle())
-            .disabled(pro.products[selection] == nil || pro.purchaseInFlight != nil)
+            .disabled(pro.priceText(selection) == nil || pro.purchaseInFlight != nil)
             .accessibilityIdentifier("paywall.purchase")
 
             Text(legalText)
