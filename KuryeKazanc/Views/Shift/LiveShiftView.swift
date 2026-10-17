@@ -3,6 +3,8 @@ import SwiftData
 
 /// Suren vardiya: tum ekran marka renginde, her teslimde ekrana dokunulur. Her dokunusta paketin tarifedeki bandi
 /// ("4–6 km bandı · 1 paket eklendi") gosterilir. "Vardiyayı bitir" hesabi yapip kaydeder ve ozeti acar.
+/// 1.15 sade: tanitim dugmesi, bolge bilgi satiri, gunluk prim satiri ve sabit ucret anahtari kalkti (bolge yalnizca
+/// konumdan okunamazsa sorulur).
 struct LiveShiftView: View {
     @Environment(LiveShiftController.self) private var controller
     @Environment(PayrollModel.self) private var payroll
@@ -14,7 +16,6 @@ struct LiveShiftView: View {
     /// Kaydedilen vardiya; ozet ayni ekranda gosterilir.
     @State private var finished: WorkLog?
     @State private var confirmsFinish = false
-    @State private var showsTutorial = false
     @State private var bounce = 0
     @State private var ripples: [UUID] = []
 
@@ -29,9 +30,6 @@ struct LiveShiftView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .fullScreenCover(isPresented: $showsTutorial) {
-            ShiftTutorialView(mode: .replay) { showsTutorial = false }
-        }
         .confirmationDialog("Vardiyayı bitir", isPresented: $confirmsFinish, titleVisibility: .visible) {
             if controller.packageCount > 0 {
                 Button("Bitir ve hesapla") { finish() }
@@ -45,7 +43,7 @@ struct LiveShiftView: View {
             Button("Devam et", role: .cancel) {}
         } message: {
             Text(controller.packageCount > 0
-                 ? "\(controller.packageCount) paket kaydedildi. Hesap firmanın güncel tarifesiyle yapılıp Kazanç'a eklenecek."
+                 ? "\(controller.packageCount) paket kaydedilecek."
                  : "Bu vardiyada paket yok; kayıt yapılmayacak.")
         }
     }
@@ -101,14 +99,7 @@ struct LiveShiftView: View {
                 .padding(.vertical, 8)
                 .background(.white.opacity(0.15), in: Capsule())
             Spacer()
-            Button { showsTutorial = true } label: {
-                Image(systemName: "questionmark")
-                    .font(.headline)
-                    .frame(width: 40, height: 40)
-                    .background(.white.opacity(0.15), in: Circle())
-            }
-            .accessibilityLabel("Tanıtımı izle")
-            .accessibilityIdentifier("shift.tutorial")
+            Color.clear.frame(width: 40, height: 40)
         }
     }
 
@@ -134,26 +125,6 @@ struct LiveShiftView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding(.top, 10)
-        } else if controller.regionLine != nil || controller.regionMessage != nil {
-            Label {
-                VStack(alignment: .leading, spacing: 2) {
-                    if let line = controller.regionLine {
-                        Text(line).font(.footnote.weight(.semibold))
-                    }
-                    if let message = controller.regionMessage {
-                        Text(message).font(.caption).opacity(0.85)
-                    }
-                }
-            } icon: {
-                Image(systemName: "mappin.and.ellipse")
-            }
-                .font(.footnote.weight(.semibold))
-                .animation(.easeInOut, value: controller.regionLine)
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .padding(.top, 10)
-                .accessibilityIdentifier("shift.region")
         }
     }
 
@@ -202,9 +173,6 @@ struct LiveShiftView: View {
                     Text("\(feedback.zone.title) · 1 paket eklendi")
                         .font(.headline)
                         .accessibilityIdentifier("shift.zone")
-                    Text(feedback.zone.detail)
-                        .font(.subheadline)
-                        .opacity(0.85)
                 }
                 Spacer(minLength: 0)
                 Button {
@@ -223,11 +191,6 @@ struct LiveShiftView: View {
             .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .id(feedback.id)
             .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
-        } else {
-            Text("Her teslimde bir kez dokun. Saat ve konum paketle birlikte kaydedilir.")
-                .font(.subheadline)
-                .multilineTextAlignment(.center)
-                .opacity(0.8)
         }
     }
 
@@ -237,33 +200,15 @@ struct LiveShiftView: View {
             let fixed: Money = payroll.fixedShareToday()
             VStack(spacing: 8) {
                 HStack {
-                    stat(fixed.isZero ? "Şu ana kadar (brüt)" : "Şu ana kadar (sabit pay dahil)",
+                    stat("Şu ana kadar",
                          estimate.map { PayFormat.tl($0 + fixed) } ?? "—", identifier: "shift.estimate")
                     Divider().frame(height: 30).overlay(.white.opacity(0.4))
                     stat("Bu vardiya", "\(controller.packageCount) paket", identifier: "shift.packages")
-                }
-                if let day = payroll.bonusTracks(live: controller.packagesByDay()).first(where: { $0.scope == .day }) {
-                    Text(dayLine(day))
-                        .font(.footnote.weight(.semibold))
-                        .multilineTextAlignment(.center)
-                        .opacity(0.9)
-                        .accessibilityIdentifier("shift.dayTotal")
-                }
-                if payroll.hasFixedPay {
-                    FixedPayToggle()
                 }
             }
             .padding(12)
             .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-    }
-
-    /// "Bugün 25 paket · 24–27 primi 760 TL · 28. pakete 3 kaldı → 1.005 TL"
-    private func dayLine(_ track: BonusTrack) -> String {
-        var parts: [String] = ["Bugün toplam \(track.packages) paket"]
-        if !track.reached.isZero { parts.append("prim \(PayFormat.tl(track.reached))") }
-        if let next = track.next { parts.append("\(next.target). pakete \(next.remaining) kaldı → \(PayFormat.tl(next.reward))") }
-        return parts.joined(separator: " · ")
     }
 
     private func stat(_ title: String, _ value: String, identifier: String) -> some View {

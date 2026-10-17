@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Canli vardiyanin kisa tanitim filmi: dort sahne kendiliginden akar (hikaye cubuklari). Ilk "Vardiya başlat"ta bir kez
+/// Canli vardiyanin kisa tanitim filmi (1.15: uc kisa sahne): sahneler kendiliginden akar (hikaye cubuklari). Ilk "Vardiya başlat"ta bir kez
 /// gosterilir; vardiya ekranindaki "?" ve Profil'den tekrar izlenir. Saga dokun: ileri, sola dokun: geri.
 struct ShiftTutorialView: View {
     enum Mode { case firstRun, replay }
@@ -14,10 +14,9 @@ struct ShiftTutorialView: View {
 
     private static let sceneLength: TimeInterval = 4.2
     private let scenes: [(title: String, text: String)] = [
-        ("Vardiyayı başlat", "İşe çıkınca tek dokunuş. Süre ve yol kendiliğinden ölçülür."),
-        ("Paketi bırakınca dokun", "Ekranın neresine dokunursan dokun, paket o anki saat ve konumla eklenir."),
-        ("Paketin bandını bulur", "Akşam ücreti, mesafe ek ödemesi, şehrine özel bonus: tarifedeki yerini hemen görürsün."),
-        ("Bitirince hesap hazır", "Paketler, km, sabit ücretin günlük payı ve yakıt. Kazanç ekranına kendiliğinden düşer."),
+        ("Vardiyayı başlat", "İşe çıkınca tek dokunuş."),
+        ("Paketi bırakınca dokun", "Ekranın herhangi bir yerine dokun, paket eklenir."),
+        ("Bitirince hesap hazır", "Cebine kalan kendiliğinden hesaplanır."),
     ]
 
     var body: some View {
@@ -141,7 +140,6 @@ struct ShiftTutorialView: View {
         switch index {
         case 0: StartScene(t: t)
         case 1: TapScene(t: t)
-        case 2: ZoneScene(t: t)
         default: ReceiptScene(t: t)
         }
     }

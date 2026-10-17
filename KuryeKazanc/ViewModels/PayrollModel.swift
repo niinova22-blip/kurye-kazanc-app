@@ -625,8 +625,13 @@ final class PayrollModel {
         reload()
     }
 
+    /// 1.15: fiyat hic girilmediyse varsayilan benzin fiyati (85 TL) kullanilir; kullaniciya sorulmaz, Araç ve yakıt'tan degisir.
     func fuelModel(fallbackCostPerKm: Double) -> FuelCostModel {
-        FuelCostModel(settings: state.fuel, vehicleType: state.vehicleType, fallbackCostPerKm: Money(double: fallbackCostPerKm))
+        var settings: FuelSettings = state.fuel
+        if settings.entries.isEmpty {
+            settings.entries = [FuelPriceEntry(day: "2000-01-01", pricePerUnit: FuelCostModel.defaultPrice, type: .gasoline)]
+        }
+        return FuelCostModel(settings: settings, vehicleType: state.vehicleType, fallbackCostPerKm: Money(double: fallbackCostPerKm))
     }
 
     func pace(entries: [EarningEntry]) -> PaceEstimate {

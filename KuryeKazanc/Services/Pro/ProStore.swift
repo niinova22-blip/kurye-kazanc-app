@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import StoreKit
 
-/// 1.14 Kurye Kazanc Pro (StoreKit 2): urunler, 7 gunluk deneme, satin alma, geri yukleme ve hak. Hak ve deneme
+/// 1.14 Kurye Kazanc Pro (StoreKit 2): urunler, 14 gunluk deneme, satin alma, geri yukleme ve hak. Hak ve deneme
 /// baslangici cihazda onbellege alinir (cevrimdisi acilista da dogru), StoreKit her acilista ve her islem guncellemesinde
 /// yeniden okunur. UI testlerinde StoreKit'e gidilmez: `override` sabit erisim verir (bkz. LaunchOptions.proAccess).
 @MainActor
@@ -65,7 +65,7 @@ final class ProStore {
 
     var access: ProAccess { override ?? ProAccess.resolve(entitlement: entitlement, trialStart: trialStart, now: now) }
 
-    /// Uygulama acik mi: Pro ya da 7 gunluk deneme suruyor. Kilitli ozellikler bunu sorar.
+    /// Uygulama acik mi: Pro ya da 14 gunluk deneme suruyor. Kilitli ozellikler bunu sorar.
     var isPro: Bool { access.hasAccess }
 
     /// Ucretli Pro (abonelik / omur boyu); deneme sayilmaz.
@@ -80,6 +80,14 @@ final class ProStore {
         if isPro { return true }
         paywallRequest = feature
         return false
+    }
+
+    /// Kilitliyken Siri / Kisayollar cevabi: deneme hic baslamadiysa baslatmaya, bittiyse Pro'ya yonlendirir.
+    var lockedMessage: String {
+        if access == .trialAvailable {
+            return "Önce uygulamayı açıp \(ProTrial.days) günlük ücretsiz denemeyi başlat."
+        }
+        return "Ücretsiz deneme süren doldu. Devam etmek için uygulamayı açıp Pro'ya geçebilirsin."
     }
 
     /// On plana donus: deneme suresi bu arada bittiyse kapi gelir.
@@ -181,7 +189,7 @@ final class ProStore {
         return demo.formatted(.currency(code: "TRY").locale(Formatters.locale))
     }
 
-    /// App Store tanitim teklifi ("1 hafta ücretsiz"), urunde tanimliysa ve hak varsa. 7 gunluk deneme ayridir.
+    /// App Store tanitim teklifi ("1 hafta ücretsiz"), urunde tanimliysa ve hak varsa. 14 gunluk deneme ayridir.
     func trialText(for item: ProProduct) -> String? {
         if demoPrices[item] != nil { return nil }
         guard isEligibleForTrial, let offer = products[item]?.subscription?.introductoryOffer,
@@ -202,7 +210,7 @@ final class ProStore {
 
     // MARK: - Deneme
 
-    /// 7 gunluk ucretsiz denemeyi baslatir: Apple onayi istenir, ucret alinmaz; bitince kendiliginden ucret alinmaz.
+    /// 14 gunluk ucretsiz denemeyi baslatir: Apple onayi istenir, ucret alinmaz; bitince kendiliginden ucret alinmaz.
     func startTrial() async {
         guard !isStartingTrial, purchaseInFlight == nil else { return }
         if override != nil {

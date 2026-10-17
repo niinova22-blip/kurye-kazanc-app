@@ -38,7 +38,7 @@ final class StoreScreenshotsUITests: XCTestCase {
         }
     }
 
-    /// 1.14: Pro kapisi, 7 gunluk deneme + secenekler (App Store Connect urun inceleme goruntusu). "-store-demo": ASC fiyatlari.
+    /// 1.15: Pro kapisi, 14 gunluk deneme + secenekler (App Store Connect urun inceleme goruntusu). "-store-demo": ASC fiyatlari.
     func testCapturePaywall() {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -49,6 +49,7 @@ final class StoreScreenshotsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["paywall.startTrial"].waitForExistence(timeout: 10))
         snap("08-pro-deneme")
+        app.buttons["paywall.showPlans"].tap()
         app.swipeUp()
         XCTAssertTrue(app.buttons["paywall.purchase"].waitForExistence(timeout: 5))
         snap("09-pro-yillik")
@@ -74,6 +75,23 @@ final class StoreScreenshotsUITests: XCTestCase {
             for _ in 0..<5 where close.exists && !close.isHittable { app.swipeUp() }
             if close.exists { close.tap() }
         }
+
+        // 2b) Elle ekle: unutulan gun, dolu alanlar ve sonuc
+        let manual = app.buttons["today.manualCalc"]
+        for _ in 0..<3 where !manual.isHittable { app.swipeUp() }
+        if manual.waitForExistence(timeout: 5) {
+            manual.tap()
+            fill(app, "manual.packages", "32")
+            fill(app, "manual.night", "6")
+            fill(app, "manual.hours", "9")
+            fill(app, "manual.km", "85")
+            fill(app, "manual.fuel", "250")
+            let done = app.buttons["keyboard.done"].firstMatch
+            if done.exists { done.tap() }
+            if app.staticTexts["manual.net"].waitForExistence(timeout: 5) { snap("06-elle-ekle") }
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+        for _ in 0..<3 { app.swipeDown() }
 
         // 3) Canli vardiya: paket sayaci
         let start = app.buttons["today.startShift"]
@@ -102,13 +120,31 @@ final class StoreScreenshotsUITests: XCTestCase {
         app.tabBars.buttons["Firmalar"].tap()
         snap("07-firmalar")
 
-        // 7) Plan
+        // 7) Plan ve tahmin: aylik hedef -> gunluk paket / saat, "bu sekilde devam edersen" tahmini
         app.tabBars.buttons["Bugün"].tap()
         let plan = app.buttons["today.planButton"]
         for _ in 0..<3 where !plan.exists { app.swipeUp() }
         if plan.waitForExistence(timeout: 3) {
             plan.tap()
-            snap("08-plan")
+            fill(app, "plan.amount", "60000")
+            let done = app.buttons["keyboard.done"].firstMatch
+            if done.exists { done.tap() }
+            let save = app.buttons["plan.save"]
+            if save.waitForExistence(timeout: 3) { save.tap() }
+            if app.descendants(matching: .any)["goal.result"].firstMatch.waitForExistence(timeout: 5) {
+                snap("08-plan")
+                let projection = app.descendants(matching: .any)["goal.projection"].firstMatch
+                for _ in 0..<4 where !(projection.exists && projection.isHittable) { app.swipeUp() }
+                snap("09-tahmin")
+            }
         }
+    }
+
+    private func fill(_ app: XCUIApplication, _ id: String, _ text: String) {
+        let field = app.textFields[id]
+        guard field.waitForExistence(timeout: 2) else { return }
+        for _ in 0..<3 where !field.isHittable { app.swipeUp() }
+        field.tap()
+        field.typeText(text)
     }
 }

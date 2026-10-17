@@ -2,20 +2,16 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 
-/// Profil sekmesi: hesap (Apple ile giris), ayarlar (firma, arac ve yakit, hedef, bildirimler), konum, otomatik vardiya, veri.
+/// Profil sekmesi: hesap, Pro, sik kullanilan ayarlar (firma, hedef, arac ve yakit, bildirimler), "Diğer ayarlar", veri.
+/// 1.15 sade: bolge, hiz, ses, tanitimlar, konum, otomatik vardiya ve Gelismis "Diğer ayarlar" altina tasindi.
 /// 1.13: kullanilmayan "Ad" ve ikinci "Araç" secimi kaldirildi (arac: Araç ve yakıt).
-/// 1.10: ekran goruntusu taramasi, kalibrasyon ve eski "Platformlarım" kaldirildi; gider tahmini Gelismis'e tasindi.
 struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.openURL) private var openURL
-    @Environment(LocationService.self) private var location
     @Environment(SyncCoordinator.self) private var sync
     @Environment(AccountService.self) private var account
     @Environment(PayrollModel.self) private var payroll
-    @Environment(\.showIntro) private var showIntro
 
     @State private var showsFirmSetup = false
-    @State private var showsShiftTutorial = false
     @State private var showDeleteConfirmation = false
 
     var body: some View {
@@ -24,8 +20,6 @@ struct ProfileView: View {
                 AccountSection()
                 ProSection()
                 settingsSection
-                locationSection
-                AutoShiftSection()
                 dataSection
                 aboutSection
             }
@@ -45,10 +39,10 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Ayarlar (1.7)
+    // MARK: - Ayarlar
 
     private var settingsSection: some View {
-        Section {
+        Section("Ayarlar") {
             Button {
                 showsFirmSetup = true
             } label: {
@@ -57,92 +51,22 @@ struct ProfileView: View {
             }
             .foregroundStyle(.primary)
             .accessibilityIdentifier("profile.firm")
-            NavigationLink { RegionSettingsView() } label: {
-                LabeledContent {
-                    Text(payroll.state.regionTier.map(TariffQuestions.regionName) ?? "Seçilmedi")
-                } label: {
-                    Label("Çalıştığın bölge", systemImage: "map")
-                }
-            }
-            .accessibilityIdentifier("profile.region")
-            NavigationLink { PaceSettingsView() } label: {
-                LabeledContent {
-                    Text("\(Formatters.decimalText(payroll.state.packagesPerHour ?? PaceEstimate.defaultPackagesPerHour)) paket/sa")
-                } label: {
-                    Label("Çalışma hızın", systemImage: "gauge.with.dots.needle.67percent")
-                }
-            }
-            .accessibilityIdentifier("profile.pace")
-            NavigationLink { FuelSettingsView() } label: {
-                Label("Araç ve yakıt", systemImage: "fuelpump")
-            }
-            .accessibilityIdentifier("profile.fuel")
             NavigationLink { GoalPlanView() } label: {
                 Label("Hedef ve plan", systemImage: "target")
             }
             .accessibilityIdentifier("profile.goal")
+            NavigationLink { FuelSettingsView() } label: {
+                Label("Araç ve yakıt", systemImage: "fuelpump")
+            }
+            .accessibilityIdentifier("profile.fuel")
             NavigationLink { NotificationSettingsView() } label: {
                 Label("Bildirimler", systemImage: "bell.badge")
             }
             .accessibilityIdentifier("profile.notifications")
-            NavigationLink { FeedbackSettingsView() } label: {
-                Label("Ses ve titreşim", systemImage: "speaker.wave.2")
+            NavigationLink { OtherSettingsView() } label: {
+                Label("Diğer ayarlar", systemImage: "ellipsis.circle")
             }
-            .accessibilityIdentifier("profile.feedback")
-            Button { showIntro() } label: {
-                Label("Tanıtımı izle", systemImage: "play.circle")
-            }
-            .accessibilityIdentifier("profile.intro")
-            Button { showsShiftTutorial = true } label: {
-                Label("Vardiya tanıtımını izle", systemImage: "hand.tap")
-            }
-            .accessibilityIdentifier("profile.shiftTutorial")
-            .fullScreenCover(isPresented: $showsShiftTutorial) {
-                ShiftTutorialView(mode: .replay) { showsShiftTutorial = false }
-            }
-            NavigationLink { AdvancedView() } label: {
-                Label("Gelişmiş", systemImage: "gearshape.2")
-            }
-            .accessibilityIdentifier("profile.advanced")
-        } header: {
-            Text("Ayarlar")
-        } footer: {
-            Text("Tüm hesaplar çalıştığın firmanın tarifesine göre yapılır.")
-        }
-    }
-
-    // MARK: - Konum
-
-    private var locationSection: some View {
-        Section {
-            LabeledContent("Konum izni", value: locationStatusText)
-                .accessibilityIdentifier("settings.locationStatus")
-
-            switch location.authorizationStatus {
-            case .notDetermined:
-                Button("Konum iznini ver") { location.requestWhenInUseAuthorization() }
-            case .authorizedWhenInUse:
-                Button("Arka plan konum iznini ver (Her Zaman)") { location.requestAlwaysAuthorization() }
-            case .denied, .restricted:
-                Button("iOS Ayarları'nı aç") { openSystemSettings() }
-            default:
-                EmptyView()
-            }
-        } header: {
-            Text("Konum")
-        } footer: {
-            Text("Konum yalnızca vardiya sırasında km, bölge ve mesafe bandı için kullanılır; vardiya bitince durur. Tam konum saklanmaz.")
-        }
-    }
-
-    private var locationStatusText: String {
-        switch location.authorizationStatus {
-        case .authorizedAlways: "Her zaman"
-        case .authorizedWhenInUse: "Uygulamayı kullanırken"
-        case .denied: "Reddedildi"
-        case .restricted: "Kısıtlı"
-        case .notDetermined: "Sorulmadı"
-        default: "Bilinmiyor"
+            .accessibilityIdentifier("profile.more")
         }
     }
 
@@ -153,7 +77,7 @@ struct ProfileView: View {
             Button("Tüm kayıtları sil", role: .destructive) { showDeleteConfirmation = true }
                 .accessibilityIdentifier("settings.deleteAll")
         } footer: {
-            Text("Yalnızca telefondaki kayıtları siler. Hesabın ve sunucudaki yedeğin için Hesap > “Hesabımı ve verilerimi sil”.")
+            Text("Yalnızca bu telefondaki kayıtları siler.")
         }
     }
 
@@ -174,17 +98,106 @@ struct ProfileView: View {
         return "\(version) (\(build))"
     }
 
-    private func openSystemSettings() {
-        if let url = URL(string: UIApplication.openSettingsURLString) {
-            openURL(url)
-        }
-    }
-
     private func deleteAllRecords() {
         try? modelContext.deleteAllRecords()
         // Silinen kayitlarin bekleyen gonderimleri de dusulur (sunucudakiler icin "Verilerimi sil")
         sync.allRecordsDeleted()
         // Bos veri otomatik yedekle sunucudaki yedegi ezmesin
         account.localRecordsCleared()
+    }
+}
+
+/// Profil > Diğer ayarlar: bolge, calisma hizi, ses ve titresim, tanitimlar, konum, otomatik vardiya, Gelismis.
+struct OtherSettingsView: View {
+    @Environment(\.openURL) private var openURL
+    @Environment(LocationService.self) private var location
+    @Environment(PayrollModel.self) private var payroll
+    @Environment(\.showIntro) private var showIntro
+    @State private var showsShiftTutorial = false
+
+    var body: some View {
+        Form {
+            Section {
+                NavigationLink { RegionSettingsView() } label: {
+                    LabeledContent {
+                        Text(payroll.state.regionTier.map(TariffQuestions.regionName) ?? "Seçilmedi")
+                    } label: {
+                        Label("Çalıştığın bölge", systemImage: "map")
+                    }
+                }
+                .accessibilityIdentifier("profile.region")
+                NavigationLink { PaceSettingsView() } label: {
+                    LabeledContent {
+                        Text("\(Formatters.decimalText(payroll.state.packagesPerHour ?? PaceEstimate.defaultPackagesPerHour)) paket/sa")
+                    } label: {
+                        Label("Çalışma hızın", systemImage: "gauge.with.dots.needle.67percent")
+                    }
+                }
+                .accessibilityIdentifier("profile.pace")
+                NavigationLink { FeedbackSettingsView() } label: {
+                    Label("Ses ve titreşim", systemImage: "speaker.wave.2")
+                }
+                .accessibilityIdentifier("profile.feedback")
+                Button { showIntro() } label: {
+                    Label("Tanıtımı izle", systemImage: "play.circle")
+                }
+                .accessibilityIdentifier("profile.intro")
+                Button { showsShiftTutorial = true } label: {
+                    Label("Vardiya tanıtımını izle", systemImage: "hand.tap")
+                }
+                .accessibilityIdentifier("profile.shiftTutorial")
+                .fullScreenCover(isPresented: $showsShiftTutorial) {
+                    ShiftTutorialView(mode: .replay) { showsShiftTutorial = false }
+                }
+            }
+            locationSection
+            AutoShiftSection()
+            Section {
+                NavigationLink { AdvancedView() } label: {
+                    Label("Gelişmiş", systemImage: "gearshape.2")
+                }
+                .accessibilityIdentifier("profile.advanced")
+            }
+        }
+        .navigationTitle("Diğer ayarlar")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var locationSection: some View {
+        Section {
+            LabeledContent("Konum izni", value: locationStatusText)
+                .accessibilityIdentifier("settings.locationStatus")
+            switch location.authorizationStatus {
+            case .notDetermined:
+                Button("Konum iznini ver") { location.requestWhenInUseAuthorization() }
+            case .authorizedWhenInUse:
+                Button("Arka plan konum iznini ver (Her Zaman)") { location.requestAlwaysAuthorization() }
+            case .denied, .restricted:
+                Button("iOS Ayarları'nı aç") { openSystemSettings() }
+            default:
+                EmptyView()
+            }
+        } header: {
+            Text("Konum")
+        } footer: {
+            Text("Yalnızca vardiyada km ve bölge için kullanılır.")
+        }
+    }
+
+    private var locationStatusText: String {
+        switch location.authorizationStatus {
+        case .authorizedAlways: "Her zaman"
+        case .authorizedWhenInUse: "Uygulamayı kullanırken"
+        case .denied: "Reddedildi"
+        case .restricted: "Kısıtlı"
+        case .notDetermined: "Sorulmadı"
+        default: "Bilinmiyor"
+        }
+    }
+
+    private func openSystemSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            openURL(url)
+        }
     }
 }

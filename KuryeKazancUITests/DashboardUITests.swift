@@ -31,10 +31,11 @@ final class DashboardUITests: XCTestCase {
         let app = launch(sampleData: false)
 
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["dashboard.netPerHour"].exists)
-        XCTAssertTrue(app.staticTexts["dashboard.workDuration"].exists)
-        XCTAssertTrue(app.staticTexts["dashboard.distance"].exists)
-        XCTAssertEqual(app.staticTexts["dashboard.netPerHour"].label, "—")
+        // 1.15: ust kartta tek satir (paket · sure); saatlik / km seridi dokumde
+        let line = app.staticTexts["dashboard.dayLine"]
+        XCTAssertTrue(line.exists)
+        XCTAssertTrue(line.label.hasPrefix("0 paket"), "gelen: \(line.label)")
+        XCTAssertFalse(app.staticTexts["dashboard.netPerHour"].exists)
     }
 
     /// 1.10: tarama ve + menusu kalkti; yerine Bugun'de "Elle hesapla" ve hedef halkasinin altinda plan dugmesi.
@@ -55,10 +56,10 @@ final class DashboardUITests: XCTestCase {
 
         let net = app.staticTexts["dashboard.netEarnings"]
         XCTAssertTrue(net.waitForExistence(timeout: 10))
-        // 1050 brut - 150 tahmini - 50 manuel = 850
-        XCTAssertTrue(net.label.contains("850"), "Beklenen net 850, gelen: \(net.label)")
-        XCTAssertEqual(app.staticTexts["dashboard.workDuration"].label, "6 sa")
-        XCTAssertTrue(app.staticTexts["dashboard.distance"].label.hasPrefix("60"))
+        // 1.15 varsayilan yakit: 60 km × 2,13 TL (2,5 L/100 km × 85 TL, kurusa yuvarlanir) = 127,8; 1050 - 127,8 - 50 = 872,2
+        XCTAssertTrue(net.label.contains("872,2"), "Beklenen net 872,2, gelen: \(net.label)")
+        let line = app.staticTexts["dashboard.dayLine"].label
+        XCTAssertTrue(line.contains("23 paket") && line.contains("6 sa"), "gelen: \(line)")
     }
 
     /// 1.11: ust kart tam ekran gun dokumunu acar; net ust kartla ayni.
@@ -71,7 +72,7 @@ final class DashboardUITests: XCTestCase {
         open.tap()
         let dayNet = app.staticTexts["dayBreakdown.net"]
         XCTAssertTrue(dayNet.waitForExistence(timeout: 5))
-        XCTAssertTrue(dayNet.label.contains("850"), "gelen: \(dayNet.label)")
+        XCTAssertTrue(dayNet.label.contains("872,2"), "gelen: \(dayNet.label)")
         let close = app.buttons["dayBreakdown.close"]
         for _ in 0..<5 where !close.isHittable { app.swipeUp() }
         close.tap()
@@ -125,16 +126,17 @@ final class DashboardUITests: XCTestCase {
         app.segmentedControls["history.periodPicker"].buttons["Gün"].tap()
         let net = app.staticTexts["history.netEarnings"]
         XCTAssertTrue(net.waitForExistence(timeout: 5))
-        XCTAssertTrue(net.label.contains("850"), "Gunluk net 850 olmali, gelen: \(net.label)")
+        XCTAssertTrue(net.label.contains("872,2"), "Gunluk net 872,2 olmali, gelen: \(net.label)")
 
-        // 1.10: gider tahmini Profil > Gelismis'te; Profil'de Bildirimler var, tarama ve kalibrasyon yok
+        // 1.15: gider tahmini Profil > Diğer ayarlar > Gelismis'te; Profil'de Bildirimler var
         app.tabBars.buttons["Profil"].tap()
         let notifications = app.buttons["profile.notifications"]
         for _ in 0..<3 where !notifications.exists { app.swipeUp() }
         XCTAssertTrue(notifications.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.switches["profile.autoScan"].exists)
+        XCTAssertFalse(app.buttons["profile.region"].exists, "Bolge Diğer ayarlar altinda")
+        openMore(app)
         let advanced = app.buttons["profile.advanced"]
-        for _ in 0..<3 where !advanced.isHittable { app.swipeUp() }
+        for _ in 0..<4 where !advanced.isHittable { app.swipeUp() }
         advanced.tap()
         XCTAssertTrue(app.switches["settings.autoEstimate"].waitForExistence(timeout: 5))
     }
@@ -164,6 +166,7 @@ final class DashboardUITests: XCTestCase {
         let app = launch(sampleData: false)
         XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Profil"].tap()
+        openMore(app)
         // Form tembel yuklenir: ekran disindaki satirlar kaydirilinca olusur
         let toggle = app.switches["profile.autoShift"]
         for _ in 0..<6 where !toggle.exists { app.swipeUp() }
@@ -172,14 +175,13 @@ final class DashboardUITests: XCTestCase {
         XCTAssertEqual(toggle.value as? String, "0", "Varsayilan kapali")
     }
 
-    func testDashboardShowsGrossAndExpenseBreakdown() {
-        let app = launch(sampleData: true)
-        // Satir birlestirilmis erisilebilirlik ogesi: turu (metin/diger) degisebilir
-        let breakdown = app.descendants(matching: .any)["dashboard.breakdown"].firstMatch
-        XCTAssertTrue(breakdown.waitForExistence(timeout: 10))
-        // 1050 brut; 150 tahmini + 50 elle = 200 gider
-        XCTAssertTrue(breakdown.label.contains("1.050"), "Beklenen brut 1.050, gelen: \(breakdown.label)")
-        XCTAssertTrue(breakdown.label.contains("200"), "Beklenen gider 200, gelen: \(breakdown.label)")
+    /// Profil > Diğer ayarlar.
+    private func openMore(_ app: XCUIApplication) {
+        let more = app.buttons["profile.more"]
+        for _ in 0..<4 where !more.isHittable { app.swipeUp() }
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+        more.tap()
+        XCTAssertTrue(app.navigationBars["Diğer ayarlar"].waitForExistence(timeout: 5))
     }
 }
 
@@ -188,34 +190,21 @@ final class OnboardingUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// 1.15: ilk acilista yalnizca firma sorulur; hesap secimi, tanitim, yakit / hedef / konum adimlari yok.
     func testOnboardingFlowReachesDashboard() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing", "-reset-defaults"]
         app.launch()
 
-        // 1.11: ilk ekran hesap secimi (Apple / misafir), sonra firma secimi
-        XCTAssertTrue(app.buttons["welcome.guest"].waitForExistence(timeout: 10))
-        app.buttons["welcome.guest"].tap()
-        // Ilk ekran firma secimi, sonra tanitim (gecilir), firma sorulari (Getir: arac), yakit, hedef, konum
         XCTAssertTrue(app.buttons["firm.yemeksepeti"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["welcome.guest"].exists)
         XCTAssertFalse(app.buttons["welcome.next"].isEnabled, "Firma secmeden devam edilmemeli")
         app.buttons["firm.yemeksepeti"].tap()
         app.buttons["welcome.next"].tap()
-        XCTAssertTrue(app.buttons["intro.skip"].waitForExistence(timeout: 10))
-        app.buttons["intro.skip"].tap()
-        // Yemeksepeti: sehir grubu sorusu (haftalik bonus)
-        XCTAssertTrue(app.buttons["question.region.ys_istanbul"].waitForExistence(timeout: 5))
-        app.buttons["question.region.ys_istanbul"].tap()
-        app.buttons["setup.next"].tap()              // -> yakit
-        app.buttons["setup.next"].tap()              // -> hedef
-        app.buttons["setup.finish"].tap()
 
-        // Arac kurulumda secildi: yalnizca konum adimi kalir
-        XCTAssertTrue(app.staticTexts["Konum yalnızca vardiyada"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.staticTexts["Bölgendeki kuryelerle karşılaştır"].exists)
-        app.buttons["onboarding.next"].tap()         // Basla
-
+        // Yemeksepeti: soru yok, dogrudan Bugun
         XCTAssertTrue(app.staticTexts["dashboard.netEarnings"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["intro.skip"].exists)
+        XCTAssertFalse(app.buttons["setup.next"].exists)
     }
-
 }

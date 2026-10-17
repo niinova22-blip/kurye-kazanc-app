@@ -16,7 +16,7 @@ struct StartShiftIntent: AppIntent {
         }
         // 1.14: canli vardiya Pro'da; uygulama acilir ve satin alma ekrani gosterilir
         guard AppEnvironment.shared.pro.require(.shortcuts) else {
-            return .result(dialog: "Canlı vardiya Kurye Kazanç Pro'da. Uygulamada Pro'ya geçebilirsin.")
+            return .result(dialog: "\(AppEnvironment.shared.pro.lockedMessage)")
         }
         liveShift.start()
         guard liveShift.isActive else {
@@ -35,7 +35,7 @@ struct RecordDeliveryIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let liveShift: LiveShiftController = AppEnvironment.shared.liveShift
         guard liveShift.isActive || AppEnvironment.shared.pro.isPro else {
-            return .result(dialog: "Ücretsiz deneme süren doldu. Devam etmek için uygulamayı açıp Pro'ya geçebilirsin.")
+            return .result(dialog: "\(AppEnvironment.shared.pro.lockedMessage)")
         }
         guard let count = liveShift.addPackageFromOutside() else {
             return .result(dialog: "Önce uygulamada firmanı seç.")

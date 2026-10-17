@@ -12,9 +12,12 @@ struct FuelCostModel: Equatable {
         self.fallbackCostPerKm = fallbackCostPerKm
     }
 
+    /// 1.15: kullaniciya sorulmayan varsayilanlar (motosiklet 2,5 L/100 km, benzin 85 TL/L).
     static func defaultConsumption(vehicleType: String?) -> Decimal {
-        vehicleType == "car" ? Decimal(string: "6.5")! : 3
+        vehicleType == "car" ? Decimal(string: "6.5")! : Decimal(string: "2.5")!
     }
+
+    static let defaultPrice = Money(85)
 
     var consumption: Decimal { settings.consumptionPer100Km ?? FuelCostModel.defaultConsumption(vehicleType: vehicleType) }
 

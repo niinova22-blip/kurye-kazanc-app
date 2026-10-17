@@ -14,9 +14,17 @@ struct FuelSettingsView: View {
     @State private var consumption: Decimal = 3
     @State private var loaded = false
     @State private var saved = false
+    @AppStorage(AppPreferences.fuelFromKmKey) private var fuelFromKm = false
 
     var body: some View {
         List {
+            Section {
+                Toggle("Elle eklerken yakıtı km'den hesapla", isOn: $fuelFromKm)
+                    .accessibilityIdentifier("fuelSettings.fromKm")
+            } footer: {
+                Text(fuelFromKm ? "Elle eklerken km sorulur; yakıt aşağıdaki fiyat ve tüketimle hesaplanır."
+                                : "Elle eklerken yakıta harcadığın tutarı yazarsın.")
+            }
             vehicleSection
             priceSection
             Section("Tüketim") {
@@ -55,7 +63,7 @@ struct FuelSettingsView: View {
         } header: {
             Text("Araç")
         } footer: {
-            Text("Araç değişince ortalama tüketim o aracın varsayılanına döner; aşağıdan değiştirebilirsin.")
+            Text("Araç değişince tüketim o aracın varsayılanına döner.")
         }
     }
 
@@ -86,7 +94,7 @@ struct FuelSettingsView: View {
         } header: {
             Text("Güncel fiyat")
         } footer: {
-            Text("Pompadaki fiyatı gir. Fiyat 7 günden eskiyse Bugün ekranında hatırlatılır.")
+            Text("Girmezsen \(PayFormat.tl(FuelCostModel.defaultPrice)) kullanılır.")
         }
     }
 
@@ -95,6 +103,7 @@ struct FuelSettingsView: View {
         return Section("Fiyat geçmişi") {
             if entries.isEmpty {
                 Text("Henüz fiyat girilmedi.").foregroundStyle(.secondary)
+                    .accessibilityIdentifier("fuelSettings.noPrice")
             }
             ForEach(entries) { entry in
                 LabeledContent(PayFormat.day(entry.day), value: "\(PayFormat.tl(entry.pricePerUnit))/\(entry.type.unitName)")

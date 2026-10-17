@@ -85,17 +85,17 @@ final class ProAccessTests: XCTestCase {
         XCTAssertFalse(ProAccess.trialAvailable.hasAccess)
     }
 
-    func testTrialLastsSevenDays() {
-        let start = now.addingTimeInterval(-6.5 * 86_400)
+    func testTrialLastsFourteenDays() {
+        let start = now.addingTimeInterval(-13.5 * 86_400)
         let access = ProAccess.resolve(entitlement: .none, trialStart: start, now: now)
-        XCTAssertEqual(access, .trial(endsAt: start.addingTimeInterval(7 * 86_400)))
+        XCTAssertEqual(access, .trial(endsAt: start.addingTimeInterval(14 * 86_400)))
         XCTAssertTrue(access.hasAccess)
         XCTAssertEqual(access.trialDaysLeft(now: now), 1)
-        XCTAssertEqual(ProAccess.resolve(entitlement: .none, trialStart: now, now: now).trialDaysLeft(now: now), 7)
+        XCTAssertEqual(ProAccess.resolve(entitlement: .none, trialStart: now, now: now).trialDaysLeft(now: now), 14)
     }
 
-    func testTrialEndsAfterSevenDays() {
-        let access = ProAccess.resolve(entitlement: .none, trialStart: now.addingTimeInterval(-7 * 86_400), now: now)
+    func testTrialEndsAfterFourteenDays() {
+        let access = ProAccess.resolve(entitlement: .none, trialStart: now.addingTimeInterval(-14 * 86_400), now: now)
         XCTAssertEqual(access, .expired)
         XCTAssertFalse(access.hasAccess)
         XCTAssertNil(access.trialDaysLeft(now: now))

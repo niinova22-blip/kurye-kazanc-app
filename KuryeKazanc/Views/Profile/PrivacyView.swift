@@ -46,6 +46,10 @@ struct PrivacyView: View {
             body: "Kayıtlarını yeni telefona taşıyabilmen için yedek alınır: Apple'ın bu uygulamaya özel verdiği kullanıcı kimliği, kazanç ve gider kayıtların (kayıtlardaki il / ilçe / semt dahil), hedeflerin ve ayarların. Ad ve e-posta istenmez. Giriş yapmazsan hiçbir kaydın sunucuya gönderilmez."
         ),
         PrivacySection(
+            title: "Satın alımlar",
+            body: "Kurye Kazanç Pro ve 14 günlük ücretsiz deneme App Store üzerinden alınır; ödemeyi Apple işler. Kart ya da ödeme bilgin bize hiç ulaşmaz. Pro'nun açık olup olmadığı telefonunda Apple'ın satın alma kaydından kontrol edilir; satın alma bilgin sunucumuza gönderilmez. Aboneliğini Ayarlar > Apple Hesabı > Abonelikler'den yönetebilir ya da iptal edebilirsin."
+        ),
+        PrivacySection(
             title: "Hizmet sağlayıcılar",
             body: "Yedek, Supabase üzerinde Avrupa Birliği'nde (Frankfurt, Almanya) barındırılır; bu yurt dışına aktarım sayılır ve Apple ile giriş yaparken buna da onay vermiş olursun (KVKK m.9). İlçe adını bulmak için konum, Apple'ın konum hizmetine (ters coğrafi kodlama) gönderilir. Güncel tarifeler sunucudan indirilir; bu sırada kişisel veri gönderilmez. Analitik, reklam ya da takip aracı yoktur."
         ),

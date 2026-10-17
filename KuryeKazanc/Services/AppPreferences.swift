@@ -68,5 +68,9 @@ enum AppPreferences {
     static let tariffUpdatesEnabledKey = "tariffUpdatesEnabled"
     static let tariffsFetchedAtKey = "tariffsFetchedAt"
 
+    /// 1.15 Araç ve yakıt > "Yakıtı km'den hesapla": acikken elle eklemede km sorulur ve yakit km'den hesaplanir;
+    /// kapaliyken (varsayilan) harcanan yakit tutari yazilir. Vardiyada yakit her zaman olculen km'den.
+    static let fuelFromKmKey = "fuelFromKm"
+
     static let defaultCostPerKm = VehicleType.motorcycle.defaultCostPerKm
 }

@@ -32,7 +32,7 @@ final class FuelCostModelTests: XCTestCase {
     }
 
     func testDefaultConsumptionByVehicle() {
-        XCTAssertEqual(FuelCostModel.defaultConsumption(vehicleType: "motorcycle"), 3)
+        XCTAssertEqual(FuelCostModel.defaultConsumption(vehicleType: "motorcycle"), Decimal(string: "2.5"))
         XCTAssertEqual(FuelCostModel.defaultConsumption(vehicleType: "car"), Decimal(string: "6.5"))
         XCTAssertEqual(FuelCostModel(settings: settings([], consumption: nil), vehicleType: "car",
                                      fallbackCostPerKm: Money(2)).consumption, Decimal(string: "6.5"))
