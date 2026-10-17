@@ -82,6 +82,14 @@ final class ProStore {
         return false
     }
 
+    /// Kilitliyken Siri / Kisayollar cevabi: deneme hic baslamadiysa baslatmaya, bittiyse Pro'ya yonlendirir.
+    var lockedMessage: String {
+        if access == .trialAvailable {
+            return "Önce uygulamayı açıp \(ProTrial.days) günlük ücretsiz denemeyi başlat."
+        }
+        return "Ücretsiz deneme süren doldu. Devam etmek için uygulamayı açıp Pro'ya geçebilirsin."
+    }
+
     /// On plana donus: deneme suresi bu arada bittiyse kapi gelir.
     func tick() {
         now = Date()
