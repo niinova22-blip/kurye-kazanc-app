@@ -3,6 +3,19 @@
 Her TestFlight surumunden ONCE en uste yeni bir `## ` bolumu ekleyin.
 CI (`scripts/ci/make_release_notes.sh`) yalnizca en ustteki bolumu TestFlight "What to Test" alanina koyar.
 
+## 1.15.0 (sunucusuz)
+
+App Review 2.1(a) düzeltmesi: Apple ile giriş, sunucu duraklatıldığı için hata veriyordu.
+
+Değişen:
+- Sunucu kapatıldı; uygulama tamamen telefonda çalışır. Apple ile giriş, yedek ve hesap bölümü kalktı.
+- Tarifeler uygulamanın içinden gelir (güncellemelerle yenilenir).
+- Gizlilik ve KVKK metni ile gizlilik bildirimi (PrivacyInfo) güncellendi: veri toplanmaz.
+
+Test et:
+- Profil'de "Hesap" bölümü ve Apple ile giriş düğmesi yok.
+- Kazanç > Tarife ekranı tarifeyi gösteriyor, hesaplar aynı.
+
 ## 1.13.0
 
 Yayın öncesi son sürüm (1.12.3'teki bölge düzeltmesi dahil).

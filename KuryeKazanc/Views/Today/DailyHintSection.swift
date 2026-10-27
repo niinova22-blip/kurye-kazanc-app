@@ -87,7 +87,6 @@ struct DailyHintSection: View {
             "Tarifendeki tutar sözleşmenden farklıysa Kazanç > Tarife ekranındaki kalemle kendi değerini yaz.",
             "Yakıt fiyatı değişince Profil > Araç ve yakıt'tan güncelle; net kazancın doğru kalsın.",
             "Hedefini değiştirdiysen “Planı değiştir” ile günlük paket ve saat yeniden hesaplanır.",
-            "Apple ile giriş yaparsan kayıtların yedeklenir; telefon değişince kaybolmaz.",
             "Kazanç > Hafta / ay özeti, bir sonraki bonus kademesine kaç paket kaldığını gösterir.",
         ]
         switch firmCode {

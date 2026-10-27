@@ -17,9 +17,10 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<!-- Supabase (surum 1.3). Bos birakilirsa sunucu kapali sayilir (SupabaseConfig.fromBundle == nil). -->
+	<!-- 1.15.1: sunucu kapali. Uygulama tamamen cihazda calisir; giris, yedek ve hesap yok. -->
 	<key>SupabaseURL</key>
-	<string>https://pgvdefkweclutfwgbxbh.supabase.co</string>
+	<string></string>
 	<key>SupabaseAnonKey</key>
-	<string>sb_publishable_CAu7FNGGNb2axhhp_tmc8g_b45tUOFl</string>
+	<string></string>
 </dict>
 </plist>

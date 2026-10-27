@@ -39,7 +39,7 @@ struct TariffInfoView: View {
                 if let fetched = model.tariffs.fetchedAt {
                     LabeledContent("Sunucudan son alınış", value: fetched.formatted(date: .abbreviated, time: .shortened))
                 } else {
-                    Text(model.tariffs.isServerAvailable ? "Sunucudan henüz tarife alınmadı; başlangıç / örnek tarife kullanılıyor." : "Sunucu kapalı; başlangıç / örnek tarife kullanılıyor.")
+                    Text(model.tariffs.isServerAvailable ? "Sunucudan henüz tarife alınmadı; başlangıç / örnek tarife kullanılıyor." : "Uygulamadaki tarife kullanılıyor; uygulama güncellemeleriyle yenilenir.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
