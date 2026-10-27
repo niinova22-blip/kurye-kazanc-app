@@ -15,24 +15,18 @@ struct AccountSection: View {
     @State private var alertMessage: String?
 
     var body: some View {
-        Section {
-            // Sunucu istemcisi yoksa hesap ozellikleri kapali.
-            if account.isServerAvailable {
+        // Sunucu istemcisi yoksa (1.15.1'den beri) hesap bolumu hic gosterilmez.
+        if account.isServerAvailable {
+            Section {
                 if account.isSignedInWithApple {
                     signedInRows
                 } else {
                     signInButton
                 }
                 deleteRow
-            } else {
-                Text("Sunucu bu sürümde kapalı")
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("profile.serverUnavailable")
-            }
-        } header: {
-            Text("Hesap")
-        } footer: {
-            if account.isServerAvailable {
+            } header: {
+                Text("Hesap")
+            } footer: {
                 footerText
             }
         }

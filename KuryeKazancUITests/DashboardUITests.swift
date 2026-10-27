@@ -152,14 +152,12 @@ final class DashboardUITests: XCTestCase {
         XCTAssertTrue(platforms.exists)
     }
 
-    /// 1.10: Hesap (Apple ile giris) Profil'in en ustunde.
-    func testProfileShowsAccountFirst() {
+    /// 1.15.1: sunucu yok; Profil'de Apple ile giris / hesap bolumu gorunmez.
+    func testProfileHasNoAccountSection() {
         let app = launch(sampleData: false)
         XCTAssertTrue(app.tabBars.buttons["Profil"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Profil"].tap()
-        let signIn = app.buttons["profile.appleSignIn"]
-        let unavailable = app.staticTexts["profile.serverUnavailable"]
-        XCTAssertTrue(signIn.waitForExistence(timeout: 5) || unavailable.exists, "Hesap bolumu en ustte gorunmeli")
+        XCTAssertFalse(app.buttons["profile.appleSignIn"].waitForExistence(timeout: 3), "Sunucusuz surumde Apple ile giris olmamali")
     }
 
     func testProfileOffersAutoShift() {
