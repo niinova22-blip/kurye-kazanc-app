@@ -171,7 +171,7 @@ struct OtherSettingsView: View {
             case .notDetermined:
                 Button("Konum iznini ver") { location.requestWhenInUseAuthorization() }
             case .authorizedWhenInUse:
-                Button("Arka plan konum iznini ver (Her Zaman)") { location.requestAlwaysAuthorization() }
+                Button("Konum iznini “Her zaman” yap (otomatik vardiya)") { location.requestAlwaysAuthorization() }
             case .denied, .restricted:
                 Button("iOS Ayarları'nı aç") { openSystemSettings() }
             default:

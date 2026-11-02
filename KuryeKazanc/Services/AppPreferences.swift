@@ -11,7 +11,7 @@ enum AppPreferences {
     static let costPerKmKey = "costPerKm"
     /// Otomatik gider tahmini acik mi?
     static let autoEstimateExpensesKey = "autoEstimateExpenses"
-    /// "Calisiyorum" modu (arka plan konum takibi yalnizca bu acikken calisir).
+    /// "Calisiyorum" modu (vardiya konum takibi yalnizca bu acikken calisir).
     static let isWorkingKey = "isWorking"
     static let workSessionStartKey = "workSessionStart"
     /// Anonim istatistik havuzuna katilim. Varsayilan KAPALI (opt-in, acik onay gerekir).

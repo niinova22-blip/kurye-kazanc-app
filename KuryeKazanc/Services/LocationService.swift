@@ -18,6 +18,10 @@ struct PlaceRegion: Equatable {
 /// Pil tuketimini sinirlamak icin SUREKLI takip YOKTUR: konum guncellemeleri yalnizca
 /// `startTracking()` (= "Calisiyorum" modu) ile baslar, `stopTracking()` ile tamamen durur.
 /// Kayitlara bolge eklemek icin tek seferlik `requestLocation()` kullanilir.
+///
+/// Arka plan konum modu (UIBackgroundModes=location) YOKTUR (App Review 2.5.4): hassas GPS yalnizca
+/// uygulama on plandayken gelir. Vardiya surerken uygulama arka plandayken km, "onemli konum
+/// degisikligi" (~500 m) olaylariyla kabaca biriktirilir; on plana donunce GPS kaldigi yerden devam eder.
 @MainActor
 @Observable
 final class LocationService: NSObject {
@@ -43,6 +47,9 @@ final class LocationService: NSObject {
     @ObservationIgnored private var lastAcceptedLocation: CLLocation?
     @ObservationIgnored private var pendingStart = false
     @ObservationIgnored private var oneShotContinuations: [CheckedContinuation<CLLocation?, Never>] = []
+    /// Onemli konum degisikligi izlemesini isteyenler: otomatik vardiya ve suren vardiya (arka planda kaba km).
+    @ObservationIgnored private var autoShiftWantsSignificantChanges = false
+    @ObservationIgnored private var trackingWantsSignificantChanges = false
 
     static let distanceKey = "workSessionDistanceMeters"
 
@@ -123,14 +130,27 @@ final class LocationService: NSObject {
 
     /// Otomatik mod: ~500 m'de bir uyandirir; uygulama kapaliysa iOS arka planda yeniden baslatir.
     func startSignificantChangeMonitoring() {
-        guard isEnabled, CLLocationManager.significantLocationChangeMonitoringAvailable() else { return }
-        manager.startMonitoringSignificantLocationChanges()
-        isMonitoringSignificantChanges = true
+        autoShiftWantsSignificantChanges = true
+        updateSignificantChangeMonitoring()
     }
 
     func stopSignificantChangeMonitoring() {
-        manager.stopMonitoringSignificantLocationChanges()
-        isMonitoringSignificantChanges = false
+        autoShiftWantsSignificantChanges = false
+        updateSignificantChangeMonitoring()
+    }
+
+    /// Otomatik vardiya ya da suren vardiya istiyorsa izler; ikisi de istemiyorsa durdurur.
+    private func updateSignificantChangeMonitoring() {
+        let wanted = autoShiftWantsSignificantChanges || trackingWantsSignificantChanges
+        if wanted {
+            guard isEnabled, !isMonitoringSignificantChanges,
+                  CLLocationManager.significantLocationChangeMonitoringAvailable() else { return }
+            manager.startMonitoringSignificantLocationChanges()
+            isMonitoringSignificantChanges = true
+        } else if isMonitoringSignificantChanges {
+            manager.stopMonitoringSignificantLocationChanges()
+            isMonitoringSignificantChanges = false
+        }
     }
 
     /// Takibi durdurur ve oturum mesafesini (km) dondurur.
@@ -139,10 +159,10 @@ final class LocationService: NSObject {
         pendingStart = false
         if isTracking {
             manager.stopUpdatingLocation()
-            manager.allowsBackgroundLocationUpdates = false
-            manager.showsBackgroundLocationIndicator = false
             isTracking = false
         }
+        trackingWantsSignificantChanges = false
+        updateSignificantChangeMonitoring()
         manager.pausesLocationUpdatesAutomatically = true
         let km = sessionDistanceMeters / 1000
         sessionDistanceMeters = 0
@@ -152,11 +172,12 @@ final class LocationService: NSObject {
 
     private func beginUpdates() {
         pendingStart = false
-        // UIBackgroundModes=location oldugu icin, on planda baslatilan takip arka planda da surer.
-        manager.allowsBackgroundLocationUpdates = true
-        manager.showsBackgroundLocationIndicator = true
+        // Arka plan konum modu yok: allowsBackgroundLocationUpdates true YAPILMAMALI (mod olmadan cokertir).
+        // Hassas GPS on planda gelir; arka planda km onemli konum degisikligi olaylariyla kabaca surer.
         manager.startUpdatingLocation()
         isTracking = true
+        trackingWantsSignificantChanges = true
+        updateSignificantChangeMonitoring()
     }
 
     // MARK: - Tek seferlik konum ve bolge
@@ -228,14 +249,29 @@ final class LocationService: NSObject {
         onLocationEvent?()
     }
 
+    /// Hassas GPS noktasi (<= 50 m) mi?
+    private static func isPrecise(_ location: CLLocation) -> Bool {
+        location.horizontalAccuracy >= 0 && location.horizontalAccuracy <= 50
+    }
+
+    /// Arka planda gelen kaba nokta (onemli konum degisikligi, ~100-1000 m dogruluk) ancak yer degistirme
+    /// dogruluk payinin acikca ustundeyse kabul edilir; yoksa titresim km'ye eklenirdi.
+    private static func isTrustedMove(to location: CLLocation, meters: Double) -> Bool {
+        if isPrecise(location) { return true }
+        let accuracy = location.horizontalAccuracy
+        guard accuracy > 0, accuracy <= 1000 else { return false }
+        return meters >= max(500, accuracy * 2)
+    }
+
     /// 50 m'den fazla yer degistirme = anlamli hareket.
     private func updateMovementAnchor(with location: CLLocation) {
-        guard location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 50 else { return }
         guard let anchor = movementAnchor else {
-            movementAnchor = location
+            if Self.isPrecise(location) { movementAnchor = location }
             return
         }
-        if location.distance(from: anchor) >= 50 {
+        let meters = location.distance(from: anchor)
+        guard Self.isTrustedMove(to: location, meters: meters) else { return }
+        if meters >= 50 {
             movementAnchor = location
             markMovement(at: location.timestamp)
         }
@@ -247,12 +283,12 @@ final class LocationService: NSObject {
 
     /// Gurultulu konumlari eleyerek mesafe biriktirir.
     private func accumulateDistance(with location: CLLocation) {
-        guard location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 50 else { return }
         guard let previous = lastAcceptedLocation else {
-            lastAcceptedLocation = location
+            if Self.isPrecise(location) { lastAcceptedLocation = location }
             return
         }
         let meters = location.distance(from: previous)
+        guard Self.isTrustedMove(to: location, meters: meters) else { return }
         let seconds = location.timestamp.timeIntervalSince(previous.timestamp)
         guard seconds > 0 else { return }
         // 160 km/sa ustu siçramalar GPS hatasidir
